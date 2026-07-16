@@ -1,0 +1,40 @@
+# Mannon — Shopify app configuration.
+# client_id is filled in by `shopify app config link` against your Partner app.
+# Confirm current webhook api_version + scope names via the Shopify Dev MCP.
+
+client_id = ""
+name = "Mannon"
+application_url = "https://example.com"
+embedded = true
+
+[access_scopes]
+# S1 declares the minimum needed to boot. S3 finalizes the full scope list;
+# every scope must have a documented reason in /docs/compliance.md.
+scopes = "read_products"
+
+[auth]
+redirect_urls = [
+  "https://example.com/auth/callback",
+  "https://example.com/auth/shopify/callback",
+  "https://example.com/api/auth/callback"
+]
+
+[webhooks]
+api_version = "2025-01"
+
+  # Handled by: /app/routes/webhooks.app.uninstalled.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/uninstalled"
+  topics = ["app/uninstalled"]
+
+  # Handled by: /app/routes/webhooks.app.scopes_update.tsx
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/app/scopes_update"
+  topics = ["app/scopes_update"]
+
+  # GDPR mandatory-compliance webhooks are implemented and registered in S15
+  # (see /docs/compliance.md): customers/data_request, customers/redact,
+  # shop/redact.
+
+[pos]
+embedded = false

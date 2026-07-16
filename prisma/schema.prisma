@@ -1,0 +1,37 @@
+// Mannon Prisma schema.
+// S1 (this slice) establishes only the Session model required by
+// @shopify/shopify-app-session-storage-prisma. S2 adds the full domain model
+// (Shop, Company, Buyer, Quote, QuoteLine, ReorderSource, append-only Event) —
+// see /docs/data-model.md for the exact schema S2 will implement.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Shopify OAuth session storage. Shape dictated by the session-storage-prisma
+// adapter; survives reinstall. Do not hand-edit column names without matching
+// the adapter's expectations.
+model Session {
+  id                  String    @id
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}

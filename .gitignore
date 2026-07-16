@@ -1,0 +1,21 @@
+node_modules
+
+/build
+/public/build
+.env
+.env.*
+!.env.example
+
+# Shopify CLI
+.shopify
+
+# Prisma local artifacts
+prisma/dev.sqlite
+prisma/*.db
+
+# Editor / OS
+.DS_Store
+*.log
+.cache
+.vscode/*
+!.vscode/extensions.json
