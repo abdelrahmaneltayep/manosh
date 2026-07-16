@@ -5,7 +5,11 @@
   "engines": {
     "node": ">=20.19 <22 || >=22.12"
   },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
+    "seed": "tsx prisma/seed.ts",
     "build": "remix vite:build",
     "dev": "shopify app dev",
     "config:link": "shopify app config link",
@@ -42,6 +46,7 @@
     "@types/node": "^22.2.0",
     "@types/react": "^18.2.31",
     "@types/react-dom": "^18.2.14",
+    "tsx": "^4.19.2",
     "typescript": "^5.2.2",
     "vite": "^6.2.2",
     "vitest": "^2.1.9"

@@ -1,8 +1,7 @@
-// Mannon Prisma schema.
-// S1 (this slice) establishes only the Session model required by
-// @shopify/shopify-app-session-storage-prisma. S2 adds the full domain model
-// (Shop, Company, Buyer, Quote, QuoteLine, ReorderSource, append-only Event) —
-// see /docs/data-model.md for the exact schema S2 will implement.
+// Mannon Prisma schema — see /docs/data-model.md for the authoritative spec.
+// Guardrail #6: Event is append-only. It is written ONLY through
+// app/services/events.server.ts (insert-only). There is no update/delete path
+// for events anywhere in application code.
 
 generator client {
   provider = "prisma-client-js"
@@ -34,4 +33,144 @@ model Session {
   emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
+}
+
+model Shop {
+  id                   String    @id @default(cuid())
+  shopifyDomain        String    @unique // e.g. acme.myshopify.com
+  plan                 Plan      @default(TRIAL)
+  trialEndsAt          DateTime?
+  autoApproveTolerance Float     @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
+  quoteExpiryDays      Int       @default(14) // default quote lifetime
+  installedAt          DateTime  @default(now())
+  companies            Company[]
+  events               Event[]
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model Company {
+  id               String          @id @default(cuid())
+  shopId           String
+  shop             Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopifyCompanyId String // gid://shopify/Company/...
+  name             String
+  buyers           Buyer[]
+  quotes           Quote[]
+  reorderSources   ReorderSource[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@unique([shopId, shopifyCompanyId])
+  @@index([shopId])
+}
+
+model Buyer {
+  id                  String    @id @default(cuid())
+  companyId           String
+  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email               String // PII
+  name                String? // PII
+  shopifyContactId    String? // gid://shopify/CompanyContact/...
+  magicTokenHash      String? // hash only, never raw
+  magicTokenExpiresAt DateTime?
+  quotes              Quote[]
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([companyId, email])
+  @@index([magicTokenHash])
+}
+
+model Quote {
+  id             String      @id @default(cuid())
+  companyId      String
+  company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  buyerId        String
+  buyer          Buyer       @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  status         QuoteStatus @default(SUBMITTED)
+  expiresAt      DateTime
+  poReference    String?
+  draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
+  totalsSnapshot Json? // exact draftOrderCalculate output
+  lines          QuoteLine[]
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@index([companyId, status])
+  @@index([status, expiresAt])
+}
+
+model QuoteLine {
+  id        String   @id @default(cuid())
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  variantId String // gid://shopify/ProductVariant/...
+  sku       String?
+  title     String // snapshot for display
+  quantity  Int
+  price     Decimal  @db.Decimal(18, 4) // buyer-proposed or countered unit price
+  createdAt DateTime @default(now())
+
+  @@index([quoteId])
+}
+
+model ReorderSource {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  shopifyOrderId String // gid://shopify/Order/...
+  orderName      String // e.g. #1042
+  orderedAt      DateTime
+  total          String // snapshot string, paired with currency
+  currency       String
+  createdAt      DateTime @default(now())
+
+  @@unique([companyId, shopifyOrderId])
+  @@index([companyId])
+}
+
+// APPEND-ONLY. Written only via app/services/events.server.ts insert helper.
+model Event {
+  id         String    @id @default(cuid())
+  shopId     String
+  shop       Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  type       EventType
+  entityType String // "Quote" | "Buyer" | "ReorderSource" | ...
+  entityId   String?
+  payload    Json? // NO PII in payload — ids + numbers only
+  createdAt  DateTime  @default(now())
+
+  @@index([shopId, type, createdAt])
+}
+
+enum Plan {
+  TRIAL
+  STARTER // $29
+  GROWTH // $79
+  CANCELLED
+}
+
+enum QuoteStatus {
+  SUBMITTED
+  COUNTERED
+  ACCEPTED
+  ORDERED
+  EXPIRED
+}
+
+enum EventType {
+  APP_INSTALLED
+  QUOTE_SUBMITTED
+  QUOTE_COUNTERED
+  QUOTE_ACCEPTED
+  QUOTE_ORDERED
+  QUOTE_EXPIRED
+  REORDER_CREATED
+  DRAFT_ORDER_CREATED
+  AI_PARSE_ACCEPTED
+  TRIAL_STARTED
+  PLAN_UPGRADED
+  PLAN_CANCELLED
+  REVIEW_PROMPT_SHOWN
 }
