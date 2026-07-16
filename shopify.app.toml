@@ -8,9 +8,11 @@ application_url = "https://example.com"
 embedded = true
 
 [access_scopes]
-# S1 declares the minimum needed to boot. S3 finalizes the full scope list;
-# every scope must have a documented reason in /docs/compliance.md.
-scopes = "read_products"
+# Minimum core-path scopes. Each is justified in /docs/compliance.md with its
+# consuming slice. `write_draft_orders` also grants read, so no separate
+# read_draft_orders scope is requested. B2B scopes for companies and payment
+# terms are added when S8/S11 land (exact names confirmed via the Dev MCP).
+scopes = "read_products,read_orders,write_draft_orders"
 
 [auth]
 redirect_urls = [

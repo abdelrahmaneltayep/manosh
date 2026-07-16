@@ -40,21 +40,35 @@ or missing signature → **401**, no side effects.
 **Confirm exact scope names + whether each is still required against the current API via the Shopify
 Dev MCP before declaring them in `shopify.app.toml`.**
 
+`write_*` scopes grant read as well, so we never request the paired `read_*` alongside a `write_*`.
+
+### Declared now (in `shopify.app.toml`, as of S3)
+
+The stable core-path set, declared up front so the merchant OAuth consent screen doesn't change
+under existing installs as the core slices land:
+
 | Scope | Why we need it | Used by |
 |---|---|---|
 | `read_products` | Read the merchant catalog to build baskets, resolve SKUs, price lines. | S7, S10, S12, catalog cache |
-| `write_draft_orders` | Create draft orders on quote-accept and reorder. | S8, S9, S11 |
-| `read_draft_orders` | Read back / calculate draft order totals. | S8 |
 | `read_orders` | List a company's past orders for reorder cards. | S9 |
-| `read_companies` | Read native B2B companies, locations, contacts for `purchasingEntity`. | S8, S9 |
+| `write_draft_orders` | Create draft orders on quote-accept and reorder (also grants read for `draftOrderCalculate`). | S8, S9, S11 |
+
+### Deferred (added when their slice lands, name confirmed via Dev MCP)
+
+Held back so we don't declare a scope whose exact name we can't yet confirm against the live API
+(declaring an invalid scope breaks install/deploy):
+
+| Scope (tentative) | Why we'll need it | Added in |
+|---|---|---|
+| `read_companies` | Read native B2B companies, locations, contacts for `purchasingEntity`. | S8 |
 | `read_payment_terms` | Surface native payment terms on quote/reorder (display only). | S11 |
 
 Notes:
 - **No `write_products`, no `write_customers`, no tax/discount scopes** — we never mutate the catalog
   and never compute money.
 - If a slice needs a scope not listed here, add the row and the reason in the same commit.
-- Keep this table in sync with `shopify.app.toml`. S19's self-review verifies they match and that
-  every declared scope is actually exercised.
+- Keep the "declared now" table in sync with `shopify.app.toml`. S19's self-review verifies they
+  match and that every declared scope is actually exercised.
 
 ---
 

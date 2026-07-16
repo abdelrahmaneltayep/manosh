@@ -6,6 +6,7 @@ import {
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import { BILLING_CONFIG } from "./services/billing.server";
 
 // Confirm the current stable ApiVersion via the Shopify Dev MCP at the start of
 // each build session before pinning — see CLAUDE.md tech stack notes.
@@ -18,6 +19,8 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  // Billing skeleton (S3): plans are defined; enforcement/gating lands in S17.
+  billing: BILLING_CONFIG,
   future: {
     unstable_newEmbeddedAuthStrategy: true,
     expiringOfflineAccessTokens: true,
