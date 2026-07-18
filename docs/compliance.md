@@ -52,6 +52,7 @@ under existing installs as the core slices land:
 | `read_products` | Read the merchant catalog to build baskets, resolve SKUs, price lines. | S7, S10, S12, catalog cache |
 | `read_orders` | List a company's past orders for reorder cards. | S9 |
 | `write_draft_orders` | Create draft orders on quote-accept and reorder (also grants read for `draftOrderCalculate`). | S8, S9, S11 |
+| `read_companies` | Read native B2B companies, locations, contacts for the draft order `purchasingEntity`. | S8, S9 |
 
 ### Deferred (added when their slice lands, name confirmed via Dev MCP)
 
@@ -60,7 +61,6 @@ Held back so we don't declare a scope whose exact name we can't yet confirm agai
 
 | Scope (tentative) | Why we'll need it | Added in |
 |---|---|---|
-| `read_companies` | Read native B2B companies, locations, contacts for `purchasingEntity`. | S8 |
 | `read_payment_terms` | Surface native payment terms on quote/reorder (display only). | S11 |
 
 Notes:

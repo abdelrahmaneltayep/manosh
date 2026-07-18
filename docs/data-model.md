@@ -103,6 +103,7 @@ model Buyer {
   email              String                          // PII
   name               String?                         // PII
   shopifyContactId   String?                         // gid://shopify/CompanyContact/...
+  shopifyCompanyLocationId String?                   // gid://shopify/CompanyLocation/... — the location this buyer purchases for (S8 purchasingEntity)
   magicTokenHash     String?                         // hash only, never raw
   magicTokenExpiresAt DateTime?
   quotes             Quote[]

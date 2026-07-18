@@ -190,6 +190,25 @@ body {
   color: #616161;
 }
 
+.totals {
+  margin: 1rem 0;
+  border-top: 1px solid var(--border);
+  padding-top: 0.75rem;
+}
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.2rem 0;
+  color: var(--muted);
+}
+.totals-total {
+  font-weight: 700;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  margin-top: 0.4rem;
+  padding-top: 0.5rem;
+}
+
 @media (max-width: 30rem) {
   .catalog-row,
   .quote-list-row,
