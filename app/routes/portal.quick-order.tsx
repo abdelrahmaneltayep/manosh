@@ -15,6 +15,8 @@ import {
   parseQuoteSelections,
   submitBuyerQuote,
 } from "../services/portal-quote.server";
+import { parseOrderPad } from "../services/ai/order-parser.server";
+import { appendEvent } from "../services/events.server";
 
 async function loadBuyer(request: Request) {
   const buyerId = await requireBuyerId(request);
@@ -32,7 +34,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 type ActionResult =
-  | { step: "resolved"; resolved: ResolvedLine[]; unresolved: UnresolvedRow[] }
+  | {
+      step: "resolved";
+      resolved: ResolvedLine[];
+      unresolved: UnresolvedRow[];
+      /** Set when the lines came from the AI parse (drives the confirm event). */
+      ai?: { rate: number };
+    }
   | { step: "error"; error: string };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -55,7 +63,50 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       catalog,
     );
     if (!result.ok) return { step: "error", error: result.error } satisfies ActionResult;
+
+    // The AI never acts autonomously — the cart is built only here, on explicit
+    // confirm. Log acceptance (with the accepted-as-is rate) for AI submits.
+    if (form.get("source") === "ai") {
+      await appendEvent({
+        shopId: buyer.company.shopId,
+        type: "AI_PARSE_ACCEPTED",
+        entityType: "Quote",
+        entityId: result.quote.id,
+        payload: { acceptedAsIsRate: Number(form.get("aiRate") ?? 0) },
+      });
+    }
     return redirect(`/portal/quotes/${result.quote.id}`);
+  }
+
+  if (intent === "ai-parse") {
+    let validated;
+    try {
+      validated = await parseOrderPad(String(form.get("blob") ?? ""), catalog);
+    } catch {
+      return {
+        step: "error",
+        error: "We couldn’t read that order automatically. Try the SKU box instead.",
+      } satisfies ActionResult;
+    }
+    // Reuse the same confirm UI: AI matched lines → resolved cart, unmatched
+    // text → flagged rows the buyer resolves manually.
+    return {
+      step: "resolved",
+      ai: { rate: validated.acceptedAsIsRate },
+      resolved: validated.matched.map((line) => ({
+        variantId: line.variantId,
+        sku: line.sku ?? "",
+        title: line.title,
+        quantity: line.quantity,
+        price: line.price,
+      })),
+      unresolved: validated.unmatched.map((raw) => ({
+        sku: "",
+        quantity: 0,
+        raw,
+        reason: "unknown-sku" as const,
+      })),
+    } satisfies ActionResult;
   }
 
   const rows = parseSkuQuantityText(String(form.get("pasted") ?? ""));
@@ -70,6 +121,8 @@ export default function QuickOrder() {
 
   const resolved = actionData?.step === "resolved" ? actionData.resolved : [];
   const unresolved = actionData?.step === "resolved" ? actionData.unresolved : [];
+  const ai =
+    actionData?.step === "resolved" && "ai" in actionData ? actionData.ai : undefined;
 
   const [quantities, setQuantities] = useState<Record<string, string>>({});
 
@@ -104,6 +157,28 @@ export default function QuickOrder() {
         </button>
       </Form>
 
+      <h2 className="portal-subhead">Or paste a PO or email</h2>
+      <p className="muted">
+        Paste a purchase order, email, or spreadsheet and we’ll match it to the
+        catalog for you. You’ll review everything before anything is ordered.
+      </p>
+      <Form method="post">
+        <input type="hidden" name="intent" value="ai-parse" />
+        <label htmlFor="blob" className="visually-hidden">
+          Paste your purchase order or email
+        </label>
+        <textarea
+          id="blob"
+          name="blob"
+          rows={6}
+          className="quick-order-input"
+          placeholder={"Hi — please send us 10 widgets (A-1) and 4 of the blue gadgets…"}
+        />
+        <button type="submit" className="portal-button" disabled={busy}>
+          Read my order
+        </button>
+      </Form>
+
       {actionData?.step === "resolved" && (
         <div className="quick-order-results">
           {unresolved.length > 0 && (
@@ -125,6 +200,12 @@ export default function QuickOrder() {
           ) : (
             <Form method="post">
               <input type="hidden" name="intent" value="submit" />
+              {ai && (
+                <>
+                  <input type="hidden" name="source" value="ai" />
+                  <input type="hidden" name="aiRate" value={String(ai.rate)} />
+                </>
+              )}
               <h2 className="portal-subhead">Your cart</h2>
               <ul className="catalog-list">
                 {resolved.map((line) => (
