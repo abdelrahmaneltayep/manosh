@@ -11,8 +11,12 @@ Buyer, Quote, QuoteLine, ReorderSource, Event**.
   precisely — see `/docs/compliance.md` for the cascade.
 - **Money is snapshotted, never computed.** `Quote.totalsSnapshot` holds exactly what
   `draftOrderCalculate` returned (subtotal, tax, total, currency). We never recompute.
-- **Secrets are hashed.** `Buyer.magicTokenHash` stores a hash; the raw token exists only in the
-  emailed link.
+- **Secrets are hashed.** `Buyer.magicTokenHash` stores `sha256(token)`; the raw token exists only in
+  the emailed link. Magic links are **single-use** — consuming one is an atomic conditional update
+  (`app/services/magic-link.server.ts`), so replays and email link-scanner requests are rejected.
+  Link lifetime is the shop's `magicLinkExpiryDays` setting. The buyer portal session is a separate
+  signed HTTP-only cookie (`app/services/buyer-session.server.ts`), independent of the Shopify admin
+  session.
 - **Shopify ids are GIDs**, stored verbatim (`gid://shopify/...`).
 
 ## Cascade / ownership
@@ -68,6 +72,7 @@ model Shop {
   trialEndsAt           DateTime?
   autoApproveTolerance  Float    @default(0)      // reorder auto-convert tolerance, fraction (0.05 = 5%)
   quoteExpiryDays       Int      @default(14)     // default quote lifetime
+  magicLinkExpiryDays   Int      @default(7)      // how long a buyer magic link stays valid
   installedAt           DateTime @default(now())
   companies             Company[]
   events                Event[]

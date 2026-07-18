@@ -1,0 +1,79 @@
+/* Buyer portal — light, standalone styles. Kept small for fast first paint. */
+:root {
+  --bg: #f6f6f7;
+  --surface: #ffffff;
+  --text: #1a1a1a;
+  --muted: #616161;
+  --border: #e1e3e5;
+  --accent: #008060;
+  --accent-text: #ffffff;
+  --danger: #8e1f0b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  line-height: 1.5;
+}
+
+.portal {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.portal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.portal h1 {
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem;
+}
+
+.portal p {
+  margin: 0.5rem 0;
+}
+
+.portal .muted {
+  color: var(--muted);
+}
+
+.portal .error {
+  color: var(--danger);
+}
+
+.portal-button {
+  display: inline-block;
+  appearance: none;
+  border: none;
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 0.7rem 1.25rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.portal-button:focus-visible {
+  outline: 3px solid #005bd3;
+  outline-offset: 2px;
+}
+
+.portal-link {
+  color: var(--accent);
+}

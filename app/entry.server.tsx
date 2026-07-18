@@ -16,7 +16,14 @@ export default async function handleRequest(
   responseHeaders: Headers,
   remixContext: EntryContext
 ) {
-  addDocumentResponseHeaders(request, responseHeaders);
+  // The buyer portal is a standalone, non-embedded surface — it must NOT get
+  // Shopify's admin-embedding document headers (CSP frame-ancestors targeting
+  // the admin). The portal sets its own anti-clickjacking headers.
+  const { pathname } = new URL(request.url);
+  const isPortal = pathname === "/portal" || pathname.startsWith("/portal/");
+  if (!isPortal) {
+    addDocumentResponseHeaders(request, responseHeaders);
+  }
   const userAgent = request.headers.get("user-agent");
   const callbackName = isbot(userAgent ?? '')
     ? "onAllReady"
