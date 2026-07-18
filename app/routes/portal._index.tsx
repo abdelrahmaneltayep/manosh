@@ -4,6 +4,7 @@ import { Form, Link, useLoaderData } from "@remix-run/react";
 import prisma from "../db.server";
 import { getBuyerId } from "../services/buyer-session.server";
 import { isExpired } from "../services/quote.server";
+import { listReorderCards } from "../services/reorder.server";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate } from "../lib/format";
 
@@ -24,10 +25,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!buyer) throw redirect("/portal/signin");
 
   const now = new Date();
+  const reorderCards = await listReorderCards(buyer.companyId);
   return {
     email: buyer.email,
     name: buyer.name,
     company: buyer.company.name,
+    reorderCards: reorderCards.map((card) => ({
+      id: card.id,
+      orderName: card.orderName,
+      orderedAt: card.orderedAt,
+      total: card.total,
+      currency: card.currency,
+    })),
     quotes: buyer.quotes.map((quote) => ({
       id: quote.id,
       displayStatus: isExpired(quote, now) ? "EXPIRED" : quote.status,
@@ -37,7 +46,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function PortalHome() {
-  const { email, name, company, quotes } = useLoaderData<typeof loader>();
+  const { email, name, company, quotes, reorderCards } = useLoaderData<typeof loader>();
   return (
     <section className="portal-card">
       <h1>Welcome{name ? `, ${name}` : ""}</h1>
@@ -50,6 +59,28 @@ export default function PortalHome() {
           Request a quote
         </Link>
       </p>
+
+      {reorderCards.length > 0 && (
+        <>
+          <h2 className="portal-subhead">Reorder a past order</h2>
+          <ul className="quote-list">
+            {reorderCards.map((card) => (
+              <li key={card.id} className="quote-list-row">
+                <span>
+                  <strong>{card.orderName}</strong>
+                  <span className="muted">
+                    {" "}
+                    · {formatDate(card.orderedAt)} · {card.currency} {card.total}
+                  </span>
+                </span>
+                <Link to={`/portal/reorder/${card.id}`} className="portal-link">
+                  Reorder
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h2 className="portal-subhead">Your quotes</h2>
       {quotes.length === 0 ? (
