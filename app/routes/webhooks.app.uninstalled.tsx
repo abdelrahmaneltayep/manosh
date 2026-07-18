@@ -1,17 +1,27 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
-import { authenticate } from "../shopify.server";
-import db from "../db.server";
+import { verifyWebhook } from "../lib/hmac.server";
+import { cleanupUninstall } from "../services/gdpr.server";
 
+// app/uninstalled. HMAC-verify, then remove the shop's sessions. Full shop data
+// erasure happens ~48h later via shop/redact (see /docs/compliance.md).
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { shop, session, topic } = await authenticate.webhook(request);
-
-  console.log(`Received ${topic} webhook for ${shop}`);
-
-  // Webhook requests can trigger multiple times and after an app has already been uninstalled.
-  // If this webhook already ran, the session may have been deleted previously.
-  if (session) {
-    await db.session.deleteMany({ where: { shop } });
+  const verification = await verifyWebhook(
+    request,
+    process.env.SHOPIFY_API_SECRET || "",
+  );
+  if (!verification.ok) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
-  return new Response();
+  const payload = JSON.parse(verification.rawBody || "{}") as {
+    myshopify_domain?: string;
+    domain?: string;
+  };
+  const shopDomain =
+    verification.shopDomain ?? payload.myshopify_domain ?? payload.domain ?? "";
+  if (shopDomain) {
+    await cleanupUninstall(shopDomain);
+  }
+
+  return new Response(null, { status: 200 });
 };

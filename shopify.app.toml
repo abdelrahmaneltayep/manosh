@@ -34,9 +34,19 @@ api_version = "2025-01"
   uri = "/webhooks/app/scopes_update"
   topics = ["app/scopes_update"]
 
-  # GDPR mandatory-compliance webhooks are implemented and registered in S15
-  # (see /docs/compliance.md): customers/data_request, customers/redact,
-  # shop/redact.
+  # GDPR mandatory-compliance webhooks (see /docs/compliance.md). All
+  # HMAC-verified before any handler logic runs.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = ["customers/data_request"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = ["customers/redact"]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = ["shop/redact"]
 
 [pos]
 embedded = false
