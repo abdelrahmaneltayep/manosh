@@ -1,5 +1,6 @@
 import type { Event, EventType, Prisma, PrismaClient } from "@prisma/client";
 import prisma from "../db.server";
+import { captureFunnelEvent } from "../lib/analytics.server";
 
 /**
  * Append-only Event log (guardrail #6).
@@ -32,7 +33,7 @@ export async function appendEvent(
   input: AppendEventInput,
   client: Pick<PrismaClient, "event"> = prisma,
 ): Promise<Event> {
-  return client.event.create({
+  const event = await client.event.create({
     data: {
       shopId: input.shopId,
       type: input.type,
@@ -41,4 +42,9 @@ export async function appendEvent(
       payload: input.payload ?? undefined,
     },
   });
+  // Mirror into the AARRR funnel (PostHog). Best-effort and non-blocking — it
+  // enqueues only, never throws, and no-ops unless analytics is configured, so
+  // it's safe even when this insert runs inside a transaction.
+  captureFunnelEvent(event);
+  return event;
 }

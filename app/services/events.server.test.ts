@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
+import {
+  setAnalyticsSinkForTesting,
+  type AnalyticsCapture,
+} from "../lib/analytics.server";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -47,6 +51,25 @@ describe.skipIf(!hasDb)("appendEvent (insert-only helper)", () => {
       ),
     );
     expect(event.type).toBe("REORDER_CREATED");
+  });
+
+  it("mirrors the appended event into the AARRR funnel sink", async () => {
+    const captured: AnalyticsCapture[] = [];
+    setAnalyticsSinkForTesting({ capture: (m) => captured.push(m) });
+    try {
+      await appendEvent({
+        shopId,
+        type: "QUOTE_ACCEPTED",
+        entityType: "Quote",
+        entityId: "gid://shopify/Quote/9",
+      });
+    } finally {
+      setAnalyticsSinkForTesting(null);
+    }
+    expect(captured).toHaveLength(1);
+    expect(captured[0].distinctId).toBe(shopId);
+    expect(captured[0].event).toBe("quote_accepted");
+    expect(captured[0].properties?.aarrr_stage).toBe("revenue");
   });
 });
 

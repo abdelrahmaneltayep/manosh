@@ -7,8 +7,31 @@ import {
 } from "@remix-run/node";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { initSentry, captureException } from "./lib/sentry.server";
+import { initAnalytics } from "./lib/analytics.server";
 
 export const streamTimeout = 5000;
+
+// One-time server startup: wire up error reporting (Sentry) and the AARRR
+// funnel sink (PostHog). Both no-op unless their env vars are set.
+void initSentry();
+void initAnalytics();
+
+/**
+ * Remix's server-side error hook — every loader/action/render error lands here.
+ * Report to Sentry (no-op unless configured); user-facing errors are still
+ * handled by route ErrorBoundaries as friendly pages. Ignore aborted requests
+ * (client navigated away), which aren't real failures.
+ */
+export function handleError(
+  error: unknown,
+  { request }: { request: Request },
+) {
+  if (!request.signal.aborted) {
+    captureException(error);
+    console.error(error);
+  }
+}
 
 export default async function handleRequest(
   request: Request,
