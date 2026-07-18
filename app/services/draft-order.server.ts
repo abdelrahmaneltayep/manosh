@@ -51,6 +51,7 @@ export interface DraftOrderInput {
     priceOverride: { amount: string; currencyCode: string };
   }>;
   poNumber?: string;
+  paymentTerms?: { paymentTermsTemplateId: string };
 }
 
 export class DraftOrderError extends Error {
@@ -70,6 +71,8 @@ export function buildDraftOrderInput(params: {
   currencyCode: string;
   purchasingEntity: PurchasingEntityRef;
   poReference?: string | null;
+  /** Native payment terms template to attach (display + attach only). */
+  paymentTermsTemplateId?: string | null;
 }): DraftOrderInput {
   const input: DraftOrderInput = {
     purchasingEntity: {
@@ -89,6 +92,9 @@ export function buildDraftOrderInput(params: {
   };
   if (params.poReference) {
     input.poNumber = params.poReference;
+  }
+  if (params.paymentTermsTemplateId) {
+    input.paymentTerms = { paymentTermsTemplateId: params.paymentTermsTemplateId };
   }
   return input;
 }

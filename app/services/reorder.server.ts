@@ -177,6 +177,7 @@ export async function createReorder(params: {
   buyerId: string;
   lines: ReorderLine[];
   tolerance: number;
+  poReference?: string | null;
   now?: Date;
   autoConvert?: { admin: AdminGraphqlClient; currencyCode: string };
 }): Promise<CreateReorderResult> {
@@ -196,6 +197,7 @@ export async function createReorder(params: {
     companyId: params.companyId,
     buyerId: params.buyerId,
     now: params.now,
+    poReference: params.poReference,
     lines: params.lines.map((line) => ({
       variantId: line.variantId,
       sku: line.sku,

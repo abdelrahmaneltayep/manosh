@@ -53,15 +53,11 @@ under existing installs as the core slices land:
 | `read_orders` | List a company's past orders for reorder cards. | S9 |
 | `write_draft_orders` | Create draft orders on quote-accept and reorder (also grants read for `draftOrderCalculate`). | S8, S9, S11 |
 | `read_companies` | Read native B2B companies, locations, contacts for the draft order `purchasingEntity`. | S8, S9 |
+| `read_payment_terms` | Read native payment terms templates to display on quote/reorder and attach to the draft order. | S11 |
 
 ### Deferred (added when their slice lands, name confirmed via Dev MCP)
 
-Held back so we don't declare a scope whose exact name we can't yet confirm against the live API
-(declaring an invalid scope breaks install/deploy):
-
-| Scope (tentative) | Why we'll need it | Added in |
-|---|---|---|
-| `read_payment_terms` | Surface native payment terms on quote/reorder (display only). | S11 |
+_All planned core-path scopes are now declared._
 
 Notes:
 - **No `write_products`, no `write_customers`, no tax/discount scopes** — we never mutate the catalog

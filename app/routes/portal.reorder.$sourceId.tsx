@@ -82,11 +82,14 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   });
   const currencyCode = resolved.catalog[0]?.currencyCode ?? "USD";
 
+  const poReference = String(form.get("poReference") ?? "").trim() || null;
+
   const result = await createReorder({
     companyId: buyer.companyId,
     buyerId: buyer.id,
     lines: adjusted,
     tolerance: shop?.autoApproveTolerance ?? 0,
+    poReference,
     autoConvert: { admin: resolved.admin, currencyCode },
   });
   return redirect(`/portal/quotes/${result.quote.id}`);
@@ -158,6 +161,10 @@ export default function Reorder() {
             </li>
           ))}
         </ul>
+        <label className="field">
+          <span className="field-label">PO reference (optional)</span>
+          <input type="text" name="poReference" placeholder="e.g. PO-2026-001" />
+        </label>
         <button type="submit" className="portal-button" disabled={submitting}>
           {submitting ? "Sending…" : "Send reorder"}
         </button>

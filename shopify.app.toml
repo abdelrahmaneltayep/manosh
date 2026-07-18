@@ -10,9 +10,8 @@ embedded = true
 [access_scopes]
 # Minimum core-path scopes. Each is justified in /docs/compliance.md with its
 # consuming slice. `write_draft_orders` also grants read, so no separate
-# read_draft_orders scope is requested. read_payment_terms is added in S11
-# (exact name confirmed via the Dev MCP).
-scopes = "read_products,read_orders,write_draft_orders,read_companies"
+# read_draft_orders scope is requested.
+scopes = "read_products,read_orders,write_draft_orders,read_companies,read_payment_terms"
 
 [auth]
 redirect_urls = [

@@ -37,7 +37,7 @@ describe("buildDraftOrderInput (pure)", () => {
     expect(input.poNumber).toBe("PO-42");
   });
 
-  it("omits contact and PO when absent", () => {
+  it("omits contact, PO, and payment terms when absent", () => {
     const input = buildDraftOrderInput({
       currencyCode: "USD",
       purchasingEntity: {
@@ -49,6 +49,19 @@ describe("buildDraftOrderInput (pure)", () => {
     });
     expect(input.purchasingEntity.purchasingCompany.companyContactId).toBeUndefined();
     expect(input.poNumber).toBeUndefined();
+    expect(input.paymentTerms).toBeUndefined();
+  });
+
+  it("attaches a native payment terms template when provided", () => {
+    const input = buildDraftOrderInput({
+      currencyCode: "USD",
+      paymentTermsTemplateId: "gid://shopify/PaymentTermsTemplate/7",
+      purchasingEntity: { companyId: "c", companyLocationId: "l", companyContactId: null },
+      lines: [{ variantId: "v", quantity: 1, price: "1.00" }],
+    });
+    expect(input.paymentTerms).toEqual({
+      paymentTermsTemplateId: "gid://shopify/PaymentTermsTemplate/7",
+    });
   });
 });
 

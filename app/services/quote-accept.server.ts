@@ -29,7 +29,7 @@ import {
 export async function acceptAndOrder(
   quoteId: string,
   admin: AdminGraphqlClient,
-  options: { currencyCode: string; now?: Date },
+  options: { currencyCode: string; paymentTermsTemplateId?: string | null; now?: Date },
 ): Promise<{ quote: QuoteWithLines; totals: DraftOrderTotals }> {
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
@@ -52,6 +52,7 @@ export async function acceptAndOrder(
   const input = buildDraftOrderInput({
     currencyCode: options.currencyCode,
     poReference: quote.poReference,
+    paymentTermsTemplateId: options.paymentTermsTemplateId,
     purchasingEntity: {
       companyId: quote.company.shopifyCompanyId,
       companyLocationId,

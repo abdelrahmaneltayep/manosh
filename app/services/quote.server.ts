@@ -105,6 +105,7 @@ export async function submitQuote(input: {
   companyId: string;
   buyerId: string;
   lines: QuoteLineInput[];
+  poReference?: string | null;
   expiryDays?: number;
   now?: Date;
 }): Promise<QuoteWithLines> {
@@ -126,6 +127,7 @@ export async function submitQuote(input: {
         buyerId: input.buyerId,
         status: "SUBMITTED",
         expiresAt,
+        poReference: input.poReference ?? null,
         lines: {
           create: input.lines.map((line) => ({
             variantId: line.variantId,

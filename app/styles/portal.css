@@ -197,6 +197,40 @@ body {
   flex-wrap: wrap;
 }
 
+.accept-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-width: 22rem;
+}
+
+.field-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.field input,
+.field select {
+  padding: 0.55rem;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+  outline: 3px solid #005bd3;
+  outline-offset: 1px;
+}
+
 .quick-order-input {
   display: block;
   width: 100%;

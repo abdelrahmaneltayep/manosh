@@ -115,6 +115,38 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     ]);
   });
 
+  it("attaches the PO number and payment terms to the draft order input", async () => {
+    const { quote } = await counteredQuote();
+    await prisma.quote.update({ where: { id: quote.id }, data: { poReference: "PO-2026-11" } });
+
+    const captured: unknown[] = [];
+    const capturingAdmin = {
+      graphql: async (query: string, options?: { variables?: Record<string, unknown> }) => {
+        captured.push(options?.variables);
+        const totals = {
+          subtotalPriceSet: { shopMoney: { amount: "1", currencyCode: "USD" } },
+          totalTaxSet: { shopMoney: { amount: "0", currencyCode: "USD" } },
+          totalPriceSet: { shopMoney: { amount: "1", currencyCode: "USD" } },
+        };
+        const data = query.includes("draftOrderCalculate")
+          ? { draftOrderCalculate: { calculatedDraftOrder: totals, userErrors: [] } }
+          : { draftOrderCreate: { draftOrder: { id: "gid://shopify/DraftOrder/7", ...totals }, userErrors: [] } };
+        return { json: async () => ({ data }) };
+      },
+    };
+
+    await acceptAndOrder(quote.id, capturingAdmin, {
+      currencyCode: "USD",
+      paymentTermsTemplateId: "gid://shopify/PaymentTermsTemplate/3",
+    });
+
+    const createVars = captured.at(-1) as { input?: { poNumber?: string; paymentTerms?: unknown } };
+    expect(createVars.input?.poNumber).toBe("PO-2026-11");
+    expect(createVars.input?.paymentTerms).toEqual({
+      paymentTermsTemplateId: "gid://shopify/PaymentTermsTemplate/3",
+    });
+  });
+
   it("refuses to accept a quote that isn't COUNTERED", async () => {
     const { quote } = await counteredQuote();
     const admin = mockAdmin();

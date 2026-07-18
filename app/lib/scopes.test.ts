@@ -6,7 +6,13 @@ import { dirname, join } from "node:path";
 // Guards guardrail #2: the scopes declared in shopify.app.toml must exactly
 // match the documented "declared now" set in /docs/compliance.md. S19 does the
 // fuller used-vs-declared reconciliation; this catches drift early.
-const EXPECTED = ["read_companies", "read_orders", "read_products", "write_draft_orders"];
+const EXPECTED = [
+  "read_companies",
+  "read_orders",
+  "read_payment_terms",
+  "read_products",
+  "write_draft_orders",
+];
 
 describe("declared OAuth scopes", () => {
   it("shopify.app.toml scopes match the documented minimum set", () => {
