@@ -190,6 +190,38 @@ body {
   color: #616161;
 }
 
+.portal-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.quick-order-input {
+  display: block;
+  width: 100%;
+  padding: 0.6rem;
+  font-size: 1rem;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  margin-bottom: 0.75rem;
+  resize: vertical;
+}
+
+.quick-order-input:focus-visible {
+  outline: 3px solid #005bd3;
+  outline-offset: 1px;
+}
+
+.quick-order-unresolved {
+  background: #fff4f4;
+  border: 1px solid #f0c6c6;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: 1rem 0;
+}
+
 .totals {
   margin: 1rem 0;
   border-top: 1px solid var(--border);

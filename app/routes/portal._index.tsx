@@ -54,9 +54,12 @@ export default function PortalHome() {
         Signed in as {email} · {company}
       </p>
 
-      <p>
+      <p className="portal-actions">
         <Link to="/portal/quotes/new" className="portal-button">
           Request a quote
+        </Link>
+        <Link to="/portal/quick-order" className="portal-link">
+          Quick order by SKU
         </Link>
       </p>
 
