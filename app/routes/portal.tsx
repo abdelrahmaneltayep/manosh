@@ -1,6 +1,12 @@
 import type { HeadersFunction, LinksFunction } from "@remix-run/node";
-import { Outlet } from "@remix-run/react";
+import {
+  Outlet,
+  Link,
+  isRouteErrorResponse,
+  useRouteError,
+} from "@remix-run/react";
 import portalStyles from "../styles/portal.css?url";
+import { portalErrorContent } from "../lib/portal-error";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: portalStyles },
@@ -21,6 +27,29 @@ export default function PortalLayout() {
   return (
     <main className="portal">
       <Outlet />
+    </main>
+  );
+}
+
+// Buyer-portal error boundary. Replaces the layout on any thrown error in a
+// portal route (e.g. a 404 "Quote not found"), so a buyer sees friendly,
+// plain-language copy instead of a raw stack trace. It re-renders the <main>
+// landmark because it stands in for PortalLayout above.
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const status = isRouteErrorResponse(error) ? error.status : null;
+  const { title, body } = portalErrorContent(status);
+  return (
+    <main className="portal">
+      <section className="portal-card" role="alert" aria-live="assertive">
+        <h1>{title}</h1>
+        <p className="muted">{body}</p>
+        <p>
+          <Link to="/portal" className="portal-link">
+            ← Back to your portal
+          </Link>
+        </p>
+      </section>
     </main>
   );
 }

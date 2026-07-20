@@ -7,6 +7,9 @@
   --border: #e1e3e5;
   --accent: #008060;
   --accent-text: #ffffff;
+  /* Darker green for link text so it clears AA (4.5:1) on both the white card
+     and the off-white page background; the brand green stays for button fills. */
+  --link: #00674e;
   --danger: #8e1f0b;
 }
 
@@ -75,7 +78,13 @@ body {
 }
 
 .portal-link {
-  color: var(--accent);
+  color: var(--link);
+}
+
+.portal-link:focus-visible {
+  outline: 3px solid #005bd3;
+  outline-offset: 2px;
+  border-radius: 0.2rem;
 }
 
 .portal-link-button {
@@ -86,6 +95,12 @@ body {
   cursor: pointer;
   font: inherit;
   padding: 0;
+}
+
+.portal-link-button:focus-visible {
+  outline: 3px solid #005bd3;
+  outline-offset: 2px;
+  border-radius: 0.2rem;
 }
 
 .portal-subhead {
