@@ -1,26 +1,45 @@
 import { BillingInterval } from "@shopify/shopify-app-remix/server";
+import { redirect } from "@remix-run/node";
+import type { EventType, Plan } from "@prisma/client";
+import prisma from "../db.server";
+import { appendEvent } from "./events.server";
+import {
+  STARTER_PLAN,
+  GROWTH_PLAN,
+  TRIAL_DAYS,
+  PLAN_PRICING,
+  featureAccess,
+  type PlanName,
+  type BillingStatus,
+} from "../lib/billing";
 
 /**
- * Billing skeleton (S3). Defines the plans and a read-only `requireBilling`
- * helper that reports the merchant's current plan. Enforcement/gating is
- * deliberately NOT wired here — S17 completes it (billing.require + plan-gated
- * features). See /docs/prd.md §3.7.
+ * Billing (S3 skeleton → S17 complete). The plan constants + pure gating live
+ * in app/lib/billing.ts (client-safe); this module holds the server-only parts:
+ * the shopifyApp billing config, reading the current plan (`requireBilling`),
+ * enforcing it (`requirePlan`), and reconciling Shopify's state onto the Shop
+ * row — emitting funnel events on plan changes. See /docs/prd.md §3.7.
  */
 
-// Plan names are the keys Shopify stores against the subscription; keep them
-// stable — changing a key orphans existing subscriptions.
-export const STARTER_PLAN = "Starter";
-export const GROWTH_PLAN = "Growth";
-
-export type PlanName = typeof STARTER_PLAN | typeof GROWTH_PLAN;
-
-export const TRIAL_DAYS = 14;
-
-/** Display pricing, also the source of truth for the billing charge below. */
-export const PLAN_PRICING = {
-  [STARTER_PLAN]: { amount: 29, currencyCode: "USD" as const },
-  [GROWTH_PLAN]: { amount: 79, currencyCode: "USD" as const },
-};
+// Re-export the client-safe pieces so existing server-side importers and tests
+// can keep importing them from billing.server.
+export {
+  STARTER_PLAN,
+  GROWTH_PLAN,
+  TRIAL_DAYS,
+  PLAN_PRICING,
+  PLAN_RANK,
+  planMeets,
+  featureAccess,
+  GROWTH_FEATURES,
+} from "../lib/billing";
+export type {
+  PlanName,
+  BillingStatus,
+  AccessReason,
+  FeatureAccess,
+  GrowthFeature,
+} from "../lib/billing";
 
 // Typed const so the enum member keeps its literal type (`Every30Days`) inside
 // the object literals below — otherwise TS widens it to `BillingInterval` and
@@ -55,18 +74,8 @@ export const BILLING_CONFIG = {
   },
 };
 
-export interface BillingStatus {
-  /** The active PAID plan, or null when on trial / no active payment. */
-  plan: PlanName | null;
-  /** Whether Shopify reports any active payment for the store. */
-  hasActivePayment: boolean;
-  /** True while no paid subscription is active (trial period or lapsed). */
-  onTrial: boolean;
-  /** The raw active subscription name, if any (for logging/telemetry). */
-  activeSubscriptionName: string | null;
-}
-
 interface SubscriptionLike {
+  id?: string;
   name: string;
   status: string;
 }
@@ -89,6 +98,7 @@ export function resolveActivePlan(
     hasActivePayment,
     onTrial: !hasActivePayment,
     activeSubscriptionName: name,
+    activeSubscriptionId: active?.id ?? null,
   };
 }
 
@@ -101,8 +111,8 @@ export interface BillingLike {
 }
 
 /**
- * Report the merchant's current plan. SKELETON: reads only — it does NOT
- * redirect to a payment/plan-selection screen. Gating is completed in S17.
+ * Report the merchant's current plan (reads only — never redirects). Use
+ * `requirePlan` when you need to enforce a plan and bounce to the billing page.
  *
  * Usage in a route:
  *   const { billing } = await authenticate.admin(request);
@@ -118,4 +128,94 @@ export async function requireBilling(
     isTest,
   });
   return resolveActivePlan(hasActivePayment, appSubscriptions);
+}
+
+/**
+ * Enforce that the merchant's plan meets `required`. Returns the status when
+ * allowed; otherwise throws a redirect to the settings billing section (with an
+ * `?upgrade=` hint so the page can explain why). Use this to guard Growth-only
+ * routes:
+ *   const status = await requirePlan(billing, GROWTH_PLAN);
+ */
+export async function requirePlan(
+  billing: BillingLike,
+  required: PlanName,
+  options: { isTest?: boolean; redirectTo?: string } = {},
+): Promise<BillingStatus> {
+  const status = await requireBilling(billing, { isTest: options.isTest });
+  if (!featureAccess(status, required).allowed) {
+    throw redirect(options.redirectTo ?? `/app/settings?upgrade=${required}`);
+  }
+  return status;
+}
+
+// --- plan persistence + funnel events ---------------------------------------
+
+/** The Prisma Plan enum value implied by a live billing status. */
+export function planEnumFor(status: BillingStatus): Extract<Plan, "TRIAL" | "STARTER" | "GROWTH"> {
+  if (status.plan === GROWTH_PLAN) return "GROWTH";
+  if (status.plan === STARTER_PLAN) return "STARTER";
+  return "TRIAL";
+}
+
+const PLAN_ENUM_RANK: Record<Plan, number> = {
+  TRIAL: 0,
+  CANCELLED: 0,
+  STARTER: 1,
+  GROWTH: 2,
+};
+
+/** Which funnel event (if any) a plan transition should record. Pure. */
+export function planChangeEvent(from: Plan, to: Plan): EventType | null {
+  if (to === "CANCELLED") {
+    return from === "STARTER" || from === "GROWTH" ? "PLAN_CANCELLED" : null;
+  }
+  if (PLAN_ENUM_RANK[to] > PLAN_ENUM_RANK[from]) {
+    // First move out of the default TRIAL into a paid plan = the trial starting;
+    // any later rank increase (Starter → Growth, or resubscribe) is an upgrade.
+    return from === "TRIAL" ? "TRIAL_STARTED" : "PLAN_UPGRADED";
+  }
+  return null; // downgrades (Growth → Starter) have no dedicated funnel event
+}
+
+/**
+ * Reconcile Shopify's billing state onto the Shop row (Shopify is the source of
+ * truth). Persists the plan and appends a funnel event on any change. Losing an
+ * active paid plan (Shopify shows no active payment while we had one recorded)
+ * is treated as a cancellation. Idempotent: no-ops when nothing changed.
+ */
+export async function reconcileShopPlan(
+  shopDomain: string,
+  status: BillingStatus,
+): Promise<Plan> {
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: shopDomain },
+    select: { id: true, plan: true },
+  });
+  if (!shop) return planEnumFor(status);
+
+  let next: Plan;
+  if (status.plan) {
+    next = planEnumFor(status);
+  } else if (shop.plan === "STARTER" || shop.plan === "GROWTH") {
+    next = "CANCELLED"; // had a paid plan, Shopify now reports none → cancelled
+  } else {
+    next = shop.plan; // TRIAL or CANCELLED — nothing new to record
+  }
+
+  if (next === shop.plan) return shop.plan;
+
+  await prisma.shop.update({ where: { id: shop.id }, data: { plan: next } });
+
+  const eventType = planChangeEvent(shop.plan, next);
+  if (eventType) {
+    await appendEvent({
+      shopId: shop.id,
+      type: eventType,
+      entityType: "Shop",
+      entityId: shop.id,
+      payload: { from: shop.plan, to: next },
+    });
+  }
+  return next;
 }
