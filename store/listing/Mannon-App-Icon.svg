@@ -1,0 +1,30 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mannon">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="1200" y2="1200" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ECEAFB"/>
+      <stop offset="0.5" stop-color="#F3EFFA"/>
+      <stop offset="1" stop-color="#FBF8F4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1000 1010) rotate(-135) scale(560)">
+      <stop offset="0" stop-color="#FCEEE2" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#FCEEE2" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mstroke" x1="537" y1="410" x2="600" y2="835" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5B51E8"/>
+      <stop offset="1" stop-color="#4632C4"/>
+    </linearGradient>
+    <linearGradient id="dot" x1="770" y1="720" x2="905" y2="860" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#C9EC5A"/>
+      <stop offset="1" stop-color="#A8D423"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1200" height="1200" rx="268" fill="url(#tile)"/>
+  <rect x="0" y="0" width="1200" height="1200" rx="268" fill="url(#glow)"/>
+
+  <path d="M324 826 L324 418 L537 676 L750 418 L750 826"
+        fill="none" stroke="url(#mstroke)" stroke-width="140"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <circle cx="838" cy="790" r="80" fill="url(#dot)"/>
+</svg>
