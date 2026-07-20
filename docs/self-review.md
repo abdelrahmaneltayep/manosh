@@ -117,3 +117,16 @@ bundled CSS, not our code).
 - `app/guardrails.test.ts` — static gauntlet: every webhook verifies HMAC + 401,
   the AI parser is temperature 0 with forced tool use, and no undercover model
   identifier appears in `app/`, `docs/`, or `prisma/`.
+
+---
+
+## Update — the paid differentiator is limits, not features
+
+The Starter/Growth split is now **enforceable limits, not locked features**.
+Every feature (quote builder, portal, net terms, AI Order Pad, reorder) is
+available on both tiers. Starter is capped at **50 active quotes / 30-day window
+and 1 seat**; Growth is **unlimited quotes and up to 5 seats**
+(`app/lib/billing.ts` → `PLAN_LIMITS`, enforced by `canCreateQuote` /
+`canAddSeat`). **Quote Copilot** and **Reorder Radar** were hooks only and are no
+longer the differentiator — `GROWTH_FEATURES` is now an empty set, so nothing is
+feature-gated. This makes the shipped app match `Mannon-Listing-Copy.md`.

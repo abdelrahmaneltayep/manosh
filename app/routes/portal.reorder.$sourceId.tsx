@@ -11,6 +11,8 @@ import {
   fetchOrderLines,
   type ReorderLine,
 } from "../services/reorder.server";
+import { QuoteCapReachedError } from "../services/plan-limits.server";
+import { QUOTE_CAP_BUYER_MESSAGE } from "../lib/billing";
 
 async function loadContext(request: Request, sourceId: string | undefined) {
   const buyerId = await requireBuyerId(request);
@@ -84,14 +86,22 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const poReference = String(form.get("poReference") ?? "").trim() || null;
 
-  const result = await createReorder({
-    companyId: buyer.companyId,
-    buyerId: buyer.id,
-    lines: adjusted,
-    tolerance: shop?.autoApproveTolerance ?? 0,
-    poReference,
-    autoConvert: { admin: resolved.admin, currencyCode },
-  });
+  let result;
+  try {
+    result = await createReorder({
+      companyId: buyer.companyId,
+      buyerId: buyer.id,
+      lines: adjusted,
+      tolerance: shop?.autoApproveTolerance ?? 0,
+      poReference,
+      autoConvert: { admin: resolved.admin, currencyCode },
+    });
+  } catch (error) {
+    if (error instanceof QuoteCapReachedError) {
+      return { error: QUOTE_CAP_BUYER_MESSAGE };
+    }
+    throw error;
+  }
   return redirect(`/portal/quotes/${result.quote.id}`);
 };
 

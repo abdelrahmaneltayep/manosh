@@ -1,7 +1,8 @@
 # /docs/data-model.md — Mannon data model (§3.5)
 
 The Prisma schema below is the contract S2 implements exactly. Entities: **Shop, Session, Company,
-Buyer, Quote, QuoteLine, ReorderSource, Event**.
+Buyer, Quote, QuoteLine, ReorderSource, Event**, plus **StaffSeat** (added later to gate the
+Starter/Growth seat cap — one row per invited staff email, `@@unique([shopId, email])`).
 
 ## Principles
 

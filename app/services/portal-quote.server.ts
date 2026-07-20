@@ -1,5 +1,8 @@
+import prisma from "../db.server";
 import type { CatalogItem } from "./catalog.server";
 import { submitQuote, type QuoteLineInput, type QuoteWithLines } from "./quote.server";
+import { canCreateQuote } from "./plan-limits.server";
+import { QUOTE_CAP_BUYER_MESSAGE } from "../lib/billing";
 
 /**
  * Buyer-portal quote submission (F1). Turns a buyer's basket of catalog
@@ -66,7 +69,7 @@ export function buildQuoteLinesFromSelections(
 
 export type SubmitBuyerQuoteResult =
   | { ok: true; quote: QuoteWithLines }
-  | { ok: false; error: string };
+  | { ok: false; error: string; capReached?: boolean };
 
 export async function submitBuyerQuote(
   buyer: { id: string; companyId: string },
@@ -75,6 +78,18 @@ export async function submitBuyerQuote(
 ): Promise<SubmitBuyerQuoteResult> {
   const built = buildQuoteLinesFromSelections(catalog, selections);
   if (!built.ok) return built;
+
+  // Plan quote-volume cap (per shop). Check before persisting.
+  const company = await prisma.company.findUnique({
+    where: { id: buyer.companyId },
+    select: { shopId: true },
+  });
+  if (company) {
+    const allowance = await canCreateQuote(company.shopId);
+    if (!allowance.allowed) {
+      return { ok: false, error: QUOTE_CAP_BUYER_MESSAGE, capReached: true };
+    }
+  }
 
   const quote = await submitQuote({
     companyId: buyer.companyId,

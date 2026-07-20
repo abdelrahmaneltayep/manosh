@@ -46,8 +46,22 @@ model Shop {
   installedAt          DateTime  @default(now())
   companies            Company[]
   events               Event[]
+  staffSeats           StaffSeat[]
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
+}
+
+// Minimal staff-seat record — used only to gate the Starter (1) vs Growth (5)
+// seat cap on the invite action. Keyed by shop; one row per invited staff email.
+model StaffSeat {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  email     String
+  createdAt DateTime @default(now())
+
+  @@unique([shopId, email])
+  @@index([shopId])
 }
 
 model Company {

@@ -71,16 +71,69 @@ export interface GrowthFeature {
   description: string;
 }
 
-/** Growth-only features (gated behind the Growth plan). See /docs/prd.md §3.7. */
-export const GROWTH_FEATURES: GrowthFeature[] = [
-  {
-    key: "quote-copilot",
-    name: "Quote Copilot",
-    description: "AI-drafted counter-offers and pricing suggestions in your inbox.",
-  },
-  {
-    key: "reorder-radar",
-    name: "Reorder Radar",
-    description: "Automatic nudges when a buyer is due to place their next order.",
-  },
-];
+/**
+ * No feature is locked behind Growth. Every feature (quote builder, portal, net
+ * terms, AI Order Pad, reorder) is available on both paid tiers. The tiers
+ * differ ONLY on enforceable limits (see PLAN_LIMITS below). Kept as an empty
+ * exported array so existing importers don't break.
+ */
+export const GROWTH_FEATURES: GrowthFeature[] = [];
+
+// --- plan limits (the real Starter vs Growth difference) ---------------------
+
+export interface PlanLimits {
+  /** Rolling cap of active quotes per 30-day window. Infinity = unlimited. */
+  activeQuoteCap: number;
+  /** Maximum staff seats for the store. */
+  seatCap: number;
+}
+
+/** How far back the "active quotes" window looks. */
+export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
+
+export const PLAN_LIMITS = {
+  starter: { activeQuoteCap: 50, seatCap: 1 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5 },
+} as const satisfies Record<"starter" | "growth", PlanLimits>;
+
+/**
+ * Limits for a plan. Accepts the Prisma `Plan` enum ("GROWTH"/"STARTER"/…) or a
+ * PlanName ("Growth"/"Starter"). Only Growth gets the higher limits; Starter,
+ * trial, cancelled, and unknown all fall back to Starter limits.
+ */
+export function getPlanLimits(plan: string | null | undefined): PlanLimits {
+  return plan === "GROWTH" || plan === GROWTH_PLAN
+    ? PLAN_LIMITS.growth
+    : PLAN_LIMITS.starter;
+}
+
+export interface QuoteAllowance {
+  allowed: boolean;
+  used: number;
+  cap: number;
+}
+
+/** Pure allowance decision: a new quote is allowed while used < cap. */
+export function evaluateQuoteAllowance(used: number, cap: number): QuoteAllowance {
+  return { allowed: used < cap, used, cap };
+}
+
+export interface SeatAllowance {
+  allowed: boolean;
+  used: number;
+  cap: number;
+}
+
+/** Merchant-facing copy when the quote cap is hit (they can upgrade). */
+export function quoteCapMessage(cap: number): string {
+  return `You've reached your Starter plan limit of ${cap} active quotes this month. Upgrade to Growth for unlimited quotes.`;
+}
+
+/** Buyer-facing copy when the store's quote cap is hit (they can't upgrade). */
+export const QUOTE_CAP_BUYER_MESSAGE =
+  "This store can't take a new quote request right now. Please reach out to them to continue.";
+
+/** Merchant-facing copy when the seat cap is hit. */
+export function seatCapMessage(cap: number): string {
+  return `Your Starter plan includes ${cap} staff seat. Upgrade to Growth for up to ${PLAN_LIMITS.growth.seatCap} seats.`;
+}

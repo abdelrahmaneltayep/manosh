@@ -5,24 +5,41 @@ import {
   Card,
   IndexTable,
   Badge,
+  Banner,
   Text,
   EmptyState,
   Link as PolarisLink,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 import { listQuotesForShop } from "../services/quote-inbox.server";
+import { canCreateQuote } from "../services/plan-limits.server";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate } from "../lib/format";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const quotes = await listQuotesForShop(session.shop);
-  return { quotes };
+
+  // Quote-volume usage, for the soft near-cap banner (display only).
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { id: true },
+  });
+  const allowance = shop ? await canCreateQuote(shop.id) : null;
+  const usage =
+    allowance && Number.isFinite(allowance.cap)
+      ? { used: allowance.used, cap: allowance.cap }
+      : null;
+
+  return { quotes, usage };
 };
 
 export default function QuotesInbox() {
-  const { quotes } = useLoaderData<typeof loader>();
+  const { quotes, usage } = useLoaderData<typeof loader>();
+  const atCap = usage && usage.used >= usage.cap;
+  const nearCap = usage && usage.used >= usage.cap * 0.8;
 
   const rows = quotes.map((quote, index) => {
     const badge = quoteStatusBadge(quote.displayStatus);
@@ -53,6 +70,21 @@ export default function QuotesInbox() {
   return (
     <Page>
       <TitleBar title="Quotes" />
+      {usage && nearCap && (
+        <div style={{ marginBottom: "var(--p-space-400)" }}>
+          <Banner
+            tone={atCap ? "critical" : "warning"}
+            title={`${usage.used} / ${usage.cap} active quotes this month`}
+            action={{ content: "Upgrade to Growth", url: "/app/settings" }}
+          >
+            <p>
+              {atCap
+                ? "You’ve reached your Starter plan limit. Buyers can’t submit new quotes until some expire or are ordered — upgrade to Growth for unlimited quotes."
+                : "You’re close to your Starter plan limit of active quotes. Upgrade to Growth for unlimited quotes."}
+            </p>
+          </Banner>
+        </div>
+      )}
       <Card padding="0">
         {quotes.length === 0 ? (
           <EmptyState

@@ -104,14 +104,22 @@ migrate — install, invite a buyer, and send your first quote.
 
 ## Pricing (from billing config)
 
-| Plan | Price | Includes |
-|---|---|---|
-| **Starter** | **$29 / month** | Quote loop, reorder, quick-order + Magic Order Pad, native terms/PO, ROI dashboard |
-| **Growth** | **$79 / month** | Everything in Starter, plus Quote Copilot and Reorder Radar |
+**Every feature is included on both plans** — quote builder, buyer portal, native
+terms/PO, AI Magic Order Pad, reorder, and the ROI dashboard. Plans differ only
+by enforceable **limits**, so merchants upgrade when their wholesale desk grows,
+not to unlock features.
+
+| Plan | Price | Active-quote cap | Seats |
+|---|---|---|---|
+| **Starter** | **$29 / month** | Up to 50 active quotes / mo (rolling 30-day) | 1 |
+| **Growth** | **$79 / month** | Unlimited | Up to 5 |
 
 - **14-day free trial** on either plan.
 - Billed through Shopify's Billing API; upgrade, downgrade, or cancel anytime
   from the app's Settings.
+- Gate mechanics live in `app/lib/billing.ts` (`PLAN_LIMITS`) and are enforced by
+  `canCreateQuote` (quote volume) and `canAddSeat` (seats). Feature access is
+  identical across tiers.
 
 ---
 

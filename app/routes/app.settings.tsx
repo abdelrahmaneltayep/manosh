@@ -24,9 +24,16 @@ import {
 } from "../services/settings.server";
 import { requireBilling, reconcileShopPlan } from "../services/billing.server";
 import { cancelPlan } from "../services/billing-actions.server";
+import { canCreateQuote } from "../services/plan-limits.server";
+import {
+  listSeats,
+  canAddSeat,
+  addStaffSeat,
+  removeSeat,
+} from "../services/staff-seats.server";
 import {
   planMeets,
-  GROWTH_FEATURES,
+  PLAN_LIMITS,
   PLAN_PRICING,
   STARTER_PLAN,
   GROWTH_PLAN,
@@ -35,16 +42,31 @@ import {
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
+// PLAN_LIMITS with Infinity → null for JSON serialisation (null = unlimited).
+const PLAN_LIMIT_DISPLAY = {
+  starter: {
+    quotes: Number.isFinite(PLAN_LIMITS.starter.activeQuoteCap) ? PLAN_LIMITS.starter.activeQuoteCap : null,
+    seats: PLAN_LIMITS.starter.seatCap,
+  },
+  growth: {
+    quotes: Number.isFinite(PLAN_LIMITS.growth.activeQuoteCap) ? PLAN_LIMITS.growth.activeQuoteCap : null,
+    seats: PLAN_LIMITS.growth.seatCap,
+  },
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
 
   const status = await requireBilling(billing, { isTest: IS_TEST });
-  // Shopify is the source of truth — reconcile it onto our Shop row (this is
-  // also where TRIAL_STARTED / PLAN_UPGRADED / PLAN_CANCELLED get recorded).
   await reconcileShopPlan(session.shop, status);
 
   const settings = await getShopSettings(session.shop);
+  const shopId = settings?.id ?? null;
   const upgradeTarget = new URL(request.url).searchParams.get("upgrade");
+
+  const [quoteAllowance, seatAllowance, seats] = shopId
+    ? await Promise.all([canCreateQuote(shopId), canAddSeat(shopId), listSeats(shopId)])
+    : [null, null, []];
 
   return {
     tolerancePercent: settings ? Math.round(settings.autoApproveTolerance * 100) : 0,
@@ -52,19 +74,27 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     magicLinkExpiryDays: settings?.magicLinkExpiryDays ?? 7,
     plan: status.plan,
     onTrial: status.onTrial,
-    growthFeatures: GROWTH_FEATURES,
     upgradeTarget:
       upgradeTarget === STARTER_PLAN || upgradeTarget === GROWTH_PLAN
         ? (upgradeTarget as PlanName)
         : null,
     pricing: PLAN_PRICING,
+    limits: PLAN_LIMIT_DISPLAY,
+    quoteUsage: quoteAllowance
+      ? { used: quoteAllowance.used, cap: Number.isFinite(quoteAllowance.cap) ? quoteAllowance.cap : null }
+      : null,
+    seatUsage: seatAllowance
+      ? { used: seatAllowance.used, cap: seatAllowance.cap, allowed: seatAllowance.allowed }
+      : null,
+    seats: seats.map((s) => ({ id: s.id, email: s.email })),
   };
 };
 
 type ActionResult =
   | { ok: true; kind: "settings" }
   | { ok: true; kind: "billing"; message: string }
-  | { ok: false; kind: "settings" | "billing"; error: string };
+  | { ok: true; kind: "seat"; message: string }
+  | { ok: false; kind: "settings" | "billing" | "seat"; error: string };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
@@ -77,21 +107,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { ok: false, kind: "billing", error: "Choose a valid plan." } satisfies ActionResult;
     }
     const appUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
-    // Always redirects to Shopify's confirmation page (Promise<never>); the
-    // return trip lands back on settings, where the loader reconciles the plan.
-    await billing.request({
-      plan,
-      isTest: IS_TEST,
-      returnUrl: `${appUrl}/app/settings`,
-    });
+    await billing.request({ plan, isTest: IS_TEST, returnUrl: `${appUrl}/app/settings` });
     return null; // unreachable — request() throws the redirect
   }
 
   if (intent === "billing-cancel") {
     const status = await requireBilling(billing, { isTest: IS_TEST });
-    const { cancelled } = await cancelPlan(billing, session.shop, status, {
-      isTest: IS_TEST,
-    });
+    const { cancelled } = await cancelPlan(billing, session.shop, status, { isTest: IS_TEST });
     return {
       ok: true,
       kind: "billing",
@@ -99,6 +121,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         ? "Your subscription was cancelled."
         : "There was no active subscription to cancel.",
     } satisfies ActionResult;
+  }
+
+  if (intent === "seat-invite" || intent === "seat-remove") {
+    const settings = await getShopSettings(session.shop);
+    if (!settings) {
+      return { ok: false, kind: "seat", error: "Your store isn’t set up yet." } satisfies ActionResult;
+    }
+    if (intent === "seat-remove") {
+      await removeSeat(settings.id, String(form.get("seatId") ?? ""));
+      return { ok: true, kind: "seat", message: "Seat removed." } satisfies ActionResult;
+    }
+    const result = await addStaffSeat(settings.id, String(form.get("email") ?? ""));
+    return result.ok
+      ? ({ ok: true, kind: "seat", message: `Invited ${result.seat.email}.` } satisfies ActionResult)
+      : ({ ok: false, kind: "seat", error: result.error } satisfies ActionResult);
   }
 
   const parsed = validateSettings({
@@ -113,19 +150,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return { ok: true, kind: "settings" } satisfies ActionResult;
 };
 
+function limitLine(quotes: number | null, seats: number) {
+  const q = quotes === null ? "Unlimited quotes" : `Up to ${quotes} active quotes / mo`;
+  return `${q} · ${seats} seat${seats === 1 ? "" : "s"}`;
+}
+
 function PlanOption({
   name,
   price,
+  limits,
   current,
   submitting,
 }: {
   name: PlanName;
   price: number;
+  limits: { quotes: number | null; seats: number };
   current: PlanName | null;
   submitting: boolean;
 }) {
   const isCurrent = current === name;
-  // "Upgrade" when moving up (or from trial), "Switch" when moving down.
   const label = !current || planMeets(name, current) ? `Choose ${name}` : `Switch to ${name}`;
   return (
     <Card>
@@ -142,6 +185,9 @@ function PlanOption({
             {" "}
             / month
           </Text>
+        </Text>
+        <Text as="p" variant="bodySm" tone="subdued">
+          {limitLine(limits.quotes, limits.seats)}
         </Text>
         {isCurrent ? (
           <Button disabled>Current plan</Button>
@@ -168,24 +214,26 @@ export default function Settings() {
   const [tolerance, setTolerance] = useState(String(data.tolerancePercent));
   const [quoteExpiry, setQuoteExpiry] = useState(String(data.quoteExpiryDays));
   const [linkExpiry, setLinkExpiry] = useState(String(data.magicLinkExpiryDays));
+  const [seatEmail, setSeatEmail] = useState("");
 
   const settingsError =
     actionData && !actionData.ok && actionData.kind === "settings" ? actionData.error : null;
-  const settingsSaved =
-    actionData?.ok === true && actionData.kind === "settings";
-  const billingMessage =
-    actionData?.ok === true && actionData.kind === "billing" ? actionData.message : null;
+  const settingsSaved = actionData?.ok === true && actionData.kind === "settings";
+  const billingMessage = actionData?.ok === true && actionData.kind === "billing" ? actionData.message : null;
+  const seatMessage = actionData?.ok === true && actionData.kind === "seat" ? actionData.message : null;
+  const seatError = actionData && !actionData.ok && actionData.kind === "seat" ? actionData.error : null;
 
-  const hasGrowth = planMeets(data.plan, GROWTH_PLAN);
   const planLabel = data.plan ?? "Free trial";
+  const usage = data.quoteUsage;
+  const nearCap = usage && usage.cap !== null && usage.used >= usage.cap * 0.8;
 
   return (
     <Page>
       <TitleBar title="Settings" />
       <BlockStack gap="500">
         {data.upgradeTarget && !planMeets(data.plan, data.upgradeTarget) && (
-          <Banner tone="warning" title={`That feature needs the ${data.upgradeTarget} plan`}>
-            <p>Choose {data.upgradeTarget} below to unlock it.</p>
+          <Banner tone="warning" title={`That needs the ${data.upgradeTarget} plan`}>
+            <p>Choose {data.upgradeTarget} below.</p>
           </Banner>
         )}
         {billingMessage && <Banner tone="success" title={billingMessage} />}
@@ -199,55 +247,54 @@ export default function Settings() {
               </Text>
               <Badge tone={data.plan ? "success" : "attention"}>{planLabel}</Badge>
             </InlineStack>
-            {data.onTrial && (
-              <Text as="p" tone="subdued" variant="bodyMd">
-                You&rsquo;re on the free trial. Choose a plan to keep Mannon once
-                it ends — you won&rsquo;t be charged until the trial is over.
-              </Text>
-            )}
+            <Text as="p" tone="subdued" variant="bodyMd">
+              Every feature — quote builder, buyer portal, net terms, AI Order Pad,
+              and reorder — is included on both plans. Plans differ only by quote
+              volume and team seats.
+            </Text>
 
             <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
               <PlanOption
                 name={STARTER_PLAN}
                 price={data.pricing[STARTER_PLAN].amount}
+                limits={data.limits.starter}
                 current={data.plan}
                 submitting={submitting}
               />
               <PlanOption
                 name={GROWTH_PLAN}
                 price={data.pricing[GROWTH_PLAN].amount}
+                limits={data.limits.growth}
                 current={data.plan}
                 submitting={submitting}
               />
             </InlineGrid>
 
-            <Divider />
-
-            <BlockStack gap="200">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text as="h3" variant="headingSm">
-                  Growth features
-                </Text>
-                <Badge tone={hasGrowth ? "success" : undefined}>
-                  {hasGrowth ? "Included" : "Growth plan"}
-                </Badge>
-              </InlineStack>
-              {data.growthFeatures.map((feature) => (
-                <InlineStack key={feature.key} align="space-between" blockAlign="start" gap="400">
-                  <BlockStack gap="0">
-                    <Text as="span" fontWeight="semibold">
-                      {feature.name}
+            {usage && (
+              <>
+                <Divider />
+                {usage.cap === null ? (
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    Quote usage: <b>{usage.used}</b> active this month · Unlimited on Growth.
+                  </Text>
+                ) : (
+                  <BlockStack gap="150">
+                    <Text as="p" variant="bodyMd">
+                      Quote usage: <b>{usage.used} / {usage.cap}</b> active quotes this month.
                     </Text>
-                    <Text as="span" variant="bodySm" tone="subdued">
-                      {feature.description}
-                    </Text>
+                    {nearCap && (
+                      <Banner tone={usage.used >= usage.cap ? "critical" : "warning"}>
+                        <p>
+                          {usage.used >= usage.cap
+                            ? "You’ve reached your Starter quote limit. Upgrade to Growth for unlimited quotes."
+                            : "You’re close to your Starter quote limit. Upgrade to Growth for unlimited quotes."}
+                        </p>
+                      </Banner>
+                    )}
                   </BlockStack>
-                  <Badge tone={hasGrowth ? "success" : undefined}>
-                    {hasGrowth ? "Available" : "Locked"}
-                  </Badge>
-                </InlineStack>
-              ))}
-            </BlockStack>
+                )}
+              </>
+            )}
 
             {data.plan && (
               <>
@@ -262,6 +309,74 @@ export default function Settings() {
             )}
           </BlockStack>
         </Card>
+
+        {/* Team seats */}
+        {data.seatUsage && (
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Team seats
+                </Text>
+                <Badge tone={data.seatUsage.allowed ? undefined : "attention"}>
+                  {`${data.seatUsage.used} / ${data.seatUsage.cap} used`}
+                </Badge>
+              </InlineStack>
+
+              {seatError && <Banner tone="warning"><p>{seatError}</p></Banner>}
+              {seatMessage && <Banner tone="success"><p>{seatMessage}</p></Banner>}
+
+              {data.seats.length === 0 ? (
+                <Text as="p" tone="subdued" variant="bodyMd">
+                  No staff invited yet. Add a teammate to help manage quotes.
+                </Text>
+              ) : (
+                <BlockStack gap="0">
+                  {data.seats.map((seat, i) => (
+                    <div key={seat.id}>
+                      {i > 0 && <Divider />}
+                      <InlineStack align="space-between" blockAlign="center">
+                        <Text as="span" variant="bodyMd">{seat.email}</Text>
+                        <Form method="post">
+                          <input type="hidden" name="intent" value="seat-remove" />
+                          <input type="hidden" name="seatId" value={seat.id} />
+                          <Button submit variant="plain" tone="critical">Remove</Button>
+                        </Form>
+                      </InlineStack>
+                    </div>
+                  ))}
+                </BlockStack>
+              )}
+
+              <Divider />
+              {data.seatUsage.allowed ? (
+                <Form method="post">
+                  <input type="hidden" name="intent" value="seat-invite" />
+                  <FormLayout>
+                    <TextField
+                      label="Invite a teammate by email"
+                      type="email"
+                      name="email"
+                      value={seatEmail}
+                      onChange={setSeatEmail}
+                      autoComplete="email"
+                      placeholder="teammate@yourstore.com"
+                    />
+                    <Button submit loading={submitting}>Add seat</Button>
+                  </FormLayout>
+                </Form>
+              ) : (
+                <Banner tone="info" title="Seat limit reached">
+                  <p>
+                    Your plan includes {data.seatUsage.cap} seat
+                    {data.seatUsage.cap === 1 ? "" : "s"}. Upgrade to Growth above for up
+                    to {data.limits.growth.seats} seats.
+                  </p>
+                </Banner>
+              )}
+            </BlockStack>
+          </Card>
+        )}
 
         {/* Merchant settings */}
         {settingsError && (
