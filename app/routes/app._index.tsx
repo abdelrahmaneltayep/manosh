@@ -1,11 +1,12 @@
-import type { LoaderFunctionArgs, SerializeFrom } from "@remix-run/node";
-import { Link as RemixLink, useLoaderData } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs, SerializeFrom } from "@remix-run/node";
+import { Link as RemixLink, useFetcher, useLoaderData } from "@remix-run/react";
 import {
   Page,
   Layout,
   Card,
   Text,
   Badge,
+  Banner,
   BlockStack,
   InlineGrid,
   InlineStack,
@@ -18,6 +19,10 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getDashboardMetrics } from "../services/dashboard.server";
+import {
+  shouldPromptReview,
+  markReviewPromptShown,
+} from "../services/review-prompt.server";
 import { EXPIRING_SOON_DAYS } from "../lib/dashboard";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate, formatDuration, formatMoney } from "../lib/format";
@@ -35,7 +40,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     select: { id: true },
   });
   const metrics = shop ? await getDashboardMetrics(shop.id) : null;
-  return { metrics };
+  const promptReview = shop ? await shouldPromptReview(shop.id) : false;
+  return { metrics, promptReview };
+};
+
+// Records REVIEW_PROMPT_SHOWN (referral funnel) when the merchant acknowledges
+// the review banner — leaving a review or dismissing it. Kept off the loader so
+// the GET stays read-only; recorded at most once.
+export const action = async ({ request }: ActionFunctionArgs) => {
+  const { session } = await authenticate.admin(request);
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { id: true },
+  });
+  if (shop) await markReviewPromptShown(shop.id);
+  return { ok: true };
 };
 
 function MetricTile({ label, value }: { label: string; value: string }) {
@@ -133,7 +152,32 @@ function ExpiringSoonCard({ metrics }: { metrics: Metrics }) {
 }
 
 export default function Index() {
-  const { metrics } = useLoaderData<typeof loader>();
+  const { metrics, promptReview } = useLoaderData<typeof loader>();
+  const reviewFetcher = useFetcher();
+  // Hide immediately on click; the action records REVIEW_PROMPT_SHOWN so it
+  // won't return on the next load either.
+  const showReview = promptReview && reviewFetcher.state === "idle" && !reviewFetcher.data;
+  const acknowledgeReview = () =>
+    reviewFetcher.submit({}, { method: "post" });
+
+  const reviewBanner = showReview ? (
+    <Banner
+      tone="info"
+      title="Enjoying Mannon?"
+      onDismiss={acknowledgeReview}
+      action={{
+        content: "Leave a review",
+        url: "https://apps.shopify.com/mannon#modal-show=WriteReview",
+        external: true,
+        onAction: acknowledgeReview,
+      }}
+    >
+      <p>
+        You&rsquo;ve turned a quote into a real order — nice. A quick review helps
+        other B2B merchants find Mannon.
+      </p>
+    </Banner>
+  ) : null;
 
   // Empty state: no shop row yet, or no activity recorded.
   if (!metrics || !metrics.hasActivity) {
@@ -163,6 +207,7 @@ export default function Index() {
     <Page>
       <TitleBar title="Mannon" />
       <BlockStack gap="500">
+        {reviewBanner}
         <Layout>
           <Layout.Section>
             <BlockStack gap="500">
