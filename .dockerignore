@@ -1,0 +1,14 @@
+node_modules
+build
+.git
+.gitignore
+.env
+.env.*
+*.log
+npm-debug.log*
+.DS_Store
+.cache
+coverage
+store/listing/rendered
+store/listing/*.mp4
+README.md

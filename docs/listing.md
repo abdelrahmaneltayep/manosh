@@ -17,7 +17,7 @@ benefit-first, honest about scope). Paste each block into the matching field.
 
 ## Tagline / subtitle (≤ 62 characters)
 
-**Wholesale quotes and one-tap reorders on native B2B**
+**Quote, counter, accept — B2B wholesale without the email**
 
 ## App card subtitle (listing grid, ~62 chars)
 
@@ -27,23 +27,22 @@ benefit-first, honest about scope). Paste each block into the matching field.
 
 ## Short description (~120 characters)
 
-Quote requests, counters, and one-tap reorders for merchants on Shopify's native
-B2B — priced on real draft orders.
+A quote negotiation loop — request, counter, accept — plus a passwordless buyer
+portal and one-tap reorder, priced on real Shopify draft orders.
 
 ## Detailed description
 
 **Stop running wholesale out of your inbox.**
 
-You turned on Shopify's native B2B — then hit the wall every merchant hits:
-quotes, custom per-account pricing, and reorders all fall back to email and
-spreadsheets. Mannon closes that gap without rebuilding anything Shopify already
-does.
+Wholesale still runs on email: a buyer asks for a price, you build a spreadsheet,
+they reply with changes, you re-quote, and days later maybe an order lands.
+Mannon turns that whole loop into a single link.
 
-Buyers get a passwordless portal to request a quote or reorder a past order in
-one tap. You get a Polaris inbox to counter and accept. The moment a quote is
-accepted, Mannon creates a real Shopify **draft order** — with Shopify's own
-totals, tax, payment terms, and PO number. Mannon never invents pricing or tax;
-it orchestrates what Shopify already owns.
+Buyers get a passwordless portal to request a quote, counter, or reorder a past
+order in one tap. You get a Polaris inbox to counter back and accept. The moment
+a quote is accepted, Mannon creates a real Shopify **draft order** — with
+Shopify's own totals, tax, payment terms, and PO number. Mannon never invents
+pricing or tax; it orchestrates what Shopify already owns.
 
 **What you can do**
 
@@ -57,17 +56,18 @@ it orchestrates what Shopify already owns.
   email — and Mannon matches it to your catalog. AI never acts on its own: every
   match is shown for confirmation, and every product id is checked against your
   live catalog before anything is created.
-- **Native terms & PO.** Attach your existing Shopify payment terms and a PO
+- **Net terms & PO.** Attach your existing Shopify payment terms and a PO
   reference to the draft order. Display and attach only — Shopify enforces terms.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
 **Built the right way**
 
-- Rides Shopify's native B2B (companies, catalogs, payment terms).
-- Prices on draft orders — Shopify is the single source of truth for money.
+- Prices on real Shopify draft orders — Shopify is the single source of truth for
+  money; Mannon never recomputes tax or totals.
 - Minimum permissions, every webhook signature-verified, buyer links passwordless
   and single-use.
+- Works on any Shopify plan.
 
 Start with a 14-day free trial. No pricing engine to configure, no data to
 migrate — install, invite a buyer, and send your first quote.
@@ -84,9 +84,9 @@ migrate — install, invite a buyer, and send your first quote.
    Your best buyers reorder past purchases instantly, repriced to today's
    catalog, with auto-approval inside a tolerance you control.
 
-3. **Built on native B2B, honest about money**
-   Mannon never computes tax or totals — Shopify does. You get accurate draft
-   orders with your real terms every time.
+3. **Real orders, honest about money**
+   Every accepted quote becomes a real Shopify draft order. Mannon never computes
+   tax or totals — Shopify does — so your books stay clean.
 
 ---
 
@@ -96,7 +96,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Merchant quote inbox with line-by-line counter and accept → draft order
 - One-tap reorder with merchant-set auto-approval tolerance
 - Quick-order pad (paste SKUs) + AI Magic Order Pad (paste a PO or email)
-- Native Shopify payment terms + PO reference on every order
+- Shopify payment terms + PO reference on every order
 - ROI dashboard built entirely from your activity
 - Minimum OAuth scopes, HMAC-verified webhooks, GDPR webhooks handled
 
@@ -104,7 +104,7 @@ migrate — install, invite a buyer, and send your first quote.
 
 ## Pricing (from billing config)
 
-**Every feature is included on both plans** — quote builder, buyer portal, native
+**Every feature is included on both plans** — quote builder, buyer portal, net
 terms/PO, AI Magic Order Pad, reorder, and the ROI dashboard. Plans differ only
 by enforceable **limits**, so merchants upgrade when their wholesale desk grows,
 not to unlock features.
@@ -134,10 +134,10 @@ not to unlock features.
 
 ## Requirements / install notes
 
-- Requires **Shopify's native B2B** to be enabled (companies + at least one B2B
-  catalog). Mannon rides these primitives; it does not replace them.
-- Works on any plan that supports B2B. No theme changes required — the merchant
-  app is embedded in Admin; the buyer portal is a standalone passwordless page.
+- Works on any Shopify plan. No theme changes required — the merchant app is
+  embedded in Admin; the buyer portal is a standalone passwordless page.
+- Mannon runs on Shopify draft orders and its own buyer portal, so it doesn't
+  depend on Shopify's company-accounts feature being set up first.
 
 ## First-use / onboarding
 

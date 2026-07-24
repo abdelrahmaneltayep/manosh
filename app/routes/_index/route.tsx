@@ -24,8 +24,8 @@ export default function App() {
       <div className={styles.content}>
         <h1 className={styles.heading}>Wholesale quoting, without the email grind</h1>
         <p className={styles.text}>
-          Mannon gives your B2B buyers a quote inbox and one-tap reorder, built
-          on your store&rsquo;s native B2B — no rebuilt pricing, no spreadsheets.
+          Mannon gives your B2B buyers a quote inbox, a passwordless portal, and
+          one-tap reorder — priced on real Shopify draft orders, no spreadsheets.
         </p>
         {showForm && (
           <Form className={styles.form} method="post" action="/auth/login">
@@ -49,8 +49,8 @@ export default function App() {
             your buyers can send from their phone.
           </li>
           <li>
-            <strong>Built on native B2B</strong>. Companies, catalogs, and
-            payment terms stay Shopify&rsquo;s — Mannon just orchestrates.
+            <strong>Passwordless buyer portal</strong>. Buyers accept, counter,
+            or reorder from a secure magic link — no password, no login wall.
           </li>
         </ul>
       </div>
