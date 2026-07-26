@@ -21,4 +21,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 EXPOSE 3000
 
-CMD ["npm", "run", "docker-start"]
+# Start the server ONLY — Prisma is generated at build time and migrations run
+# via fly.toml's release_command. Running generate/migrate here delayed the boot
+# ~20s, causing Fly "connection refused" and failed page loads on cold start.
+CMD ["npm", "run", "start"]
