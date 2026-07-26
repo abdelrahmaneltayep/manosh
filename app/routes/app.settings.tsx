@@ -40,7 +40,13 @@ import {
   type PlanName,
 } from "../lib/billing";
 
-const IS_TEST = process.env.NODE_ENV !== "production";
+// Billing test mode: real charges can't be created on development / review
+// stores, so force test charges there. Defaults to test off in production, but
+// set SHOPIFY_BILLING_TEST=true (e.g. while testing on a dev store or during
+// App Store review) to use test charges. Flip it off for real paying merchants.
+const IS_TEST =
+  process.env.NODE_ENV !== "production" ||
+  process.env.SHOPIFY_BILLING_TEST === "true";
 
 // PLAN_LIMITS with Infinity → null for JSON serialisation (null = unlimited).
 const PLAN_LIMIT_DISPLAY = {
