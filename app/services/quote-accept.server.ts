@@ -67,6 +67,41 @@ export async function acceptAndOrder(
     );
   }
 
+  // F9 — enforce order rules at conversion too, so a countered quote that no
+  // longer meets MOQ/pack/min-value can't slip through. Round line quantities up
+  // (persisted) and block a total under the store minimum.
+  if (process.env.MANNON_FF_MOQ === "true") {
+    const shop = await prisma.shop.findUnique({
+      where: { id: quote.company.shopId },
+      select: { shopifyDomain: true },
+    });
+    if (shop) {
+      const { evaluateForCompany, logRuleApplied } = await import("./order-rules.server");
+      const evalResult = await evaluateForCompany(
+        shop.shopifyDomain,
+        quote.lines.map((l) => ({ variantId: l.variantId, qty: l.quantity, price: Number(l.price) })),
+        quote.companyId,
+      );
+      let changed = 0;
+      for (const adj of evalResult.lines) {
+        if (!adj.changed) continue;
+        const line = quote.lines.find((l) => l.variantId === adj.variantId);
+        if (line) {
+          await prisma.quoteLine.update({ where: { id: line.id }, data: { quantity: adj.finalQty } });
+          line.quantity = adj.finalQty;
+          changed++;
+        }
+      }
+      if (!evalResult.ok && evalResult.minOrderValue != null) {
+        await logRuleApplied(quote.company.shopId, quoteId, { changed, blocked: true });
+        throw new DraftOrderError(
+          `This order is under the ${options.currencyCode} ${evalResult.minOrderValue.toFixed(2)} minimum. Add more before placing it.`,
+        );
+      }
+      if (changed > 0) await logRuleApplied(quote.company.shopId, quoteId, { changed, blocked: false });
+    }
+  }
+
   const input = buildDraftOrderInput({
     currencyCode: options.currencyCode,
     poReference: quote.poReference,

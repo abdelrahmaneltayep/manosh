@@ -431,6 +431,12 @@ export default function Settings() {
                 </Text>
                 <Badge tone="info">1 reminder on Starter · full cadence on Growth</Badge>
               </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Order minimums &amp; pack rules
+                </Text>
+                <Badge tone="info">Store + product on Starter · groups + packs + CSV on Growth</Badge>
+              </InlineStack>
             </BlockStack>
 
             <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">

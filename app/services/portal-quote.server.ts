@@ -82,12 +82,32 @@ export async function submitBuyerQuote(
   // Plan quote-volume cap (per shop). Check before persisting.
   const company = await prisma.company.findUnique({
     where: { id: buyer.companyId },
-    select: { shopId: true },
+    select: { shopId: true, shop: { select: { shopifyDomain: true } } },
   });
   if (company) {
     const allowance = await canCreateQuote(company.shopId);
     if (!allowance.allowed) {
       return { ok: false, error: QUOTE_CAP_BUYER_MESSAGE, capReached: true };
+    }
+  }
+
+  // F9 — order rules (MOQ / pack size / min order value). Round line quantities
+  // up (never dropped) and block a cart under the store minimum with a shortfall.
+  if (process.env.MANNON_FF_MOQ === "true" && company) {
+    const { evaluateForCompany } = await import("./order-rules.server");
+    const evalResult = await evaluateForCompany(
+      company.shop.shopifyDomain,
+      built.lines.map((l) => ({ variantId: l.variantId, qty: l.quantity, price: Number(l.price) })),
+      buyer.companyId,
+    );
+    for (const adj of evalResult.lines) {
+      const line = built.lines.find((l) => l.variantId === adj.variantId);
+      if (line) line.quantity = adj.finalQty;
+    }
+    if (!evalResult.ok && evalResult.minOrderValue != null) {
+      const { shortfallMessage } = await import("../lib/order-rules");
+      const currency = catalog[0]?.currencyCode ?? "USD";
+      return { ok: false, error: shortfallMessage(currency, evalResult.shortfall, evalResult.minOrderValue) };
     }
   }
 

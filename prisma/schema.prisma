@@ -59,8 +59,35 @@ model Shop {
   wholesaleApplications WholesaleApplication[]
   quoteMetrics          QuoteMetricDaily[]
   followupPolicy        FollowupPolicy?
+  orderRules            OrderRule[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F9 — wholesale order controls: minimum order quantity, pack/case-size
+// multiples, and order-value minimums. Scoped by specificity (product >
+// customer-group > collection > store); the most specific matching rule wins.
+model OrderRule {
+  id            String    @id @default(cuid())
+  shopId        String
+  shop          Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  scope         RuleScope
+  targetId      String? // variantId (PRODUCT), companyId (CUSTOMER_GROUP), collection gid (COLLECTION); null for STORE
+  minQty        Int?
+  packSize      Int?
+  minOrderValue Decimal?  @db.Decimal(18, 4)
+  priority      Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([shopId, scope])
+}
+
+enum RuleScope {
+  STORE
+  COLLECTION
+  PRODUCT
+  CUSTOMER_GROUP
 }
 
 // F8 — store default follow-up policy (one per shop). Starter is clamped to a
@@ -614,6 +641,7 @@ enum EventType {
   WHOLESALE_APPLICATION_DECIDED
   ANALYTICS_VIEWED
   FOLLOWUP_SENT
+  ORDER_RULE_APPLIED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

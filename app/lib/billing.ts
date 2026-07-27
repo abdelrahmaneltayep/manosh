@@ -163,6 +163,27 @@ export function evaluateSavedListAllowance(used: number, cap: number): { allowed
   return { allowed: used < cap, used, cap };
 }
 
+// --- F9 order-rule scope gating ----------------------------------------------
+
+export type RuleScopeName = "STORE" | "COLLECTION" | "PRODUCT" | "CUSTOMER_GROUP";
+
+/**
+ * Which order-rule scopes a plan may create. Starter = store minimum + product
+ * MOQ; Growth adds collection + customer-group scopes (and pack multiples + CSV,
+ * gated separately). Pure.
+ */
+export function allowedRuleScopes(plan: string | null | undefined): RuleScopeName[] {
+  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowth
+    ? ["STORE", "PRODUCT", "COLLECTION", "CUSTOMER_GROUP"]
+    : ["STORE", "PRODUCT"];
+}
+
+/** Pack/case-size multiples + CSV import are Growth-only. Pure. */
+export function packRulesAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
 /** Buyer-facing copy when the saved-list cap is hit. */
 export function savedListCapMessage(cap: number): string {
   return `This store's plan allows ${cap} saved lists. Ask them to upgrade for unlimited saved lists and CSV upload.`;
