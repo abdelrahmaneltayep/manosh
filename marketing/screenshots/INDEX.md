@@ -14,10 +14,11 @@ faithful mocks built in the container, which can't reach a store).
 | 4 | `f4-order-pad.png` | F4 Bulk Order Pad | Order pad with pasted SKUs + a live subtotal | core |
 | 5 | `f5-company-accounts.png` | F5 Company Accounts | Team tab with roles + an approval-request state | core |
 | 6 | `f6-wholesale-registration.png` | F6 Wholesale Registration | Admin approval queue with a pending application open | candidate (funnel story) |
+| 7 | `f7-quote-analytics.png` | F7 Quote Analytics | Analytics dashboard: KPI cards + trend sparklines + top accounts | candidate (strong — promote into store 7) |
 
 ## Reel order (extended cut)
 
 Opening → **F4** order pad · **F1** AI counter-offer (hero) · **F2** net-terms
 invoice · **F3** custom pricing · **F5** team approvals (closing) · **F6** wholesale
-sign-up (extended B-roll only). Keep the core store reel ≤ 60s — see
-`marketing/video-script.md`.
+sign-up (extended B-roll) · **F7** analytics (standalone 15s social cut). Keep the
+core store reel ≤ 60s — see `marketing/video-script.md`.

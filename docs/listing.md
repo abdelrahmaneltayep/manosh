@@ -50,6 +50,9 @@ it orchestrates what Shopify already owns.
 - **Quote loop.** Buyers build a basket and submit; you counter line-by-line
   from your inbox; they accept. Every quote has a clear status and a merchant-set
   expiry.
+- **Negotiation analytics (Growth).** A dashboard rivals don't have: win rate,
+  average discount, time-to-close, open pipeline, top accounts, and which SKUs get
+  discounted most — with 30/90-day trends and CSV export.
 - **AI counter-offers (Growth).** Inside any quote, get a suggested price, a
   margin read, and a ready-to-send message in one click. Suggestions never go
   below the floor margin you set, and you confirm every counter — the AI drafts,
@@ -116,6 +119,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Buyer quote builder + passwordless portal (magic-link sign-in)
 - Merchant quote inbox with line-by-line counter and accept → draft order
 - AI Quote Assistant: one-click AI counter-offers with a margin read (Growth plan)
+- Negotiation analytics: win rate, avg discount, time-to-close, pipeline (Growth plan)
 - Net terms + invoice due dates on every terms order (all plans)
 - Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
@@ -156,6 +160,9 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Negotiation analytics (Growth):** win rate, average discount, time-to-close,
+  and open pipeline — with 30/90-day trends, top accounts, a most-discounted-SKU
+  leaderboard, and CSV export. Most apps show orders; this shows the negotiation.
 - **Gated wholesale sign-up:** a branded “apply to buy wholesale” form with an
   approval queue (approve / reject / request more info) and auto-approval rules —
   screen buyers before they see your prices, then approve in one click to

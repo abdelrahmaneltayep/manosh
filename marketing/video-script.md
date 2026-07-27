@@ -62,6 +62,15 @@ over dialogue.
 > **approval queue** with a pending application — the merchant clicks **Approve**
 > and it flips to approved. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## 15s social cut — negotiation analytics (Feature 7)
+
+> **VO:** "See every deal you're winning and losing — win rate, average discount,
+> and time-to-close, at a glance."
+>
+> **On screen:** The **Analytics** dashboard: KPI cards with trend sparklines, the
+> 30/90-day switcher, and the top-accounts table. _(Standalone 15s social clip —
+> not part of the ≤60s store reel.)_
+
 ## Supporting beats (existing pillars)
 
 - **Passwordless portal.** VO: "Your buyer accepts from a secure link — no

@@ -80,6 +80,11 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "A new wholesale application from {{companyName}} ({{contactEmail}}) is waiting for review in Mannon.",
   },
+  weekly_digest: {
+    subject: "Your week in quotes — {{shopName}}",
+    body:
+      "Here's your week: {{quotes}} quotes, {{winRate}} win rate, {{pipeline}} open pipeline.\n\nOpen Mannon → Analytics for the full picture.",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

@@ -100,6 +100,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     application_received: "Wholesale — application received",
     application_decision: "Wholesale — application decision",
     application_notify: "Wholesale — new application (internal)",
+    weekly_digest: "Analytics — weekly digest",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -195,6 +196,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       "application_received",
       "application_decision",
       "application_notify",
+      "weekly_digest",
     ];
     const overrides: Record<string, { subject?: string; body?: string }> = {};
     for (const key of keys) {
@@ -405,6 +407,17 @@ export default function Settings() {
                   Wholesale sign-up forms
                 </Text>
                 <Badge tone="info">1 form · manual on Starter · multi-form + auto-approve on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Quote analytics
+                </Text>
+                <Badge tone="info">Growth</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Win rate, avg discount, time-to-close, and pipeline.
+                  </Text>
+                )}
               </InlineStack>
             </BlockStack>
 

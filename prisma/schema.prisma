@@ -46,6 +46,7 @@ model Shop {
   minMarginPct          Float                  @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
   defaultTermsDays      Int                    @default(30) // F2: default net-terms days for new invoices
   emailTemplates        Json? // F2: editable invoice/reminder email templates (keyed by template id)
+  weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
   installedAt           DateTime               @default(now())
   companies             Company[]
   events                Event[]
@@ -55,8 +56,30 @@ model Shop {
   priceListTags         PriceListTag[]
   wholesaleForms        WholesaleForm[]
   wholesaleApplications WholesaleApplication[]
+  quoteMetrics          QuoteMetricDaily[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F7 — nightly rollup of negotiation metrics per shop per day. Derived from
+// Quote + the append-only Event stream by the analytics cron; the dashboard also
+// computes "today" live. One row per (shopId, date).
+model QuoteMetricDaily {
+  id                String   @id @default(cuid())
+  shopId            String
+  shop              Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  date              DateTime @db.Date
+  quotesCreated     Int      @default(0)
+  quotesWon         Int      @default(0)
+  quotesLost        Int      @default(0)
+  quotesExpired     Int      @default(0)
+  quoteValueTotal   Decimal  @default(0) @db.Decimal(18, 4)
+  discountPctAvg    Float    @default(0)
+  timeToCloseHrsAvg Float    @default(0)
+  createdAt         DateTime @default(now())
+
+  @@unique([shopId, date])
+  @@index([shopId, date])
 }
 
 // F6 — a branded wholesale application form. Starter = 1 form; Growth = multiple
@@ -536,6 +559,7 @@ enum EventType {
   MEMBER_INVITED
   ORDER_APPROVED
   WHOLESALE_APPLICATION_DECIDED
+  ANALYTICS_VIEWED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
