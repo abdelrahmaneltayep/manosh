@@ -8,6 +8,7 @@ import { dirname, join } from "node:path";
 // fuller used-vs-declared reconciliation; this catches drift early.
 const EXPECTED = [
   "read_companies",
+  "read_inventory",
   "read_orders",
   "read_payment_terms",
   "read_products",

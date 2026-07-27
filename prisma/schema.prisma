@@ -36,19 +36,38 @@ model Session {
 }
 
 model Shop {
-  id                   String    @id @default(cuid())
-  shopifyDomain        String    @unique // e.g. acme.myshopify.com
-  plan                 Plan      @default(TRIAL)
+  id                   String        @id @default(cuid())
+  shopifyDomain        String        @unique // e.g. acme.myshopify.com
+  plan                 Plan          @default(TRIAL)
   trialEndsAt          DateTime?
-  autoApproveTolerance Float     @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
-  quoteExpiryDays      Int       @default(14) // default quote lifetime
-  magicLinkExpiryDays  Int       @default(7) // how long a buyer magic link stays valid
-  installedAt          DateTime  @default(now())
+  autoApproveTolerance Float         @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
+  quoteExpiryDays      Int           @default(14) // default quote lifetime
+  magicLinkExpiryDays  Int           @default(7) // how long a buyer magic link stays valid
+  minMarginPct         Float         @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
+  installedAt          DateTime      @default(now())
   companies            Company[]
   events               Event[]
   staffSeats           StaffSeat[]
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  variantCosts         VariantCost[]
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+// Cached wholesale cost per variant, pulled from Shopify inventoryItem.unitCost
+// (needs read_inventory). Populated opportunistically when the AI Quote
+// Assistant computes a suggestion, so margin math is real. Reference only — the
+// authoritative money is still settled on the draft order, never computed by us.
+model VariantCost {
+  id           String   @id @default(cuid())
+  shopId       String
+  shop         Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  variantId    String // gid://shopify/ProductVariant/...
+  costPrice    Decimal? @db.Decimal(18, 4) // unit cost; null when Shopify has none
+  currencyCode String?
+  updatedAt    DateTime @updatedAt
+
+  @@unique([shopId, variantId])
+  @@index([shopId])
 }
 
 // Minimal staff-seat record — used only to gate the Starter (1) vs Growth (5)
@@ -81,37 +100,38 @@ model Company {
 }
 
 model Buyer {
-  id                  String    @id @default(cuid())
-  companyId           String
-  company             Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  email               String // PII
-  name                String? // PII
-  shopifyContactId    String? // gid://shopify/CompanyContact/...
+  id                       String    @id @default(cuid())
+  companyId                String
+  company                  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  email                    String // PII
+  name                     String? // PII
+  shopifyContactId         String? // gid://shopify/CompanyContact/...
   shopifyCompanyLocationId String? // gid://shopify/CompanyLocation/... — the location this buyer purchases for (purchasingEntity)
-  magicTokenHash      String? // hash only, never raw
-  magicTokenExpiresAt DateTime?
-  quotes              Quote[]
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  magicTokenHash           String? // hash only, never raw
+  magicTokenExpiresAt      DateTime?
+  quotes                   Quote[]
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   @@unique([companyId, email])
   @@index([magicTokenHash])
 }
 
 model Quote {
-  id             String      @id @default(cuid())
+  id             String              @id @default(cuid())
   companyId      String
-  company        Company     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company        Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   buyerId        String
-  buyer          Buyer       @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  status         QuoteStatus @default(SUBMITTED)
+  buyer          Buyer               @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  status         QuoteStatus         @default(SUBMITTED)
   expiresAt      DateTime
   poReference    String?
   draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
   totalsSnapshot Json? // exact draftOrderCalculate output
   lines          QuoteLine[]
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  aiSuggestions  QuoteAiSuggestion[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@index([companyId, status])
   @@index([status, expiresAt])
@@ -129,6 +149,27 @@ model QuoteLine {
   createdAt DateTime @default(now())
 
   @@index([quoteId])
+}
+
+// AI Quote Assistant (Feature 1, Growth-only). One row per suggestion the
+// merchant generated for a quote — line-level (lineId set) or quote-level
+// (lineId null). The most recent row per (quoteId, lineId) is the cached
+// suggestion shown on the page. AI drafts only; a human confirms (guardrail #4).
+model QuoteAiSuggestion {
+  id             String   @id @default(cuid())
+  quoteId        String
+  quote          Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  lineId         String? // null = quote-level suggestion
+  suggestedPrice Decimal  @db.Decimal(18, 4)
+  floorPrice     Decimal  @db.Decimal(18, 4)
+  marginPct      Float? // null when the variant has no cached cost (unknown margin)
+  belowFloor     Boolean  @default(false) // snapshot: did the suggestion breach the floor?
+  rationale      String // plain-English reasoning shown to the merchant
+  draftMessage   String // ready-to-send buyer message
+  model          String // e.g. claude-haiku-4-5
+  createdAt      DateTime @default(now())
+
+  @@index([quoteId, lineId, createdAt])
 }
 
 model ReorderSource {
@@ -185,6 +226,7 @@ enum EventType {
   REORDER_CREATED
   DRAFT_ORDER_CREATED
   AI_PARSE_ACCEPTED
+  AI_SUGGESTION_USED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

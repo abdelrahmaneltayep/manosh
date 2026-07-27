@@ -11,6 +11,9 @@ export interface ShopSettings {
   autoApproveTolerance: number;
   quoteExpiryDays: number;
   magicLinkExpiryDays: number;
+  /** Fraction (0.15 = 15%). AI Quote Assistant floor margin — suggestions never
+   * knowingly go below this. */
+  minMarginPct: number;
 }
 
 export type ValidateResult =
@@ -22,6 +25,7 @@ export function validateSettings(input: {
   autoApproveTolerance: number;
   quoteExpiryDays: number;
   magicLinkExpiryDays: number;
+  minMarginPct: number;
 }): ValidateResult {
   if (
     !Number.isFinite(input.autoApproveTolerance) ||
@@ -36,6 +40,13 @@ export function validateSettings(input: {
   if (!Number.isInteger(input.magicLinkExpiryDays) || input.magicLinkExpiryDays < 1 || input.magicLinkExpiryDays > 90) {
     return { ok: false, error: "Magic-link expiry must be between 1 and 90 days." };
   }
+  if (
+    !Number.isFinite(input.minMarginPct) ||
+    input.minMarginPct < 0 ||
+    input.minMarginPct > 0.95
+  ) {
+    return { ok: false, error: "Floor margin must be between 0% and 95%." };
+  }
   return { ok: true, settings: input };
 }
 
@@ -49,6 +60,7 @@ export async function getShopSettings(
       autoApproveTolerance: true,
       quoteExpiryDays: true,
       magicLinkExpiryDays: true,
+      minMarginPct: true,
     },
   });
   return shop;
@@ -65,6 +77,7 @@ export async function updateShopSettings(
       autoApproveTolerance: true,
       quoteExpiryDays: true,
       magicLinkExpiryDays: true,
+      minMarginPct: true,
     },
   });
   return updated;
