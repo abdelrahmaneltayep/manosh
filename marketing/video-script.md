@@ -25,6 +25,16 @@ over dialogue.
 > 31–60 / 60+) and a company near its credit limit. Cut to the buyer portal: an
 > **invoice with its due date** and a **Download PDF** button.
 
+## Custom pricing beat (Feature 3 — slot near the quote beat)
+
+> **VO:** "Every customer sees their own pricing automatically — assign a price
+> list once, and the buyer's portal shows their price and how much they save, no
+> codes."
+>
+> **On screen:** The merchant's **price-list grid** with per-variant prices and a
+> volume break. Cut to the buyer's quote page: a product line showing the list
+> price struck through, the custom price, and a **"You save 18%"** badge.
+
 ## Supporting beats (existing pillars)
 
 - **Passwordless portal.** VO: "Your buyer accepts from a secure link — no
