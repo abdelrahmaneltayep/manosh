@@ -85,6 +85,21 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Here's your week: {{quotes}} quotes, {{winRate}} win rate, {{pipeline}} open pipeline.\n\nOpen Mannon → Analytics for the full picture.",
   },
+  followup_reminder: {
+    subject: "A quick nudge on your quote from {{shopName}}",
+    body:
+      "Hi {{buyerName}},\n\nJust following up on your open quote — it's ready for you to accept or counter:\n\n{{quoteUrl}}\n\nIt expires on {{expiresAt}}.\n\nThank you,\n{{shopName}}\n\nStop these reminders: {{unsubscribeUrl}}",
+  },
+  followup_expiry_warning: {
+    subject: "Your quote expires soon — {{expiresAt}}",
+    body:
+      "Hi {{buyerName}},\n\nYour quote expires on {{expiresAt}}. Accept or counter it before then so you don't lose the pricing:\n\n{{quoteUrl}}\n\nThank you,\n{{shopName}}\n\nStop these reminders: {{unsubscribeUrl}}",
+  },
+  followup_expired: {
+    subject: "Your quote has expired",
+    body:
+      "Hi {{buyerName}},\n\nYour quote has expired. Reach out if you'd still like to order — we're happy to re-quote.\n\n{{quoteUrl}}\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

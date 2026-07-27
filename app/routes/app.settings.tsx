@@ -101,6 +101,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     application_decision: "Wholesale — application decision",
     application_notify: "Wholesale — new application (internal)",
     weekly_digest: "Analytics — weekly digest",
+    followup_reminder: "Follow-up — reminder nudge",
+    followup_expiry_warning: "Follow-up — expiry warning",
+    followup_expired: "Follow-up — expired",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -197,6 +200,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       "application_decision",
       "application_notify",
       "weekly_digest",
+      "followup_reminder",
+      "followup_expiry_warning",
+      "followup_expired",
     ];
     const overrides: Record<string, { subject?: string; body?: string }> = {};
     for (const key of keys) {
@@ -418,6 +424,12 @@ export default function Settings() {
                     Win rate, avg discount, time-to-close, and pipeline.
                   </Text>
                 )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Auto follow-ups &amp; expiry
+                </Text>
+                <Badge tone="info">1 reminder on Starter · full cadence on Growth</Badge>
               </InlineStack>
             </BlockStack>
 
