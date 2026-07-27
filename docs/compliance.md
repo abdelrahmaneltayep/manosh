@@ -64,6 +64,9 @@ _All planned core-path scopes are now declared._
 Notes:
 - **No `write_products`, no `write_customers`, no tax/discount scopes** — we never mutate the catalog
   and never compute money.
+- **F10 Accounting Sync adds no Shopify scope.** QuickBooks Online / Xero use their own external OAuth
+  (scopes in `docs/accounting-sync.md`). Their access + refresh tokens are AES-256-GCM encrypted at rest
+  (`app/lib/crypto.server.ts`, key `MANNON_ENCRYPTION_KEY`) and never logged (guardrail #7).
 - If a slice needs a scope not listed here, add the row and the reason in the same commit.
 - Keep the "declared now" table in sync with `shopify.app.toml`. S19's self-review verifies they
   match and that every declared scope is actually exercised.

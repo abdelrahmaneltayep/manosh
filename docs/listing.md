@@ -83,6 +83,9 @@ it orchestrates what Shopify already owns.
 - **Order minimums, MOQ & case-size rules.** Enforce minimum order quantities,
   order-value minimums, and pack/case multiples across the portal, order pad, and
   quote conversion — quantities round up with a plain-language explanation.
+- **QuickBooks & Xero sync (Growth).** Connect QuickBooks Online or Xero once and
+  every Mannon invoice — and its payment — lands in your books automatically. No
+  re-keying, idempotent so nothing double-posts, with a sync log you can retry.
 - **Net terms & credit control (Growth).** Give each company a credit limit and
   terms; net-terms orders raise an invoice with a due date. An aging dashboard,
   automatic payment reminders, and downloadable invoices keep receivables tidy.
@@ -130,6 +133,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Order minimums, MOQ & pack/case-size rules (group/collection + CSV on Growth)
 - Net terms + invoice due dates on every terms order (all plans)
 - Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
+- QuickBooks Online & Xero sync — invoices + payments, no re-keying (Growth plan)
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
@@ -168,6 +172,9 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **QuickBooks Online & Xero sync (Growth):** connect your accounting once and
+  every net-terms invoice + payment syncs automatically — idempotent (nothing
+  double-posts), with a retryable sync log. No more re-keying invoices.
 - **Order minimums & case-size rules:** minimum order quantities, order-value
   minimums, and pack/case multiples — enforced identically in the portal, the
   order pad, and quote conversion, with quantities rounded up and explained.

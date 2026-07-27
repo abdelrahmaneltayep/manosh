@@ -80,6 +80,15 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — accounting sync (Feature 10)
+
+> **VO:** "Orders land in your books automatically — connect QuickBooks or Xero
+> once and every invoice syncs, no re-keying."
+>
+> **On screen:** The **Accounting** settings page: a green **"Connected to
+> QuickBooks"** badge and a sync log with invoices marked **Synced**. _(Extended
+> cut only — keep the core reel ≤ 60s.)_
+
 ## Docs GIF only — order rules (Feature 9)
 
 > **Not in the store reel** (keep it ≤ 60s). A short docs/help GIF: a buyer sets

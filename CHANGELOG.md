@@ -5,6 +5,28 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 10: Accounting Sync (QuickBooks Online & Xero) (Growth)
+
+- **Books, no re-keying.** Connect QuickBooks Online or Xero via OAuth (standard
+  redirect — no pasted secrets) and every Mannon net-terms invoice, plus its
+  payment when settled, syncs to the provider automatically. Tokens are
+  **AES-256-GCM encrypted at rest** (`app/lib/crypto.server.ts`) and never logged.
+- **Idempotent + self-healing.** Each invoice is queued once per provider (DB
+  unique on shop+provider+entity+localId — a retry or double-checkout never
+  double-posts), synced by `/internal/cron/accounting` (CRON_SECRET) with capped
+  exponential backoff, and parked as **FAILED** with a **Retry** button after
+  `SYNC_MAX_ATTEMPTS`. A failed sync never blocks the Shopify order.
+- **Field mapping.** Map Mannon tax classes → provider tax codes and a default
+  income account, choose customer match strategy (email / name), and a sandbox
+  test-mode toggle — at `/app/accounting`.
+- **Failure digest.** One merchant email (not per-event spam) summarizes
+  undigested failures; new editable template `accounting_sync_failure`.
+- **Plan gating.** Growth-only (`accountingSyncAllowed`); Starter sees "Connect
+  your accounting — upgrade to Growth." Optional first-run nudge in Settings.
+  Events `ACCOUNTING_CONNECTED`, `INVOICE_SYNCED`. Dark-launched behind
+  `MANNON_FF_ACCOUNTING_SYNC`. Migration `f10_accounting_sync`. No new Shopify
+  OAuth scope (QBO/Xero are external OAuth). See `docs/accounting-sync.md`.
+
 ### Added — Feature 9: MOQ, Order Minimums & Pack/Case-Size Rules
 
 - **Wholesale order controls.** Minimum order quantity (MOQ), order-value
