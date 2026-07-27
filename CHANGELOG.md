@@ -5,6 +5,24 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 5: Company Accounts & Multi-Buyer Sub-Accounts
+
+- **Members with roles.** A buyer is now a company member with a role (admin /
+  buyer / approver) and status (invited / active). Admins invite teammates from a
+  new portal **Team** tab using the existing passwordless magic-link — no new
+  passwords. Extends `Buyer` rather than forking a parallel identity table.
+- **Seat cap.** `PLAN_LIMITS.memberCap` = 1 (Starter) / 5 (Growth). The 2nd invite
+  and the approver/admin roles are blocked on Starter with an upgrade CTA.
+- **Spending approvals (Growth).** Set `Company.approvalThreshold`; a quote whose
+  estimated total reaches it can't be placed until an approver approves. The accept
+  action creates a pending `OrderApproval`, emails approvers (approve/reject
+  deep-link), and blocks the order; approve unblocks it, reject stops it.
+- **Emails.** New editable templates: member invite, approval request, approval
+  decision.
+- **Events.** `MEMBER_INVITED`, `ORDER_APPROVED` (append-only). Dark-launched
+  behind `MANNON_FF_COMPANY_ACCOUNTS`. Migration `f5_company_accounts` (backfills
+  the earliest buyer per company to ADMIN).
+
 ### Added — Feature 4: Enhanced Quick Order / Bulk Order Pad
 
 - **Keyboard-first order pad** in the buyer portal: type-ahead SKU/product search

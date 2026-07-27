@@ -94,6 +94,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     reminder_due: "Reminder — on due date",
     reminder_overdue_7: "Reminder — 7 days overdue",
     reorder_list: "Reorder a saved list",
+    member_invite: "Team — member invite",
+    approval_request: "Team — approval request",
+    approval_decision: "Team — approval decision",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -183,6 +186,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       "reminder_due",
       "reminder_overdue_7",
       "reorder_list",
+      "member_invite",
+      "approval_request",
+      "approval_decision",
     ];
     const overrides: Record<string, { subject?: string; body?: string }> = {};
     for (const key of keys) {
@@ -381,6 +387,12 @@ export default function Settings() {
                   Order pad &amp; saved lists
                 </Text>
                 <Badge tone="info">3 lists on Starter · unlimited + CSV on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Company accounts &amp; approvals
+                </Text>
+                <Badge tone="info">1 buyer on Starter · 5 members + approvals on Growth</Badge>
               </InlineStack>
             </BlockStack>
 

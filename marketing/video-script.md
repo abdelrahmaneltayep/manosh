@@ -44,6 +44,15 @@ over dialogue.
 > volume break. Cut to the buyer's quote page: a product line showing the list
 > price struck through, the custom price, and a **"You save 18%"** badge.
 
+## Closing beat — team approvals (Feature 5 — end the reel here, keep total ≤ 60s)
+
+> **VO:** "Big orders stay in control — add your team, set a spending limit, and
+> anything over it waits for an approver's one tap."
+>
+> **On screen:** The buyer portal **Team** tab shows members with roles
+> (admin / buyer / approver). Cut to a quote marked **"Waiting for approval"**;
+> the approver taps **Approve order** and the status flips to approved.
+
 ## Supporting beats (existing pillars)
 
 - **Passwordless portal.** VO: "Your buyer accepts from a secure link — no
