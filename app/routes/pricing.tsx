@@ -28,7 +28,10 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Quote builder + passwordless portal", starter: "✓", growth: "✓" },
   { label: "Net terms + PO on draft orders", starter: "✓", growth: "✓" },
   { label: "AI Magic Order Pad + one-tap reorder", starter: "✓", growth: "✓" },
+  { label: "Net terms + invoice due dates", starter: "✓", growth: "✓" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
+  { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },
+  { label: "Invoice PDFs", starter: "—", growth: "✓" },
 ];
 
 export default function Pricing() {
@@ -67,7 +70,7 @@ export default function Pricing() {
         <PlanCard
           name={GROWTH_PLAN}
           price={PLAN_PRICING[GROWTH_PLAN].amount}
-          blurb="Unlimited quotes, more seats, and AI counter-offers."
+          blurb="Unlimited quotes, more seats, AI counter-offers, and credit control."
           accent="#4f46e5"
           featured
         />

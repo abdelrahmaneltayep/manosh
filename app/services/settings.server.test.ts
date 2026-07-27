@@ -14,10 +14,15 @@ describe("validateSettings (pure)", () => {
     quoteExpiryDays: 14,
     magicLinkExpiryDays: 7,
     minMarginPct: 0.15,
+    defaultTermsDays: 30,
   };
 
   it("accepts valid settings", () => {
     expect(validateSettings(base).ok).toBe(true);
+  });
+
+  it("rejects a non-standard default net term", () => {
+    expect(validateSettings({ ...base, defaultTermsDays: 20 }).ok).toBe(false);
   });
 
   it("rejects a floor margin outside 0..0.95", () => {
@@ -57,6 +62,7 @@ describe.skipIf(!hasDb)("shop settings (DB)", () => {
       quoteExpiryDays: 30,
       magicLinkExpiryDays: 14,
       minMarginPct: 0.2,
+      defaultTermsDays: 45,
     });
 
     const after = await getShopSettings("settings.myshopify.com");
@@ -65,6 +71,7 @@ describe.skipIf(!hasDb)("shop settings (DB)", () => {
       quoteExpiryDays: 30,
       magicLinkExpiryDays: 14,
       minMarginPct: 0.2,
+      defaultTermsDays: 45,
     });
   });
 });

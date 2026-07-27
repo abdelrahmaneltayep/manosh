@@ -61,6 +61,9 @@ export default function PortalHome() {
         <Link to="/portal/quick-order" className="portal-link">
           Quick order by SKU
         </Link>
+        <Link to="/portal/invoices" className="portal-link">
+          Your invoices
+        </Link>
       </p>
 
       {reorderCards.length > 0 && (

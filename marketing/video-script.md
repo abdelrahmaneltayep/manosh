@@ -16,6 +16,15 @@ over dialogue.
 >
 > _(This is the hero beat of the reel — lead with it.)_
 
+## Net terms + invoice beat (Feature 2 — slot right after the AI counter-offer)
+
+> **VO:** "When the order goes out on net terms, Mannon raises the invoice, sets
+> the due date, and chases payment for you — with an aging view of who owes what."
+>
+> **On screen:** The **Credit** page shows the aging dashboard (Current / 1–30 /
+> 31–60 / 60+) and a company near its credit limit. Cut to the buyer portal: an
+> **invoice with its due date** and a **Download PDF** button.
+
 ## Supporting beats (existing pillars)
 
 - **Passwordless portal.** VO: "Your buyer accepts from a secure link — no

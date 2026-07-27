@@ -10,9 +10,11 @@ import {
   Badge,
   Banner,
   BlockStack,
+  Box,
   InlineGrid,
   InlineStack,
   Divider,
+  Select,
   Text,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
@@ -21,7 +23,16 @@ import {
   getShopSettings,
   updateShopSettings,
   validateSettings,
+  getEmailTemplates,
+  saveEmailTemplates,
+  TERM_DAYS_OPTIONS,
 } from "../services/settings.server";
+import {
+  DEFAULT_TEMPLATES,
+  resolveTemplate,
+  type TemplateKey,
+} from "../services/mailer.server";
+import prisma from "../db.server";
 import { requireBilling, reconcileShopPlan } from "../services/billing.server";
 import { cancelPlan } from "../services/billing-actions.server";
 import { canCreateQuote } from "../services/plan-limits.server";
@@ -64,15 +75,40 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shopId = settings?.id ?? null;
   const upgradeTarget = new URL(request.url).searchParams.get("upgrade");
 
-  const [quoteAllowance, seatAllowance, seats] = shopId
-    ? await Promise.all([canCreateQuote(shopId), canAddSeat(shopId), listSeats(shopId)])
-    : [null, null, []];
+  const creditEnabled = process.env.MANNON_FF_CREDIT === "true";
+
+  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount] =
+    shopId
+      ? await Promise.all([
+          canCreateQuote(shopId),
+          canAddSeat(shopId),
+          listSeats(shopId),
+          getEmailTemplates(session.shop),
+          prisma.creditProfile.count({ where: { company: { shopId } } }),
+        ])
+      : [null, null, [], {}, 0];
+
+  const TEMPLATE_LABELS: Record<TemplateKey, string> = {
+    invoice_issued: "Invoice issued",
+    reminder_t_minus_3: "Reminder — 3 days before due",
+    reminder_due: "Reminder — on due date",
+    reminder_overdue_7: "Reminder — 7 days overdue",
+  };
+  const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
+    const t = resolveTemplate(key, templateOverrides);
+    return { key, label: TEMPLATE_LABELS[key], subject: t.subject, body: t.body };
+  });
 
   return {
     tolerancePercent: settings ? Math.round(settings.autoApproveTolerance * 100) : 0,
     quoteExpiryDays: settings?.quoteExpiryDays ?? 14,
     magicLinkExpiryDays: settings?.magicLinkExpiryDays ?? 7,
     minMarginPercent: settings ? Math.round(settings.minMarginPct * 100) : 15,
+    defaultTermsDays: settings?.defaultTermsDays ?? 30,
+    termDaysOptions: TERM_DAYS_OPTIONS,
+    creditEnabled,
+    hasCreditProfile: creditProfileCount > 0,
+    templates,
     plan: status.plan,
     onTrial: status.onTrial,
     upgradeTarget:
@@ -139,11 +175,33 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       : ({ ok: false, kind: "seat", error: result.error } satisfies ActionResult);
   }
 
+  if (intent === "save-templates") {
+    const keys: TemplateKey[] = [
+      "invoice_issued",
+      "reminder_t_minus_3",
+      "reminder_due",
+      "reminder_overdue_7",
+    ];
+    const overrides: Record<string, { subject?: string; body?: string }> = {};
+    for (const key of keys) {
+      const subject = String(form.get(`tpl_${key}_subject`) ?? "").trim();
+      const body = String(form.get(`tpl_${key}_body`) ?? "").trim();
+      // Only store fields that differ from the default, so defaults keep flowing.
+      const entry: { subject?: string; body?: string } = {};
+      if (subject && subject !== DEFAULT_TEMPLATES[key].subject) entry.subject = subject;
+      if (body && body !== DEFAULT_TEMPLATES[key].body) entry.body = body;
+      if (entry.subject || entry.body) overrides[key] = entry;
+    }
+    await saveEmailTemplates(session.shop, overrides);
+    return { ok: true, kind: "settings" } satisfies ActionResult;
+  }
+
   const parsed = validateSettings({
     autoApproveTolerance: Number(form.get("tolerancePercent")) / 100,
     quoteExpiryDays: Number(form.get("quoteExpiryDays")),
     magicLinkExpiryDays: Number(form.get("magicLinkExpiryDays")),
     minMarginPct: Number(form.get("minMarginPercent")) / 100,
+    defaultTermsDays: Number(form.get("defaultTermsDays")),
   });
   if (!parsed.ok) {
     return { ok: false, kind: "settings", error: parsed.error } satisfies ActionResult;
@@ -217,7 +275,18 @@ export default function Settings() {
   const [quoteExpiry, setQuoteExpiry] = useState(String(data.quoteExpiryDays));
   const [linkExpiry, setLinkExpiry] = useState(String(data.magicLinkExpiryDays));
   const [minMargin, setMinMargin] = useState(String(data.minMarginPercent));
+  const [defaultTerms, setDefaultTerms] = useState(String(data.defaultTermsDays));
   const [seatEmail, setSeatEmail] = useState("");
+  const [tpl, setTpl] = useState<Record<string, string>>(() =>
+    Object.fromEntries(
+      data.templates.flatMap((t) => [
+        [`${t.key}_subject`, t.subject],
+        [`${t.key}_body`, t.body],
+      ]),
+    ),
+  );
+  const setTplField = (field: string, value: string) =>
+    setTpl((prev) => ({ ...prev, [field]: value }));
 
   const settingsError =
     actionData && !actionData.ok && actionData.kind === "settings" ? actionData.error : null;
@@ -241,6 +310,19 @@ export default function Settings() {
         )}
         {billingMessage && <Banner tone="success" title={billingMessage} />}
 
+        {/* First-run checklist: set up credit */}
+        {data.creditEnabled && !data.hasCreditProfile && (
+          <Banner tone="info" title="Finish setting up: add your first credit profile">
+            <p>
+              Give a company a credit limit and net terms so orders on terms raise
+              an invoice with a due date.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/credit">Set your first credit profile</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Plan & billing */}
         <Card>
           <BlockStack gap="400">
@@ -257,17 +339,31 @@ export default function Settings() {
               Growth-only feature.
             </Text>
 
-            <InlineStack gap="200" blockAlign="center" wrap>
-              <Text as="span" variant="bodySm" fontWeight="semibold">
-                AI Quote Assistant
-              </Text>
-              <Badge tone="info">Growth</Badge>
-              {data.plan !== GROWTH_PLAN && (
-                <Text as="span" variant="bodySm" tone="subdued">
-                  Upgrade to Growth to suggest AI counter-offers inside a quote.
+            <BlockStack gap="150">
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  AI Quote Assistant
                 </Text>
-              )}
-            </InlineStack>
+                <Badge tone="info">Growth</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Upgrade to Growth to suggest AI counter-offers inside a quote.
+                  </Text>
+                )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Credit limits, aging &amp; auto-reminders
+                </Text>
+                <Badge tone="info">Growth</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Starter includes net terms + due dates; Growth adds credit
+                    control, the aging dashboard, reminders, and invoice PDFs.
+                  </Text>
+                )}
+              </InlineStack>
+            </BlockStack>
 
             <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
               <PlanOption
@@ -452,6 +548,17 @@ export default function Settings() {
                 autoComplete="off"
                 helpText="The AI Quote Assistant never knowingly suggests a counter-offer below this margin. Suggestions that would breach it are flagged and can’t be accepted in one click."
               />
+              <Select
+                label="Default net terms"
+                name="defaultTermsDays"
+                options={data.termDaysOptions.map((t) => ({
+                  label: `Net ${t}`,
+                  value: String(t),
+                }))}
+                value={defaultTerms}
+                onChange={setDefaultTerms}
+                helpText="Used to set an invoice's due date when a net-terms order checks out, unless the company has its own credit profile terms."
+              />
               <Text as="p" tone="subdued" variant="bodySm">
                 Totals and tax are always calculated by Shopify — Mannon never
                 computes them.
@@ -462,6 +569,53 @@ export default function Settings() {
             </FormLayout>
           </Form>
         </Card>
+
+        {/* Email templates (F2) — edit the invoice + reminder copy. */}
+        {data.creditEnabled && (
+          <Card>
+            <Form method="post">
+              <input type="hidden" name="intent" value="save-templates" />
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">
+                  Invoice &amp; reminder emails
+                </Text>
+                <Text as="p" tone="subdued" variant="bodySm">
+                  Edit the copy sent for invoices and the T-3 / due / overdue
+                  reminders. Use {"{{invoiceNumber}}"}, {"{{amount}}"},{" "}
+                  {"{{dueDate}}"}, {"{{buyerName}}"}, {"{{invoiceUrl}}"}. Leave a
+                  field as-is to keep the default.
+                </Text>
+                {data.templates.map((t) => (
+                  <Box key={t.key} paddingBlockStart="200">
+                    <BlockStack gap="150">
+                      <Text as="h3" variant="headingSm">
+                        {t.label}
+                      </Text>
+                      <TextField
+                        label="Subject"
+                        name={`tpl_${t.key}_subject`}
+                        value={tpl[`${t.key}_subject`] ?? ""}
+                        onChange={(v) => setTplField(`${t.key}_subject`, v)}
+                        autoComplete="off"
+                      />
+                      <TextField
+                        label="Body"
+                        name={`tpl_${t.key}_body`}
+                        value={tpl[`${t.key}_body`] ?? ""}
+                        onChange={(v) => setTplField(`${t.key}_body`, v)}
+                        autoComplete="off"
+                        multiline={4}
+                      />
+                    </BlockStack>
+                  </Box>
+                ))}
+                <Button variant="primary" submit loading={submitting}>
+                  Save email templates
+                </Button>
+              </BlockStack>
+            </Form>
+          </Card>
+        )}
       </BlockStack>
     </Page>
   );

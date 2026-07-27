@@ -44,6 +44,8 @@ model Shop {
   quoteExpiryDays      Int           @default(14) // default quote lifetime
   magicLinkExpiryDays  Int           @default(7) // how long a buyer magic link stays valid
   minMarginPct         Float         @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
+  defaultTermsDays     Int           @default(30) // F2: default net-terms days for new invoices
+  emailTemplates       Json? // F2: editable invoice/reminder email templates (keyed by template id)
   installedAt          DateTime      @default(now())
   companies            Company[]
   events               Event[]
@@ -92,11 +94,84 @@ model Company {
   buyers           Buyer[]
   quotes           Quote[]
   reorderSources   ReorderSource[]
+  creditProfile    CreditProfile?
+  invoices         Invoice[]
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
   @@unique([shopId, shopifyCompanyId])
   @@index([shopId])
+}
+
+// F2 — Net Terms + Credit. One credit profile per company: a limit, default
+// terms, and an active/hold status. Credit limits + status are Growth-only
+// features; the profile row itself is harmless on any plan.
+model CreditProfile {
+  id          String       @id @default(cuid())
+  companyId   String       @unique
+  company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  creditLimit Decimal      @default(0) @db.Decimal(18, 4) // 0 = no limit enforced
+  termsDays   Int          @default(30) // 7|15|30|45|60|90
+  status      CreditStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// F2 — an invoice raised when a net-terms order checks out. Amount + currency
+// are snapshots (Shopify owns money); dueDate = issuedAt + termsDays.
+model Invoice {
+  id        String            @id @default(cuid())
+  companyId String
+  company   Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  quoteId   String? // origin quote, when created from an accepted quote
+  orderId   String? // gid://shopify/DraftOrder|Order/...
+  amount    Decimal           @db.Decimal(18, 4)
+  currency  String
+  status    InvoiceStatus     @default(OPEN)
+  issuedAt  DateTime          @default(now())
+  dueDate   DateTime
+  paidAt    DateTime?
+  reminders PaymentReminder[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([companyId, status])
+  @@index([status, dueDate])
+}
+
+// F2 — one row per reminder actually sent, so we never double-send a stage.
+model PaymentReminder {
+  id        String          @id @default(cuid())
+  invoiceId String
+  invoice   Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  kind      ReminderKind
+  channel   ReminderChannel @default(EMAIL)
+  sentAt    DateTime        @default(now())
+
+  @@unique([invoiceId, kind]) // idempotent: each stage sends at most once
+  @@index([invoiceId])
+}
+
+enum CreditStatus {
+  ACTIVE
+  HOLD
+}
+
+enum InvoiceStatus {
+  OPEN
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum ReminderChannel {
+  EMAIL
+}
+
+enum ReminderKind {
+  T_MINUS_3
+  DUE
+  OVERDUE_7
 }
 
 model Buyer {
@@ -227,6 +302,9 @@ enum EventType {
   DRAFT_ORDER_CREATED
   AI_PARSE_ACCEPTED
   AI_SUGGESTION_USED
+  INVOICE_CREATED
+  REMINDER_SENT
+  CREDIT_OVERRIDE
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
