@@ -12,6 +12,7 @@ const EXPECTED = [
   "read_orders",
   "read_payment_terms",
   "read_products",
+  "write_customers",
   "write_draft_orders",
 ];
 

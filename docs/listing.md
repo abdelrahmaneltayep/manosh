@@ -57,6 +57,10 @@ it orchestrates what Shopify already owns.
 - **One-tap reorder.** Buyers reprice and resend a past order in a tap. Small
   price moves auto-convert within a tolerance you set; larger ones wait for your
   approval.
+- **Gated wholesale sign-up.** A branded “apply to buy wholesale” form screens
+  buyers before they see your prices. Review applications in a queue (approve /
+  reject / more info), auto-approve trusted domains (Growth), and approval
+  provisions the account + emails a passwordless link.
 - **Company accounts & approvals (Growth).** Add up to 5 team members per company
   with roles (admin / buyer / approver). Set a spending threshold and orders above
   it route to an approver before they're placed — invites use the same passwordless
@@ -120,6 +124,8 @@ migrate — install, invite a buyer, and send your first quote.
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
 - Company accounts: up to 5 members with roles + a Team tab (Growth plan)
 - Spending approvals: orders over a threshold route to an approver (Growth plan)
+- Gated wholesale sign-up: branded apply form + approval queue (1 form on Starter)
+- Auto-approve trusted email domains + multiple forms (Growth plan)
 - One-tap reorder with merchant-set auto-approval tolerance
 - Quick-order pad (paste SKUs) + AI Magic Order Pad (paste a PO or email)
 - Native Shopify payment terms + PO reference on every order
@@ -150,6 +156,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Gated wholesale sign-up:** a branded “apply to buy wholesale” form with an
+  approval queue (approve / reject / request more info) and auto-approval rules —
+  screen buyers before they see your prices, then approve in one click to
+  provision the account and email a passwordless link.
 - **Company accounts & approvals:** multiple buyers per company with roles
   (admin / buyer / approver) and a spending-approval chain — orders over your
   threshold wait for an approver. Passwordless invites, up to 5 members (Growth).

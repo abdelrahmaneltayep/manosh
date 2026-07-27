@@ -11,7 +11,7 @@ embedded = true
 # Minimum core-path scopes. Each is justified in /docs/compliance.md with its
 # consuming slice. `write_draft_orders` also grants read, so no separate
 # read_draft_orders scope is requested.
-scopes = "read_products,read_orders,write_draft_orders,read_companies,read_payment_terms,read_inventory"
+scopes = "read_products,read_orders,write_draft_orders,read_companies,read_payment_terms,read_inventory,write_customers"
 
 [auth]
 redirect_urls = [

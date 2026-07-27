@@ -28,6 +28,7 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Quote builder + passwordless portal", starter: "✓", growth: "✓" },
   { label: "Net terms + PO on draft orders", starter: "✓", growth: "✓" },
   { label: "AI Magic Order Pad + one-tap reorder", starter: "✓", growth: "✓" },
+  { label: "Wholesale application form + approval queue", starter: "1 form · manual", growth: "Multi-form + auto-approve" },
   { label: "Bulk order pad (search + paste) + saved lists", starter: "3 lists", growth: "Unlimited" },
   { label: "Order-pad CSV upload", starter: "—", growth: "✓" },
   { label: "Net terms + invoice due dates", starter: "✓", growth: "✓" },

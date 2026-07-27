@@ -97,6 +97,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     member_invite: "Team — member invite",
     approval_request: "Team — approval request",
     approval_decision: "Team — approval decision",
+    application_received: "Wholesale — application received",
+    application_decision: "Wholesale — application decision",
+    application_notify: "Wholesale — new application (internal)",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -189,6 +192,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       "member_invite",
       "approval_request",
       "approval_decision",
+      "application_received",
+      "application_decision",
+      "application_notify",
     ];
     const overrides: Record<string, { subject?: string; body?: string }> = {};
     for (const key of keys) {
@@ -393,6 +399,12 @@ export default function Settings() {
                   Company accounts &amp; approvals
                 </Text>
                 <Badge tone="info">1 buyer on Starter · 5 members + approvals on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Wholesale sign-up forms
+                </Text>
+                <Badge tone="info">1 form · manual on Starter · multi-form + auto-approve on Growth</Badge>
               </InlineStack>
             </BlockStack>
 

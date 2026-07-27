@@ -92,14 +92,16 @@ export interface PlanLimits {
   savedListCap: number;
   /** F5: maximum buyer members per company. Infinity = unlimited. */
   memberCap: number;
+  /** F6: maximum wholesale application forms. Infinity = unlimited. */
+  wholesaleFormCap: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5 },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**

@@ -55,6 +55,7 @@ under existing installs as the core slices land:
 | `read_companies` | Read native B2B companies, locations, contacts for the draft order `purchasingEntity`. | S8, S9 |
 | `read_payment_terms` | Read native payment terms templates to display on quote/reorder and attach to the draft order. | S11 |
 | `read_inventory` | Read `ProductVariant.inventoryItem.unitCost` so the AI Quote Assistant computes real margins and enforces the floor. Cost is reference-only; we never write inventory. | F1 (AI Quote Assistant) |
+| `write_customers` | On wholesale approval, tag the matching customer `b2b-approved` so the storefront can gate trade pricing. Best-effort tags-add only; grants read to look the customer up by email. | F6 (Wholesale Registration) |
 
 ### Deferred (added when their slice lands, name confirmed via Dev MCP)
 
