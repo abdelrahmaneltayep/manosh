@@ -1,16 +1,24 @@
-/* Buyer portal — light, standalone styles. Kept small for fast first paint. */
+/* Buyer portal — light, standalone styles, Mannon-branded. Kept small for fast
+   first paint. Brand tokens mirror the App Store listing: indigo + lime on a
+   soft lavender→cream gradient, Outfit for headings, Inter for body. */
 :root {
-  --bg: #f6f6f7;
+  --bg: #fbf8f4;
   --surface: #ffffff;
-  --text: #1a1a1a;
-  --muted: #616161;
-  --border: #e1e3e5;
-  --accent: #008060;
+  --ink: #1b1730;
+  --text: #1b1730;
+  --muted: #5b5670;
+  --border: #eae7f2;
+  --accent: #4f46e5;
+  --accent-deep: #3730a3;
   --accent-text: #ffffff;
-  /* Darker green for link text so it clears AA (4.5:1) on both the white card
-     and the off-white page background; the brand green stays for button fills. */
-  --link: #00674e;
+  --lime: #c6e94b;
+  --lime-deep: #a8d423;
+  --indigo-soft: #eceafb;
+  /* Deep indigo for link text so it clears AA (4.5:1) on both the white card
+     and the tinted page background; the brand indigo stays for button fills. */
+  --link: #3730a3;
   --danger: #8e1f0b;
+  --focus: #4f46e5;
 }
 
 * {
@@ -19,12 +27,24 @@
 
 body {
   margin: 0;
-  background: var(--bg);
   color: var(--text);
   font-family:
     Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
   line-height: 1.5;
+  background:
+    radial-gradient(
+      900px 420px at 12% -10%,
+      var(--indigo-soft) 0%,
+      rgba(236, 234, 251, 0) 60%
+    ),
+    radial-gradient(
+      760px 380px at 100% 0%,
+      #f0f7d6 0%,
+      rgba(240, 247, 214, 0) 55%
+    ),
+    linear-gradient(180deg, #ffffff 0%, var(--bg) 100%);
+  background-attachment: fixed;
 }
 
 .portal {
@@ -33,16 +53,42 @@ body {
   padding: 1.5rem 1rem 3rem;
 }
 
+/* Brand header */
+.portal-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.portal-mark {
+  width: 1.9rem;
+  height: 1.9rem;
+  display: block;
+}
+
+.portal-wordmark {
+  font-family: Outfit, Inter, sans-serif;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
 .portal-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   padding: 1.5rem;
   margin-top: 1rem;
+  box-shadow: 0 12px 30px -20px rgba(27, 23, 48, 0.28);
 }
 
 .portal h1 {
-  font-size: 1.5rem;
+  font-family: Outfit, Inter, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-size: 1.6rem;
   margin: 0 0 0.25rem;
 }
 
@@ -62,19 +108,36 @@ body {
   display: inline-block;
   appearance: none;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.6rem;
   background: var(--accent);
   color: var(--accent-text);
+  font-family: Outfit, Inter, sans-serif;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 700;
   padding: 0.7rem 1.25rem;
   cursor: pointer;
   text-decoration: none;
+  box-shadow: 0 12px 30px -16px rgba(79, 70, 229, 0.65);
+}
+
+.portal-button:hover {
+  background: var(--accent-deep);
 }
 
 .portal-button:focus-visible {
-  outline: 3px solid #005bd3;
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* Positive / accept action — brand lime with dark ink for AA contrast. */
+.portal-button-accept {
+  background: var(--lime);
+  color: var(--ink);
+  box-shadow: 0 12px 30px -16px rgba(168, 212, 35, 0.7);
+}
+
+.portal-button-accept:hover {
+  background: var(--lime-deep);
 }
 
 .portal-link {
@@ -82,7 +145,7 @@ body {
 }
 
 .portal-link:focus-visible {
-  outline: 3px solid #005bd3;
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
   border-radius: 0.2rem;
 }
@@ -98,13 +161,16 @@ body {
 }
 
 .portal-link-button:focus-visible {
-  outline: 3px solid #005bd3;
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
   border-radius: 0.2rem;
 }
 
 .portal-subhead {
-  font-size: 1.1rem;
+  font-family: Outfit, Inter, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: 1.15rem;
   margin-top: 1.5rem;
 }
 
@@ -150,7 +216,7 @@ body {
 }
 
 .catalog-qty input:focus-visible {
-  outline: 3px solid #005bd3;
+  outline: 3px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -242,7 +308,7 @@ body {
 
 .field input:focus-visible,
 .field select:focus-visible {
-  outline: 3px solid #005bd3;
+  outline: 3px solid var(--focus);
   outline-offset: 1px;
 }
 
@@ -259,7 +325,7 @@ body {
 }
 
 .quick-order-input:focus-visible {
-  outline: 3px solid #005bd3;
+  outline: 3px solid var(--focus);
   outline-offset: 1px;
 }
 

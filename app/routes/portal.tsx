@@ -23,9 +23,37 @@ export const headers: HeadersFunction = () => ({
   "X-Frame-Options": "DENY",
 });
 
+// Mannon brandmark: the "M" clover from the App Store listing. Inline SVG so
+// the portal stays a single fast request with no extra asset fetch.
+function Brandmark() {
+  return (
+    <svg
+      className="portal-mark"
+      viewBox="0 0 40 40"
+      role="img"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d="M9 28.5V12.5l9.5 9 9.5-9v16"
+        fill="none"
+        stroke="#4F46E5"
+        strokeWidth="4.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="32" cy="25.5" r="3" fill="#B6E02F" />
+    </svg>
+  );
+}
+
 export default function PortalLayout() {
   return (
     <main className="portal">
+      <div className="portal-brand">
+        <Brandmark />
+        <span className="portal-wordmark">Mannon</span>
+      </div>
       <Outlet />
     </main>
   );

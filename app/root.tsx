@@ -22,6 +22,19 @@ export default function App() {
           rel="stylesheet"
           href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
         />
+        {/* Mannon brand type: Outfit for headings/wordmark, Inter for body.
+            Used by the marketing landing page and the buyer portal; the
+            embedded Polaris admin keeps Shopify's own font stack. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin=""
+        />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
+        />
         <Meta />
         <Links />
       </head>
