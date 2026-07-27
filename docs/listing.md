@@ -57,6 +57,9 @@ it orchestrates what Shopify already owns.
 - **One-tap reorder.** Buyers reprice and resend a past order in a tap. Small
   price moves auto-convert within a tolerance you set; larger ones wait for your
   approval.
+- **Bulk order pad.** The fastest way to build a big order: type-ahead SKU search
+  (Enter to add), paste `SKU,QTY` lines, CSV upload (Growth), and saved lists you
+  reorder in one tap — with a live subtotal at each buyer's own price.
 - **Quick-order & Magic Order Pad.** Buyers paste a SKU list — or a whole PO or
   email — and Mannon matches it to your catalog. AI never acts on its own: every
   match is shown for confirmation, and every product id is checked against your
@@ -109,6 +112,8 @@ migrate — install, invite a buyer, and send your first quote.
 - Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
+- Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
+- Order-pad CSV upload + unlimited saved lists (Growth plan)
 - One-tap reorder with merchant-set auto-approval tolerance
 - Quick-order pad (paste SKUs) + AI Magic Order Pad (paste a PO or email)
 - Native Shopify payment terms + PO reference on every order
@@ -139,6 +144,9 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Bulk order pad:** the fastest way to place a big B2B order — type-ahead SKU
+  search, paste, CSV upload (Growth), and saved lists to reorder in a tap, with a
+  live subtotal at each customer's own price.
 - **Customer-specific price lists:** per-company (or per-tag) pricing and volume
   breaks so buyers see their price with no discount codes — with a "you save X%"
   badge in the portal. Up to 3 lists on Starter; unlimited + volume breaks + CSV

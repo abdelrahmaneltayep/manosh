@@ -93,6 +93,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     reminder_t_minus_3: "Reminder — 3 days before due",
     reminder_due: "Reminder — on due date",
     reminder_overdue_7: "Reminder — 7 days overdue",
+    reorder_list: "Reorder a saved list",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -181,6 +182,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       "reminder_t_minus_3",
       "reminder_due",
       "reminder_overdue_7",
+      "reorder_list",
     ];
     const overrides: Record<string, { subject?: string; body?: string }> = {};
     for (const key of keys) {
@@ -373,6 +375,12 @@ export default function Settings() {
                     Growth adds unlimited lists, volume breaks, and CSV import.
                   </Text>
                 )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Order pad &amp; saved lists
+                </Text>
+                <Badge tone="info">3 lists on Starter · unlimited + CSV on Growth</Badge>
               </InlineStack>
             </BlockStack>
 

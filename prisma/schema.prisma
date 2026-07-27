@@ -170,11 +170,38 @@ model Company {
   creditProfile    CreditProfile?
   invoices         Invoice[]
   priceList        CompanyPriceList?
+  savedOrderLists  SavedOrderList[]
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
   @@unique([shopId, shopifyCompanyId])
   @@index([shopId])
+}
+
+// F4 — a buyer's saved order list (favourites / recurring order). Capped per
+// plan (see PLAN_LIMITS.savedListCap). Reordering a list drops its items into
+// the order pad.
+model SavedOrderList {
+  id        String           @id @default(cuid())
+  companyId String
+  company   Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  items     SavedOrderItem[]
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([companyId])
+}
+
+model SavedOrderItem {
+  id        String         @id @default(cuid())
+  listId    String
+  list      SavedOrderList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  variantId String // gid://shopify/ProductVariant/...
+  qty       Int
+
+  @@unique([listId, variantId])
+  @@index([listId])
 }
 
 // F2 — Net Terms + Credit. One credit profile per company: a limit, default
@@ -380,6 +407,7 @@ enum EventType {
   REMINDER_SENT
   CREDIT_OVERRIDE
   PRICELIST_ASSIGNED
+  ORDERPAD_USED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
