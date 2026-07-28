@@ -112,6 +112,12 @@ it orchestrates what Shopify already owns.
   blocked before checkout), and paid orders export automatically (webhook, SFTP,
   NetSuite, or custom) with a two-way sync log. Credentials encrypted; failures
   never block Shopify.
+- **Multi-currency & Arabic/RTL buyer portal.** Buyers see the portal in their
+  language — Arabic is full RTL, not just translated text — and prices in their
+  currency (Shopify Markets rates or your fixed contract rates). Every quote locks
+  its FX rate at issue, so a counter-offer never drifts. Built GCC-first.
+  <br>**عربي:** بوابة الشراء بالكامل بالعربية مع دعم الاتجاه من اليمين لليسار
+  وعرض الأسعار بعملة المشتري وتثبيت سعر الصرف لكل عرض سعر.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
@@ -160,6 +166,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Deposits, installments & pay-by-link — captured by Shopify checkout, no card data stored (Growth plan)
 - Tax exemption & VAT/GST-correct invoices — GCC 15%/5%, EU VAT, US resale (regions + certificates on Growth)
 - ERP & inventory sync — real-time stock + order export, oversell guard (Growth plan)
+- Multi-currency & Arabic/RTL buyer portal — FX locked per quote (1 extra currency + EN/AR on Starter)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -197,6 +204,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Multi-currency & Arabic/RTL (GCC-first):** buyers get the portal in their
+  language (Arabic = full RTL) and prices in their currency, with the FX rate
+  **locked per quote** so a counter-offer never drifts. Starter includes one extra
+  currency + EN/AR; Growth is unlimited with fixed contract rates.
 - **ERP & inventory sync (Growth):** real-time stock updates from your ERP/WMS
   feed an oversell guard, and paid orders export automatically (webhook / SFTP /
   NetSuite / custom) with a two-way, retryable sync log. Credentials are

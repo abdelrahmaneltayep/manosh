@@ -100,14 +100,18 @@ export interface PlanLimits {
   customCatalogCap: number;
   /** F12: maximum sales-rep seats. Starter = 0 (feature hidden). */
   repSeatCap: number;
+  /** F16: additional currencies beyond the store default. Starter = 1. */
+  extraCurrencyCap: number;
+  /** F16: maximum enabled locales. Starter = 2 (EN + AR). */
+  localeCap: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1, repSeatCap: 0 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity, repSeatCap: 3 },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1, repSeatCap: 0, extraCurrencyCap: 1, localeCap: 2 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity, repSeatCap: 3, extraCurrencyCap: Infinity, localeCap: 3 },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**
@@ -261,6 +265,26 @@ export function compliantInvoiceNumbering(plan: string | null | undefined): bool
 /** ERP / inventory sync (stock in, orders out) is Growth-only. Pure. */
 export function erpSyncAllowed(plan: string | null | undefined): boolean {
   return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+// --- F16 i18n / multi-currency gating ----------------------------------------
+
+/**
+ * Fixed contract rates + per-currency price-list overrides are Growth-only.
+ * (Both plans get display-conversion via a rate.) Pure.
+ */
+export function contractRatesAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** Pure allowance decision for enabling another currency (beyond the store default). */
+export function evaluateCurrencyAllowance(usedExtra: number, cap: number): { allowed: boolean; used: number; cap: number } {
+  return { allowed: usedExtra < cap, used: usedExtra, cap };
+}
+
+/** Merchant-facing copy when the extra-currency cap is hit. */
+export function currencyCapMessage(cap: number): string {
+  return `Your Starter plan includes the store currency plus ${cap} more. Upgrade to Growth for unlimited currencies and fixed contract rates.`;
 }
 
 /** Pure allowance decision for inviting another sales rep. */

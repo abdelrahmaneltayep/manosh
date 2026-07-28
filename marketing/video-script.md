@@ -80,6 +80,17 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — multi-currency & language (Feature 16)
+
+> **VO:** "Your buyers, their language and currency — an Arabic buyer sees the
+> whole portal right-to-left, priced in riyals, with the rate locked on every
+> quote."
+>
+> **On screen:** The buyer portal **flips to full RTL Arabic** with **SAR**
+> pricing as the language is switched; a quote shows its **locked rate**. _(Extended
+> B-roll — also flag an **Arabic-market social clip**; not part of the ≤60s store
+> reel.)_
+
 ## Extended B-roll — ERP & inventory sync (Feature 15)
 
 > **VO:** "Stock and orders stay in sync with your ERP — sell what you actually

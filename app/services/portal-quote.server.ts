@@ -124,11 +124,28 @@ export async function submitBuyerQuote(
     }
   }
 
+  // F16 — lock the buyer's display currency + FX rate at issue time so a later
+  // counter-offer never drifts with FX. Flag off → base currency, rate 1.
+  let displayCurrency: string | null = null;
+  let displayRate: string | null = null;
+  if (process.env.MANNON_FF_I18N === "true" && company) {
+    try {
+      const { resolveLockedFx } = await import("./i18n.server");
+      const fx = await resolveLockedFx(company.shop.shopifyDomain, { companyId: buyer.companyId, memberId: buyer.id });
+      displayCurrency = fx.currency;
+      displayRate = fx.rate;
+    } catch {
+      /* fall back to store currency — never block a quote on FX resolution */
+    }
+  }
+
   const quote = await submitQuote({
     companyId: buyer.companyId,
     buyerId: buyer.id,
     lines: built.lines,
     placedByRepId: options.placedByRepId ?? null,
+    displayCurrency,
+    displayRate,
   });
 
   // F8 — schedule automated follow-ups (feature-flagged; no-op if the policy is

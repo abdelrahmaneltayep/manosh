@@ -5,6 +5,32 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 16: Multi-Currency & Multi-Language (GCC-First)
+
+- **Their language, their currency.** Buyers see the portal in their locale
+  (**Arabic = full RTL**, not just translated text — the shell mirrors via `dir`)
+  and prices in their currency. Resolution: member > company > store default.
+  Locale switch persists (member `LocalePreference`) and drives localized emails.
+- **FX locked per quote (guardrail).** A quote **locks its display currency + rate
+  at issue** (`Quote.displayCurrency` / `displayRate`, via pure `lockFx`), so a
+  counter-offer never drifts with FX; invoices show the locked rate. Currencies are
+  **never mixed** within a quote (`assertSingleCurrency`), and everything **falls
+  back cleanly** to the store currency when no rate exists.
+- **Contract pricing.** `CurrencyRate` holds Shopify-Markets or merchant-set fixed
+  rates; Growth adds **per-currency price-list overrides** (exact prices, no FX) +
+  contract rates + custom translations. Mannon never settles money — conversion is
+  presentation of an agreed price (guardrail #1).
+- **Localized emails.** `resolveTemplate(key, overrides, locale)` layers shop
+  override > locale translation > **EN fallback**, so every email always resolves
+  (Arabic translations for the core buyer templates; regression-tested across all
+  templates × locales).
+- **Plan gating (partial).** Starter = store default + **1 extra currency**, EN +
+  AR; Growth = unlimited currencies + all locales + per-currency overrides + fixed
+  contract rates (`PLAN_LIMITS.extraCurrencyCap` / `localeCap`,
+  `contractRatesAllowed`). Merchant settings at `/app/i18n`; number/date/money via
+  `Intl`. Event `LOCALE_CHANGED`. Dark-launched behind `MANNON_FF_I18N`. Migration
+  `f16_multi_currency_language`. See `docs/i18n.md`.
+
 ### Added — Feature 15: ERP / Inventory Sync — Real-Time Stock & Order Export (Growth)
 
 - **Stock in.** An ERP posts stock to `/internal/erp/stock` (per-connection secret,

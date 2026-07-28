@@ -1,21 +1,25 @@
-import type { HeadersFunction, LinksFunction } from "@remix-run/node";
+import type { HeadersFunction, LinksFunction, LoaderFunctionArgs } from "@remix-run/node";
 import {
   Outlet,
   Link,
+  Form,
+  useLoaderData,
+  useLocation,
   isRouteErrorResponse,
   useRouteError,
 } from "@remix-run/react";
 import portalStyles from "../styles/portal.css?url";
 import { portalErrorContent } from "../lib/portal-error";
+import { readLocaleCookie, I18N_ENABLED } from "../services/i18n.server";
+import { localeDir, localeName, SUPPORTED_LOCALES, t } from "../lib/i18n";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: portalStyles },
 ];
 
 // Non-embedded buyer portal shell. Deliberately light — no Polaris/App Bridge
-// bundle — so it renders fast (p95 < 500ms) and works as a standalone page
-// outside Shopify Admin. Later slices (S7 quote builder, S9 reorder,
-// S10 quick-order) render inside this shell.
+// bundle — so it renders fast (p95 < 500ms). F16: the shell mirrors RTL for
+// Arabic from the session locale cookie and offers a language switch.
 
 // Standalone surface: forbid framing to prevent clickjacking.
 export const headers: HeadersFunction = () => ({
@@ -23,9 +27,30 @@ export const headers: HeadersFunction = () => ({
   "X-Frame-Options": "DENY",
 });
 
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const locale = I18N_ENABLED() ? (await readLocaleCookie(request)) ?? "en" : "en";
+  return { locale, dir: localeDir(locale), i18nOn: I18N_ENABLED(), locales: SUPPORTED_LOCALES };
+};
+
 export default function PortalLayout() {
+  const { locale, dir, i18nOn, locales } = useLoaderData<typeof loader>();
+  const location = useLocation();
   return (
-    <main className="portal">
+    <main className="portal" dir={dir} lang={locale}>
+      {i18nOn && (
+        <div className="portal-localebar">
+          <span className="muted">{t(locale, "language")}:</span>
+          {locales.map((l) => (
+            <Form method="post" action="/portal/locale" key={l.code} style={{ display: "inline" }}>
+              <input type="hidden" name="locale" value={l.code} />
+              <input type="hidden" name="redirectTo" value={location.pathname} />
+              <button type="submit" className={`portal-localebtn${l.code === locale ? " on" : ""}`} aria-current={l.code === locale ? "true" : undefined}>
+                {localeName(l.code)}
+              </button>
+            </Form>
+          ))}
+        </div>
+      )}
       <Outlet />
     </main>
   );

@@ -164,6 +164,44 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;
 
+/**
+ * F16 — locale translations for the buyer-facing templates. EN is the source
+ * (DEFAULT_TEMPLATES); any key not translated for a locale falls back to EN, so
+ * every email always resolves. Add locales/keys here as they're translated.
+ */
+export const TEMPLATE_TRANSLATIONS: Record<string, Partial<Record<TemplateKey, { subject: string; body: string }>>> = {
+  ar: {
+    invoice_issued: {
+      subject: "فاتورة {{invoiceNumber}} من {{shopName}} — تُستحق في {{dueDate}}",
+      body: "مرحباً {{buyerName}}،\n\nفاتورتك {{invoiceNumber}} بمبلغ {{amount}} أصبحت مفتوحة بشروط {{terms}} وتُستحق في {{dueDate}}.\n\nاعرضها وحمّلها في أي وقت من بوابتك: {{invoiceUrl}}\n\nشكراً لك،\n{{shopName}}",
+    },
+    reminder_t_minus_3: {
+      subject: "تذكير: الفاتورة {{invoiceNumber}} تُستحق خلال 3 أيام",
+      body: "مرحباً {{buyerName}}،\n\nتذكير ودّي بأن الفاتورة {{invoiceNumber}} بمبلغ {{amount}} تُستحق في {{dueDate}} (خلال 3 أيام).\n\n{{invoiceUrl}}\n\nشكراً لك،\n{{shopName}}",
+    },
+    reminder_due: {
+      subject: "الفاتورة {{invoiceNumber}} تُستحق اليوم",
+      body: "مرحباً {{buyerName}}،\n\nالفاتورة {{invoiceNumber}} بمبلغ {{amount}} تُستحق اليوم ({{dueDate}}).\n\n{{invoiceUrl}}\n\nشكراً لك،\n{{shopName}}",
+    },
+    followup_reminder: {
+      subject: "تذكير سريع بشأن عرض السعر من {{shopName}}",
+      body: "مرحباً {{buyerName}}،\n\nمتابعة بخصوص عرض السعر المفتوح — جاهز لقبوله أو تقديم عرض مقابل:\n\n{{quoteUrl}}\n\nينتهي في {{expiresAt}}.\n\nشكراً لك،\n{{shopName}}\n\nلإيقاف هذه التذكيرات: {{unsubscribeUrl}}",
+    },
+    member_invite: {
+      subject: "تمت دعوتك لتقديم الطلبات لصالح {{companyName}}",
+      body: "مرحباً،\n\nتمت دعوتك إلى بوابة {{companyName}} بصفة {{role}}. استخدم هذا الرابط الآمن لتسجيل الدخول — بدون كلمة مرور:\n\n{{inviteUrl}}\n\nشكراً لك،\n{{shopName}}",
+    },
+    paylink: {
+      subject: "رابط الدفع الآمن الخاص بك بمبلغ {{amount}}",
+      body: "مرحباً {{buyerName}}،\n\nإليك رابطاً آمناً لدفع {{amount}} — بدون تسجيل دخول. صالح لمرة واحدة وينتهي قريباً:\n\n{{payUrl}}\n\nتتم المعالجة عبر Shopify؛ لا نطّلع على بيانات بطاقتك.\n\nشكراً لك،\n{{shopName}}",
+    },
+    tax_verified: {
+      subject: "تم التحقق من وضعك الضريبي — {{companyName}}",
+      body: "مرحباً {{buyerName}}،\n\nتم التحقق من الوضع الضريبي لـ {{companyName}} ({{status}}). ستعكس عروض الأسعار والفواتير الضريبة الصحيحة من الآن.\n\nشكراً لك،\n{{shopName}}",
+    },
+  },
+};
+
 /** Fill `{{token}}` placeholders. Unknown tokens are left blank. */
 export function renderTemplate(
   template: { subject: string; body: string },
@@ -175,14 +213,19 @@ export function renderTemplate(
 }
 
 /**
- * Resolve a template for a shop: shop override (from Shop.emailTemplates) merged
- * over the default. Pure so it's testable.
+ * Resolve a template for a shop + locale. Precedence: shop override
+ * (Shop.emailTemplates) > locale translation (F16) > EN default. Every key always
+ * resolves (EN is the ultimate fallback), so localization never breaks an email.
+ * Pure so it's testable.
  */
 export function resolveTemplate(
   key: TemplateKey,
   overrides: unknown,
+  locale = "en",
 ): { subject: string; body: string } {
-  const base = DEFAULT_TEMPLATES[key];
+  const en = DEFAULT_TEMPLATES[key];
+  const localized = TEMPLATE_TRANSLATIONS[locale]?.[key];
+  const base = localized ?? en;
   const map = (overrides ?? {}) as Record<string, { subject?: string; body?: string }>;
   const o = map[key] ?? {};
   return { subject: o.subject || base.subject, body: o.body || base.body };
