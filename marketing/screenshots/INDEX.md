@@ -15,6 +15,7 @@ faithful mocks built in the container, which can't reach a store).
 | 5 | `f5-company-accounts.png` | F5 Company Accounts | Team tab with roles + an approval-request state | core |
 | 6 | `f6-wholesale-registration.png` | F6 Wholesale Registration | Admin approval queue with a pending application open | candidate (funnel story) |
 | 7 | `f7-quote-analytics.png` | F7 Quote Analytics | Analytics dashboard: KPI cards + trend sparklines + top accounts | candidate (strong — promote into store 7) |
+| 8 | `f8-followups.png` | F8 Quote Follow-ups | A quote with its expiry + scheduled follow-up timeline (day 3/7/12 + expiry) | candidate |
 
 ## Reel order (extended cut)
 

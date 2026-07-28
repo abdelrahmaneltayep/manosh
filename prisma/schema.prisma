@@ -47,6 +47,7 @@ model Shop {
   defaultTermsDays      Int                    @default(30) // F2: default net-terms days for new invoices
   emailTemplates        Json? // F2: editable invoice/reminder email templates (keyed by template id)
   weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
+  timezone              String? // F8: IANA tz for quiet-hours-safe follow-up sends
   installedAt           DateTime               @default(now())
   companies             Company[]
   events                Event[]
@@ -57,8 +58,24 @@ model Shop {
   wholesaleForms        WholesaleForm[]
   wholesaleApplications WholesaleApplication[]
   quoteMetrics          QuoteMetricDaily[]
+  followupPolicy        FollowupPolicy?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F8 — store default follow-up policy (one per shop). Starter is clamped to a
+// single manual reminder (PLAN_LIMITS.followupCadenceMax); Growth runs the full
+// cadence.
+model FollowupPolicy {
+  id          String   @id @default(cuid())
+  shopId      String   @unique
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  enabled     Boolean  @default(false)
+  expiryDays  Int      @default(14)
+  cadenceDays Int[] // days after submit to nudge, e.g. [3, 7, 12]
+  maxNudges   Int      @default(3)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // F7 — nightly rollup of negotiation metrics per shop per day. Derived from
@@ -452,13 +469,49 @@ model Quote {
   poReference    String?
   draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
   totalsSnapshot Json? // exact draftOrderCalculate output
+  reminderState  Json? // F8: per-quote follow-up state ({ unsubscribed, nudgesSent, overrideCadence })
   lines          QuoteLine[]
   aiSuggestions  QuoteAiSuggestion[]
+  followups      QuoteFollowup[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   @@index([companyId, status])
   @@index([status, expiresAt])
+}
+
+// F8 — a scheduled follow-up for a quote (reminder nudge, expiry warning, or the
+// expiry itself). The scheduler dispatches due rows and cancels the rest when a
+// quote is accepted/rejected.
+model QuoteFollowup {
+  id           String          @id @default(cuid())
+  quoteId      String
+  quote        Quote           @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  kind         FollowupKind
+  scheduledFor DateTime
+  sentAt       DateTime?
+  channel      FollowupChannel @default(EMAIL)
+  status       FollowupStatus  @default(SCHEDULED)
+  createdAt    DateTime        @default(now())
+
+  @@index([quoteId])
+  @@index([status, scheduledFor])
+}
+
+enum FollowupKind {
+  REMINDER
+  EXPIRY_WARNING
+  EXPIRED
+}
+
+enum FollowupChannel {
+  EMAIL
+}
+
+enum FollowupStatus {
+  SCHEDULED
+  SENT
+  CANCELLED
 }
 
 model QuoteLine {
@@ -560,6 +613,7 @@ enum EventType {
   ORDER_APPROVED
   WHOLESALE_APPLICATION_DECIDED
   ANALYTICS_VIEWED
+  FOLLOWUP_SENT
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

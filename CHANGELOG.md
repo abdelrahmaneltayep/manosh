@@ -5,6 +5,25 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 8: Automated Quote Follow-ups, Expiry & Reminders
+
+- **Stop quotes going cold.** A store follow-up policy (expiry days + nudge
+  cadence + max nudges) schedules per-quote reminders, an expiry warning, and the
+  expiry itself. Each buyer email carries accept/counter deep-links.
+- **Self-healing scheduler.** `/internal/cron/followups` (CRON_SECRET) reconciles
+  schedules (schedule active quotes, cancel terminal ones) then dispatches due
+  nudges and runs expiries via the existing status machine (`expireQuote`).
+- **Guardrails.** Never exceeds `maxNudges`; respects buyer **unsubscribe** (signed
+  email link → `/portal/unsubscribe/:id`); **quiet-hours-safe** (Mon–Fri 9–18 in
+  `Shop.timezone`). Accepting a quote cancels the remaining nudges.
+- **Merchant control.** A "needs a nudge" list with **Send now**, and the policy
+  editor at `/app/followups`.
+- **Plan gating.** Starter = expiry + a single reminder; Growth = full auto-cadence
+  + multi-nudge (`PLAN_LIMITS.followupCadenceMax`). Emails (reminder /
+  expiry-warning / expired) are editable in Settings. Events `FOLLOWUP_SENT`,
+  `QUOTE_EXPIRED`. Dark-launched behind `MANNON_FF_FOLLOWUPS`. Migration
+  `f8_quote_followups`.
+
 ### Added — Feature 7: Quote Analytics & Sales Dashboard (Growth)
 
 - **Negotiation analytics** at `/app/analytics`: win rate, average discount,

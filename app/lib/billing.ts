@@ -94,14 +94,16 @@ export interface PlanLimits {
   memberCap: number;
   /** F6: maximum wholesale application forms. Infinity = unlimited. */
   wholesaleFormCap: number;
+  /** F8: maximum follow-up nudges in a quote's cadence. Starter = 1 (manual). */
+  followupCadenceMax: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6 },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**

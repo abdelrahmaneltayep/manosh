@@ -96,5 +96,17 @@ export async function submitBuyerQuote(
     buyerId: buyer.id,
     lines: built.lines,
   });
+
+  // F8 — schedule automated follow-ups (feature-flagged; no-op if the policy is
+  // off). Best-effort: a scheduling hiccup must never fail the quote.
+  if (process.env.MANNON_FF_FOLLOWUPS === "true") {
+    try {
+      const { scheduleForQuote } = await import("./followups.server");
+      await scheduleForQuote(quote.id);
+    } catch {
+      /* self-heals on the next cron reconcile */
+    }
+  }
+
   return { ok: true, quote };
 }

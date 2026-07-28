@@ -71,6 +71,15 @@ over dialogue.
 > 30/90-day switcher, and the top-accounts table. _(Standalone 15s social clip —
 > not part of the ≤60s store reel.)_
 
+## Extended B-roll — auto follow-ups (Feature 8)
+
+> **VO:** "Every quote follows itself up — nudges before it expires, and it closes
+> the loop the moment a buyer accepts."
+>
+> **On screen:** A quote's **follow-up timeline** (day 3 · day 7 · day 12 · expiry)
+> with the first nudge marked sent; cut to the buyer's email with **Accept /
+> Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
+
 ## Supporting beats (existing pillars)
 
 - **Passwordless portal.** VO: "Your buyer accepts from a secure link — no

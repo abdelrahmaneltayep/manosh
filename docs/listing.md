@@ -60,6 +60,9 @@ it orchestrates what Shopify already owns.
 - **One-tap reorder.** Buyers reprice and resend a past order in a tap. Small
   price moves auto-convert within a tolerance you set; larger ones wait for your
   approval.
+- **Auto follow-ups & expiry.** Set a quote expiry and Mannon nudges buyers on a
+  cadence — with accept/counter links in every email — then expires cold quotes
+  automatically. Accepting cancels the rest. Recover deals that used to go cold.
 - **Gated wholesale sign-up.** A branded “apply to buy wholesale” form screens
   buyers before they see your prices. Review applications in a queue (approve /
   reject / more info), auto-approve trusted domains (Growth), and approval
@@ -120,6 +123,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Merchant quote inbox with line-by-line counter and accept → draft order
 - AI Quote Assistant: one-click AI counter-offers with a margin read (Growth plan)
 - Negotiation analytics: win rate, avg discount, time-to-close, pipeline (Growth plan)
+- Auto quote follow-ups + expiry with buyer reminders (full cadence on Growth)
 - Net terms + invoice due dates on every terms order (all plans)
 - Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
@@ -160,6 +164,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Automated quote follow-ups & expiry:** set an expiry, nudge buyers on a
+  cadence (accept/counter links in every email), and auto-expire cold quotes —
+  accepting cancels the rest. Recovers deals that used to go cold. Starter sends a
+  single reminder; Growth runs the full cadence.
 - **Negotiation analytics (Growth):** win rate, average discount, time-to-close,
   and open pipeline — with 30/90-day trends, top accounts, a most-discounted-SKU
   leaderboard, and CSV export. Most apps show orders; this shows the negotiation.

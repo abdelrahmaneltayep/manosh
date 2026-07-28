@@ -123,6 +123,16 @@ export async function acceptAndOrder(
     payload: { draftOrderId: created.id },
   });
 
+  // F8 — accepting mid-cadence cancels the remaining nudges.
+  if (process.env.MANNON_FF_FOLLOWUPS === "true") {
+    try {
+      const { cancelForQuote } = await import("./followups.server");
+      await cancelForQuote(quoteId);
+    } catch {
+      /* self-heals on the next cron reconcile */
+    }
+  }
+
   // F2 — raise the net-terms invoice (dueDate = now + termsDays). Best-effort:
   // an invoice failure must not strand a placed order, so we swallow + report.
   if (CREDIT_ENABLED()) {

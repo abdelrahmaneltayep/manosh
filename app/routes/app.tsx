@@ -28,6 +28,7 @@ export default function App() {
           Home
         </Link>
         <Link to="/app/quotes">Quotes</Link>
+        <Link to="/app/followups">Follow-ups</Link>
         <Link to="/app/analytics">Analytics</Link>
         <Link to="/app/buyers">Buyers</Link>
         <Link to="/app/wholesale">Wholesale</Link>
