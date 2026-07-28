@@ -84,6 +84,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const erpEnabled = process.env.MANNON_FF_ERP_SYNC === "true";
   const i18nEnabled = process.env.MANNON_FF_I18N === "true";
   const quoteWidgetEnabled = process.env.MANNON_FF_QUOTE_WIDGET === "true";
+  const buyerPwaEnabled = process.env.MANNON_FF_BUYER_PWA === "true";
 
   const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex, erpConnCount] =
     shopId
@@ -131,6 +132,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     tax_rejected: "Tax — rejected",
     tax_cert_expiring: "Tax — certificate expiring",
     erp_sync_failure: "ERP — sync failure digest",
+    pwa_install_nudge: "Buyer app — install nudge",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -162,6 +164,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasI18nSetup: ((shopFlex?.supportedLocales as string[] | null)?.length ?? 0) > 1 || ((shopFlex?.supportedCurrencies as string[] | null)?.length ?? 0) > 0,
     quoteWidgetEnabled,
     hasQuoteWidget: shopFlex?.quoteWidgetEnabled === true,
+    buyerPwaEnabled,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -428,6 +431,18 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Optional onboarding: invite buyers to install the app */}
+        {data.buyerPwaEnabled && (
+          <Banner tone="info" title="Optional: invite buyers to install the app">
+            <p>
+              Repeat buyers can add your wholesale portal to their phone’s home
+              screen and reorder their usual in one tap. It’s automatic — the
+              install prompt appears in their portal; you can also send an
+              “install the app” email nudge from your reminder emails.
+            </p>
+          </Banner>
+        )}
+
         {/* Recommended onboarding: set your tax rules */}
         {data.taxVatEnabled && !data.hasTaxRules && (
           <Banner tone="info" title="Recommended: set your tax rules">
@@ -654,6 +669,12 @@ export default function Settings() {
                   Storefront “Request a Quote” widget
                 </Text>
                 <Badge tone="info">PDP form on Starter · cart + gated + custom fields on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Installable buyer app &amp; one-tap reorder
+                </Text>
+                <Badge tone="info">Install + one-tap reorder on Starter · push reminders + saved bundles on Growth</Badge>
               </InlineStack>
             </BlockStack>
 

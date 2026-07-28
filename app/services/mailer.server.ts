@@ -170,6 +170,11 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi,\n\nThanks for requesting a quote from {{shopName}}. We've received it and our team will get back to you shortly with pricing.\n\nThank you,\n{{shopName}}",
   },
+  pwa_install_nudge: {
+    subject: "Reorder from your phone in one tap — {{shopName}}",
+    body:
+      "Hi {{buyerName}},\n\nAdd {{shopName}}'s wholesale portal to your phone's home screen and reorder your usual in one tap.\n\nOpen your portal, then choose “Add to Home Screen”:\n\n{{portalUrl}}\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

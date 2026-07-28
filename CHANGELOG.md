@@ -5,6 +5,33 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 18: Buyer PWA & One-Tap Reorder (Installable Mobile)
+
+- **Installable buyer app.** The magic-link portal now ships a **web app manifest**
+  (`/portal/manifest.webmanifest`, brand tokens, named after the buyer's shop) and a
+  **service worker** (`/portal/sw.js`, scope `/portal/`) so repeat buyers add the
+  store to their phone's home screen and reorder in one tap. Pure **progressive
+  enhancement** — SW registration is guarded, older browsers keep the plain portal,
+  and every PWA route **404s when `MANNON_FF_BUYER_PWA` is off**.
+- **Stale-cache guardrail.** The SW cache name is **versioned** (`SW_VERSION`); a
+  bump drops old caches on activate. Fetch is **network-first** for portal
+  navigations with an offline fallback, and it caches **no PII** beyond what the
+  signed-in buyer already sees.
+- **One-tap reorder + shortcuts.** `/portal/shortcuts` lets buyers save usual orders
+  as **shortcuts** and reorder any in one tap. Reorder runs through **`submitBuyerQuote`**,
+  so **MOQ (F9)**, **catalog visibility (F11)**, and **price lists (F3)** all apply;
+  a hidden SKU can never be reordered. Emits **`reorder_oneclick`** and **`pwa_installed`** events.
+- **Opt-in push (Growth).** Web-Push "time to reorder?" reminders are **strictly
+  opt-in** — the permission prompt only appears when the buyer taps "Turn on", never
+  on load. Delivery is a pluggable **no-op until VAPID** keys are set. Starter gets
+  install + one-tap reorder + **1** saved shortcut; Growth adds push reminders +
+  **unlimited** shortcut bundles (`reorderShortcutCap`, `pushRemindersAllowed`).
+- **Nudges.** A new `pwa_install_nudge` email ("Reorder from your phone in one tap")
+  and the `/internal/cron/reorder-push` worker (CRON_SECRET-guarded) send push
+  reminders to subscribed Growth buyers and email install nudges to active buyers
+  without a subscription. New models: `PushSubscription`, `ReorderShortcut`. Docs in
+  `docs/buyer-pwa.md`.
+
 ### Added — Feature 17: Embedded "Request a Quote" Storefront Widget
 
 - **Top of funnel, no code.** A **theme app extension** (`extensions/quote-widget`)
