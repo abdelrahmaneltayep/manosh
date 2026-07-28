@@ -29,8 +29,10 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Net terms + PO on draft orders", starter: "✓", growth: "✓" },
   { label: "AI Magic Order Pad + one-tap reorder", starter: "✓", growth: "✓" },
   { label: "Net terms + invoice due dates", starter: "✓", growth: "✓" },
+  { label: "Customer price lists", starter: "Up to 3", growth: "Unlimited" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },
+  { label: "Volume-break pricing + CSV import", starter: "—", growth: "✓" },
   { label: "Invoice PDFs", starter: "—", growth: "✓" },
 ];
 

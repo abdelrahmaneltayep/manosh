@@ -66,6 +66,9 @@ it orchestrates what Shopify already owns.
 - **Net terms & credit control (Growth).** Give each company a credit limit and
   terms; net-terms orders raise an invoice with a due date. An aging dashboard,
   automatic payment reminders, and downloadable invoices keep receivables tidy.
+- **Customer-specific pricing.** Assign per-company price lists — by customer or
+  Shopify tag — so buyers see the right price with no discount codes. Volume
+  breaks and CSV import (Growth) handle quantity pricing and bulk updates.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
@@ -104,6 +107,8 @@ migrate — install, invite a buyer, and send your first quote.
 - AI Quote Assistant: one-click AI counter-offers with a margin read (Growth plan)
 - Net terms + invoice due dates on every terms order (all plans)
 - Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
+- Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
+- Volume-break pricing + CSV import/export for price lists (Growth plan)
 - One-tap reorder with merchant-set auto-approval tolerance
 - Quick-order pad (paste SKUs) + AI Magic Order Pad (paste a PO or email)
 - Native Shopify payment terms + PO reference on every order
@@ -134,6 +139,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Customer-specific price lists:** per-company (or per-tag) pricing and volume
+  breaks so buyers see their price with no discount codes — with a "you save X%"
+  badge in the portal. Up to 3 lists on Starter; unlimited + volume breaks + CSV
+  on Growth.
 - **Net terms + credit management:** company credit limits, an aging dashboard,
   automatic payment reminders (T-3 / due / overdue), and downloadable invoices.
   Net terms and due dates are on every plan; credit control is Growth.

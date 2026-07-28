@@ -86,14 +86,16 @@ export interface PlanLimits {
   activeQuoteCap: number;
   /** Maximum staff seats for the store. */
   seatCap: number;
+  /** F3: maximum number of price lists. Infinity = unlimited. */
+  priceListCap: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5 },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**
@@ -136,4 +138,14 @@ export const QUOTE_CAP_BUYER_MESSAGE =
 /** Merchant-facing copy when the seat cap is hit. */
 export function seatCapMessage(cap: number): string {
   return `Your Starter plan includes ${cap} staff seat. Upgrade to Growth for up to ${PLAN_LIMITS.growth.seatCap} seats.`;
+}
+
+/** Pure allowance decision for creating another price list. */
+export function evaluatePriceListAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
+  return { allowed: used < cap, used, cap };
+}
+
+/** Merchant-facing copy when the price-list cap is hit. */
+export function priceListCapMessage(cap: number): string {
+  return `Your Starter plan includes ${cap} price lists. Upgrade to Growth for unlimited price lists, volume breaks, and CSV import.`;
 }

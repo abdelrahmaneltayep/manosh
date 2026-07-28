@@ -5,6 +5,23 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 3: Customer-Specific Price Lists & Volume Pricing
+
+- **Price lists.** Named per-variant price lists assigned to a company directly or
+  by Shopify customer tag (auto-apply on signup). Buyers see their price with no
+  discount codes, plus a **"you save X%"** badge in the portal quote builder.
+- **Volume breaks (Growth).** Quantity-break pricing per variant.
+- **Price resolver.** Pure, hard-tested precedence: **volume break > list entry >
+  default** (`app/lib/price-resolver.ts`), used identically server-side and in the
+  portal.
+- **Bulk editor + CSV.** Polaris `IndexTable` editor; CSV export + blank template
+  on any plan; **CSV import is Growth-only**, with a per-line validation summary.
+- **Plan gating.** Starter = up to **3** price lists, no volume breaks, no CSV
+  import. Growth = unlimited lists + volume breaks + CSV. The 4th list on Starter
+  is blocked with an upgrade CTA (`PLAN_LIMITS.priceListCap`). Dark-launched behind
+  `MANNON_FF_PRICELISTS`.
+- Event: `PRICELIST_ASSIGNED` (append-only). Migration: `f3_price_lists`.
+
 ### Added — Feature 2: Net Terms + Credit Management
 
 - **Invoices on net-terms checkout.** When an accepted quote becomes a draft

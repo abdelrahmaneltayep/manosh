@@ -36,23 +36,96 @@ model Session {
 }
 
 model Shop {
-  id                   String        @id @default(cuid())
-  shopifyDomain        String        @unique // e.g. acme.myshopify.com
-  plan                 Plan          @default(TRIAL)
+  id                   String         @id @default(cuid())
+  shopifyDomain        String         @unique // e.g. acme.myshopify.com
+  plan                 Plan           @default(TRIAL)
   trialEndsAt          DateTime?
-  autoApproveTolerance Float         @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
-  quoteExpiryDays      Int           @default(14) // default quote lifetime
-  magicLinkExpiryDays  Int           @default(7) // how long a buyer magic link stays valid
-  minMarginPct         Float         @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
-  defaultTermsDays     Int           @default(30) // F2: default net-terms days for new invoices
+  autoApproveTolerance Float          @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
+  quoteExpiryDays      Int            @default(14) // default quote lifetime
+  magicLinkExpiryDays  Int            @default(7) // how long a buyer magic link stays valid
+  minMarginPct         Float          @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
+  defaultTermsDays     Int            @default(30) // F2: default net-terms days for new invoices
   emailTemplates       Json? // F2: editable invoice/reminder email templates (keyed by template id)
-  installedAt          DateTime      @default(now())
+  installedAt          DateTime       @default(now())
   companies            Company[]
   events               Event[]
   staffSeats           StaffSeat[]
   variantCosts         VariantCost[]
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
+  priceLists           PriceList[]
+  priceListTags        PriceListTag[]
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+}
+
+// F3 — Customer-specific price lists. A named set of per-variant prices (+ volume
+// breaks), assigned to companies directly or by Shopify customer tag. Buyers see
+// their resolved price without discount codes. Growth unlocks unlimited lists,
+// volume breaks, and CSV import; Starter is capped (see PLAN_LIMITS).
+model PriceList {
+  id        String             @id @default(cuid())
+  shopId    String
+  shop      Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name      String
+  currency  String
+  isDefault Boolean            @default(false)
+  entries   PriceListEntry[]
+  breaks    VolumeBreak[]
+  companies CompanyPriceList[]
+  tags      PriceListTag[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([shopId])
+}
+
+// A per-variant fixed price within a list.
+model PriceListEntry {
+  id          String    @id @default(cuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  variantId   String // gid://shopify/ProductVariant/...
+  price       Decimal   @db.Decimal(18, 4)
+
+  @@unique([priceListId, variantId])
+  @@index([priceListId])
+}
+
+// A quantity break within a list: at >= minQty, the unit price is `price`.
+model VolumeBreak {
+  id          String    @id @default(cuid())
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  variantId   String
+  minQty      Int
+  price       Decimal   @db.Decimal(18, 4)
+
+  @@unique([priceListId, variantId, minQty])
+  @@index([priceListId, variantId])
+}
+
+// Assign a list to a company (one list per company).
+model CompanyPriceList {
+  companyId   String    @id
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  assignedAt  DateTime  @default(now())
+
+  @@index([priceListId])
+}
+
+// Map a Shopify customer tag to a list, so new companies carrying the tag
+// auto-apply the list on signup.
+model PriceListTag {
+  id          String    @id @default(cuid())
+  shopId      String
+  shop        Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  tag         String
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, tag])
+  @@index([priceListId])
 }
 
 // Cached wholesale cost per variant, pulled from Shopify inventoryItem.unitCost
@@ -86,9 +159,9 @@ model StaffSeat {
 }
 
 model Company {
-  id               String          @id @default(cuid())
+  id               String            @id @default(cuid())
   shopId           String
-  shop             Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shop             Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
   shopifyCompanyId String // gid://shopify/Company/...
   name             String
   buyers           Buyer[]
@@ -96,8 +169,9 @@ model Company {
   reorderSources   ReorderSource[]
   creditProfile    CreditProfile?
   invoices         Invoice[]
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  priceList        CompanyPriceList?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
 
   @@unique([shopId, shopifyCompanyId])
   @@index([shopId])
@@ -305,6 +379,7 @@ enum EventType {
   INVOICE_CREATED
   REMINDER_SENT
   CREDIT_OVERRIDE
+  PRICELIST_ASSIGNED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

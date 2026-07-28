@@ -363,6 +363,17 @@ export default function Settings() {
                   </Text>
                 )}
               </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Price lists
+                </Text>
+                <Badge tone="info">3 on Starter · unlimited on Growth</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Growth adds unlimited lists, volume breaks, and CSV import.
+                  </Text>
+                )}
+              </InlineStack>
             </BlockStack>
 
             <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">

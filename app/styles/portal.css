@@ -205,6 +205,17 @@ body {
   color: #616161;
 }
 
+/* F3 — "you save X%" badge on the buyer catalog. */
+.save-badge {
+  display: inline-block;
+  background: var(--lime, #c6e94b);
+  color: #1b1730;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 0.1rem 0.5rem;
+}
+
 .portal-actions {
   display: flex;
   align-items: center;
