@@ -122,6 +122,11 @@ it orchestrates what Shopify already owns.
   tap — no app store, no login each time. Save common orders as shortcuts;
   Growth adds opt-in push "time to reorder?" reminders and multi-bundle
   shortcuts. Works offline-friendly and never breaks on older browsers.
+- **Publish a shareable wholesale catalog & capture new buyers (Growth).** Turn
+  any custom catalog into a branded public page — link it or list it in Mannon's
+  discovery index — so new buyers browse and request access. Prices stay hidden
+  until you approve them, hidden SKUs never leak, and approving a request
+  provisions the buyer and unlocks their prices automatically.
 - **Multi-currency & Arabic/RTL buyer portal.** Buyers see the portal in their
   language — Arabic is full RTL, not just translated text — and prices in their
   currency (Shopify Markets rates or your fixed contract rates). Every quote locks
@@ -179,6 +184,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Multi-currency & Arabic/RTL buyer portal — FX locked per quote (1 extra currency + EN/AR on Starter)
 - “Request a Quote” storefront button (theme app block, no code) — one-click convert to a quote
 - Installable buyer app (PWA): add to home screen + one-tap mobile reorder (push reminders + saved bundles on Growth)
+- Shareable wholesale catalog + B2B discovery index — capture new buyers, prices protected until approval (Growth)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -216,6 +222,11 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Shareable wholesale catalog & B2B discovery (Growth):** publish a custom
+  catalog as a branded public page — share the link or list it in Mannon's
+  discovery index — so new buyers find you and request access. Prices stay hidden
+  until you approve, hidden SKUs never leak, and approving a request provisions the
+  buyer and unlocks their prices automatically.
 - **Installable buyer app + one-tap reorder:** repeat buyers add your wholesale
   portal to their phone's home screen and reorder their usual in one tap — no app
   store, no re-login. Save common orders as shortcuts. Install + one-tap reorder on

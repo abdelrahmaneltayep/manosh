@@ -45,6 +45,7 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Multi-currency & language (Arabic/RTL)", starter: "1 extra currency · EN + AR", growth: "Unlimited + contract rates" },
   { label: "Storefront “Request a Quote” widget (no code)", starter: "PDP button + form", growth: "Cart + gated + custom fields" },
   { label: "Installable buyer app & one-tap mobile reorder", starter: "Install + one-tap reorder", growth: "Push reminders + saved bundles" },
+  { label: "Shareable wholesale catalog & B2B discovery (Faire-style)", starter: "—", growth: "Public catalog + discovery listing" },
   { label: "Quote analytics (win rate, discount, time-to-close)", starter: "—", growth: "✓" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },

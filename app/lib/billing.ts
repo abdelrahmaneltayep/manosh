@@ -288,6 +288,17 @@ export function shortcutCapMessage(cap: number): string {
   return `This store's plan allows ${cap} saved reorder shortcut. Ask them to upgrade for unlimited saved bundles.`;
 }
 
+// --- F19 catalog sharing / B2B discovery gating ------------------------------
+
+/** Publishing a shareable public catalog + the discovery listing is Growth-only. Pure. */
+export function catalogSharingAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** Merchant-facing copy when catalog sharing is hit on Starter. */
+export const CATALOG_SHARE_UPGRADE_MESSAGE =
+  "Publish a shareable wholesale catalog — upgrade to Growth to get discovered by new buyers.";
+
 // --- F17 storefront quote-widget gating --------------------------------------
 
 export interface QuoteWidgetFeatures {

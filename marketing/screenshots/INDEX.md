@@ -26,6 +26,7 @@ faithful mocks built in the container, which can't reach a store).
 | 16 | `f16-multi-currency-language.png` | F16 Multi-Currency & Language | Buyer portal in Arabic RTL priced in SAR | core 8 (GCC listing region) |
 | 17 | `f17-quote-widget.png` | F17 Quote Widget | Storefront PDP with the "Request a Quote" block + the resulting request in admin | core 8 · **reel opener** (funnel) |
 | 18 | `f18-buyer-pwa.png` | F18 Buyer PWA | Phone home screen with the Mannon app icon + the one-tap reorder screen | candidate (mobile story) |
+| 19 | `f19-catalog-sharing.png` | F19 Catalog Sharing | Branded public wholesale catalog page with hidden prices + "Request access" | candidate (later-phase growth differentiator) |
 
 ## Reel order (extended cut)
 

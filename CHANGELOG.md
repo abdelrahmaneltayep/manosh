@@ -5,6 +5,29 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 19: Catalog Sharing & B2B Discovery (Faire-Style)
+
+- **Publish a shareable catalog.** A merchant turns any **F11 custom catalog** into
+  a branded public wholesale page (`/catalog/:shop/:slug`) — shareable by link or
+  opt-in **listed** in the in-app discovery index (`/discover`). New models
+  `PublicCatalog` + `CatalogLead` (migration `f19_catalog_sharing`); admin at
+  **/app/catalog-sharing**. **Growth-only** (`catalogSharingAllowed`); Starter sees
+  an upgrade CTA. Dark-launched behind `MANNON_FF_CATALOG_SHARE`.
+- **Price-protection guarantee.** The public page reads products through the **same
+  F11 visibility resolution** as the portal, so a hidden SKU can never leak. Prices
+  render **only** when the merchant chose `showPrices = PUBLIC`; `HIDDEN` and
+  `AFTER_APPROVAL` keep prices off the public page (documented in
+  `docs/catalog-sharing.md`, unit-tested in `pricesVisibleOnPublicPage`).
+- **Request access → F6 → F11.** A "Request wholesale access" CTA creates a
+  `CatalogLead` (honeypot + rate-limited, shared with F6; generic OK to bots).
+  Approving a lead runs the **F6 provisioning pipeline** (Company + magic-link buyer
+  + default price list) and **assigns the catalog (F11)** to the new company, so the
+  buyer immediately sees their real prices. Emits `PUBLIC_CATALOG_PUBLISHED` and
+  `CATALOG_LEAD_CREATED`.
+- **Emails.** `catalog_lead_created` (merchant new-lead notice) and
+  `catalog_access_approved` (buyer welcome + secure link). Merchant fully controls
+  publish / unlist / delete; unlisting takes the public page offline immediately.
+
 ### Added — Feature 18: Buyer PWA & One-Tap Reorder (Installable Mobile)
 
 - **Installable buyer app.** The magic-link portal now ships a **web app manifest**

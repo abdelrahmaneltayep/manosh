@@ -83,6 +83,7 @@ model Shop {
   stockOverrides        StockOverride[]
   currencyRates         CurrencyRate[]
   quoteRequests         QuoteRequest[]
+  publicCatalogs        PublicCatalog[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 }
@@ -107,6 +108,69 @@ model QuoteRequest {
   updatedAt        DateTime            @updatedAt
 
   @@index([shopId, status])
+}
+
+// F19 — a shareable public/semi-public wholesale catalog (Faire-style). Renders
+// a chosen F11 Catalog as a branded public page. Prices are hidden by default;
+// hidden SKUs never leak (the page reads through the same F11 visibility as the
+// portal). A "Request wholesale access" CTA creates a CatalogLead → F6 → F11.
+// Growth-only; dark-launched behind MANNON_FF_CATALOG_SHARE.
+model PublicCatalog {
+  id         String                  @id @default(cuid())
+  shopId     String
+  shop       Shop                    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  catalogId  String // the F11 Catalog whose products are published
+  catalog    Catalog                 @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  slug       String // public URL segment, unique per shop
+  title      String
+  visibility PublicCatalogVisibility @default(LINK) // LINK = unlisted; LISTED = in the discovery index
+  showPrices PublicCatalogPrices     @default(HIDDEN)
+  status     PublicCatalogStatus     @default(DRAFT)
+  leads      CatalogLead[]
+  createdAt  DateTime                @default(now())
+  updatedAt  DateTime                @updatedAt
+
+  @@unique([shopId, slug])
+  @@index([shopId])
+  @@index([visibility, status])
+}
+
+enum PublicCatalogVisibility {
+  LINK // shareable link only (unlisted)
+  LISTED // opt-in to the in-app Mannon discovery index
+}
+
+enum PublicCatalogPrices {
+  HIDDEN // never show prices publicly
+  AFTER_APPROVAL // prices unlock in the portal once the buyer is approved
+  PUBLIC // show reference prices on the public page
+}
+
+enum PublicCatalogStatus {
+  DRAFT // not yet published; public page 404s
+  LIVE // published; public page + (if LISTED) discovery index
+}
+
+// F19 — a wholesale-access request captured from a public catalog page. Approving
+// it runs the F6 provisioning pipeline (Company + magic-link buyer) and assigns
+// the catalog (F11) so the new buyer sees their real prices. Spam-guarded.
+model CatalogLead {
+  id              String          @id @default(cuid())
+  publicCatalogId String
+  publicCatalog   PublicCatalog   @relation(fields: [publicCatalogId], references: [id], onDelete: Cascade)
+  email           String
+  companyName     String?
+  message         String?
+  status          CatalogLeadStatus @default(NEW)
+  createdAt       DateTime        @default(now())
+
+  @@index([publicCatalogId, status])
+}
+
+enum CatalogLeadStatus {
+  NEW
+  APPROVED
+  DECLINED
 }
 
 // F18 — a buyer's Web Push subscription (installable PWA). Opt-in only; stores
@@ -379,6 +443,7 @@ model Catalog {
   visibility  CatalogVisibility   @default(ASSIGNED)
   items       CatalogItem[]
   assignments CatalogAssignment[]
+  publicCatalogs PublicCatalog[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 
@@ -1206,6 +1271,8 @@ enum EventType {
   QUOTE_REQUEST_CREATED
   PWA_INSTALLED
   REORDER_ONECLICK
+  PUBLIC_CATALOG_PUBLISHED
+  CATALOG_LEAD_CREATED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
