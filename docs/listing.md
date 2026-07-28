@@ -95,6 +95,9 @@ it orchestrates what Shopify already owns.
 - **Custom catalogs.** Show each buyer only their products. Assign a catalog to a
   company (or, on Growth, a group or a single member); hidden SKUs never leak —
   not via search, direct URL, or the quote picker. "Preview as customer" to QA it.
+- **Sales-rep portal (Growth).** Your reps log in to a scoped portal, see only
+  their assigned accounts, and place or negotiate orders on behalf of buyers —
+  within each buyer's limits. Every rep-placed order is attributed and audited.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
@@ -139,6 +142,7 @@ migrate — install, invite a buyer, and send your first quote.
 - QuickBooks Online & Xero sync — invoices + payments, no re-keying (Growth plan)
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
 - Custom catalogs: per-customer product visibility (1 on Starter; group/member + CSV on Growth)
+- Sales-rep portal: reps order & negotiate on behalf of buyers, scoped to their accounts (Growth plan)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -176,6 +180,11 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Sales-rep portal (Growth):** your reps sign in to a scoped portal, see only
+  their assigned accounts, and place or negotiate orders on behalf of buyers —
+  every rep-placed order is attributed (`placedByRepId`) and audited, and the
+  buyer gets a transparency notice. A rep leaderboard tracks quotes, orders, and
+  win rate.
 - **Custom catalogs & per-customer visibility:** show each buyer only the
   products they're allowed to see — assign a catalog to a company (group/member
   on Growth); hidden SKUs never leak via search, direct URL, or the quote picker,

@@ -98,14 +98,16 @@ export interface PlanLimits {
   followupCadenceMax: number;
   /** F11: maximum CUSTOM catalogs (the default catalog is not counted). */
   customCatalogCap: number;
+  /** F12: maximum sales-rep seats. Starter = 0 (feature hidden). */
+  repSeatCap: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1, repSeatCap: 0 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity, repSeatCap: 3 },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**
@@ -220,6 +222,23 @@ export function evaluateCatalogAllowance(used: number, cap: number): { allowed: 
 /** Merchant-facing copy when the custom-catalog cap is hit. */
 export function catalogCapMessage(cap: number): string {
   return `Your Starter plan includes ${cap} custom catalog. Upgrade to Growth for unlimited catalogs plus group- and member-level assignment and CSV import.`;
+}
+
+// --- F12 sales-rep portal gating ---------------------------------------------
+
+/** The sales-rep portal (order-on-behalf + assigned accounts) is Growth-only. */
+export function repPortalAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** Pure allowance decision for inviting another sales rep. */
+export function evaluateRepSeatAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
+  return { allowed: used < cap, used, cap };
+}
+
+/** Merchant-facing copy when the rep-seat cap is hit. */
+export function repSeatCapMessage(cap: number): string {
+  return `Your plan includes ${cap} sales-rep seats. Contact us to add more reps.`;
 }
 
 /** Buyer-facing copy when the saved-list cap is hit. */

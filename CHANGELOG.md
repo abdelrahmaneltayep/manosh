@@ -5,6 +5,30 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 12: Sales-Rep Portal (Order-on-Behalf & Assigned Accounts) (Growth)
+
+- **Reps sell through Mannon.** A `SalesRep` signs in via the same passwordless
+  magic-link mechanism as buyers (token hashed at rest) to a scoped `/rep` portal
+  that shows **only** their assigned companies (`RepAssignment`). Strict isolation:
+  every read is scoped, and `getRepCompany` returns null (→ 404) for an unassigned
+  company (`repCanAccessCompany` is the single source of truth).
+- **Order on behalf.** A rep picks a buyer, enters an impersonation context
+  (clearly banner-marked "Ordering on behalf of {buyer} · {company}"), and places
+  a quote/order that stays the buyer's but is attributed to the rep
+  (`Quote.placedByRepId`). Buyer limits still apply (F9 MOQ, F5 approvals, F3
+  price list, F11 visibility). Every on-behalf order logs
+  `ORDER_PLACED_ON_BEHALF` (rep + buyer ids) and emails the buyer a transparency
+  notice.
+- **Merchant admin** at `/app/reps`: invite reps (magic link), assign companies,
+  and a **rep leaderboard** (quotes / orders / win rate) derived from attributed
+  quotes.
+- **Plan gating.** Growth-only (`repPortalAllowed`, `PLAN_LIMITS.repSeatCap` = 0
+  Starter / 3 Growth). Starter sees "Add your sales team — upgrade to Growth."
+  Events `REP_INVITED`, `ORDER_PLACED_ON_BEHALF`. New editable templates
+  `rep_invite`, `rep_order_placed`. Dark-launched behind `MANNON_FF_REP_PORTAL`.
+  Migration `f12_sales_rep_portal`. Optional first-run nudge in Settings. See
+  `docs/sales-rep-portal.md` for the isolation + impersonation-audit guarantees.
+
 ### Added — Feature 11: Custom Catalogs & Per-Customer Product Visibility
 
 - **See only your products.** A `Catalog` (visibility `ASSIGNED` = deny-by-default

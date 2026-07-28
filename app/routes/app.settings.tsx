@@ -78,8 +78,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const creditEnabled = process.env.MANNON_FF_CREDIT === "true";
   const accountingEnabled = process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
   const catalogsEnabled = process.env.MANNON_FF_CUSTOM_CATALOGS === "true";
+  const repPortalEnabled = process.env.MANNON_FF_REP_PORTAL === "true";
 
-  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount] =
+  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount] =
     shopId
       ? await Promise.all([
           canCreateQuote(shopId),
@@ -89,8 +90,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           prisma.creditProfile.count({ where: { company: { shopId } } }),
           prisma.accountingConnection.count({ where: { shopId } }),
           prisma.catalog.count({ where: { shopId, isDefault: false } }),
+          prisma.salesRep.count({ where: { shopId } }),
         ])
-      : [null, null, [], {}, 0, 0, 0];
+      : [null, null, [], {}, 0, 0, 0, 0];
 
   const TEMPLATE_LABELS: Record<TemplateKey, string> = {
     invoice_issued: "Invoice issued",
@@ -109,6 +111,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     followup_expiry_warning: "Follow-up — expiry warning",
     followup_expired: "Follow-up — expired",
     accounting_sync_failure: "Accounting — sync failure digest",
+    rep_invite: "Sales rep — invite",
+    rep_order_placed: "Sales rep — order placed (buyer notice)",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -128,6 +132,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasAccountingConnection: accountingConnCount > 0,
     catalogsEnabled,
     hasCustomCatalog: customCatalogCount > 0,
+    repPortalEnabled,
+    hasRep: repCount > 0,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -367,6 +373,19 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Optional onboarding (Growth): invite sales reps */}
+        {data.repPortalEnabled && data.plan === GROWTH_PLAN && !data.hasRep && (
+          <Banner tone="info" title="Optional: invite your sales reps">
+            <p>
+              Give your reps a scoped login to their assigned accounts so they can
+              place and negotiate orders on behalf of buyers.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/reps">Invite your sales reps</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Optional onboarding (Growth): connect accounting */}
         {data.accountingEnabled && data.plan === GROWTH_PLAN && !data.hasAccountingConnection && (
           <Banner tone="info" title="Optional: connect your accounting">
@@ -488,6 +507,17 @@ export default function Settings() {
                   Custom catalogs
                 </Text>
                 <Badge tone="info">1 on Starter · unlimited + group/member + CSV on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Sales-rep portal
+                </Text>
+                <Badge tone="info">Growth · up to 3 rep seats</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Reps order &amp; negotiate on behalf of buyers, scoped to their accounts.
+                  </Text>
+                )}
               </InlineStack>
             </BlockStack>
 

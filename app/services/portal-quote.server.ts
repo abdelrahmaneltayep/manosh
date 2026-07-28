@@ -75,6 +75,7 @@ export async function submitBuyerQuote(
   buyer: { id: string; companyId: string },
   selections: QuoteSelection[],
   catalog: CatalogItem[],
+  options: { placedByRepId?: string | null } = {},
 ): Promise<SubmitBuyerQuoteResult> {
   const built = buildQuoteLinesFromSelections(catalog, selections);
   if (!built.ok) return built;
@@ -115,6 +116,7 @@ export async function submitBuyerQuote(
     companyId: buyer.companyId,
     buyerId: buyer.id,
     lines: built.lines,
+    placedByRepId: options.placedByRepId ?? null,
   });
 
   // F8 — schedule automated follow-ups (feature-flagged; no-op if the policy is

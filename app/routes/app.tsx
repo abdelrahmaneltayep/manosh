@@ -31,6 +31,7 @@ export default function App() {
         <Link to="/app/followups">Follow-ups</Link>
         <Link to="/app/analytics">Analytics</Link>
         <Link to="/app/buyers">Buyers</Link>
+        <Link to="/app/reps">Reps</Link>
         <Link to="/app/wholesale">Wholesale</Link>
         <Link to="/app/price-lists">Price lists</Link>
         <Link to="/app/catalogs">Catalogs</Link>

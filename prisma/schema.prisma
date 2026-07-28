@@ -64,8 +64,50 @@ model Shop {
   accountingSyncLogs    AccountingSyncLog[]
   accountingMap         AccountingMap?
   catalogs              Catalog[]
+  salesReps             SalesRep[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F12 — a merchant's sales rep. Authenticates via the same passwordless
+// magic-link mechanism as buyers (token hashed at rest, guardrail #7), into a
+// scoped rep portal that shows only their assigned companies. Growth-only.
+model SalesRep {
+  id                  String          @id @default(cuid())
+  shopId              String
+  shop                Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  email               String
+  name                String?
+  status              RepStatus       @default(INVITED)
+  magicTokenHash      String? // hash only, never raw
+  magicTokenExpiresAt DateTime?
+  invitedAt           DateTime?
+  assignments         RepAssignment[]
+  placedQuotes        Quote[]         @relation("QuotePlacedByRep")
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@unique([shopId, email])
+  @@index([magicTokenHash])
+}
+
+// F12 — which companies a rep may see/act on. Strict isolation: a rep only ever
+// sees companies with a row here.
+model RepAssignment {
+  id        String   @id @default(cuid())
+  repId     String
+  rep       SalesRep @relation(fields: [repId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([repId, companyId])
+  @@index([companyId])
+}
+
+enum RepStatus {
+  INVITED
+  ACTIVE
 }
 
 // F11 — a custom product catalog: which SKUs a buyer/company/group may see.
@@ -463,6 +505,7 @@ model Company {
   priceList         CompanyPriceList?
   savedOrderLists   SavedOrderList[]
   catalogAssignments CatalogAssignment[]
+  repAssignments    RepAssignment[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -646,6 +689,8 @@ model Quote {
   draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
   totalsSnapshot Json? // exact draftOrderCalculate output
   reminderState  Json? // F8: per-quote follow-up state ({ unsubscribed, nudgesSent, overrideCadence })
+  placedByRepId  String? // F12: the sales rep who placed/negotiated this on behalf of the buyer
+  placedByRep    SalesRep?           @relation("QuotePlacedByRep", fields: [placedByRepId], references: [id], onDelete: SetNull)
   lines          QuoteLine[]
   aiSuggestions  QuoteAiSuggestion[]
   followups      QuoteFollowup[]
@@ -654,6 +699,7 @@ model Quote {
 
   @@index([companyId, status])
   @@index([status, expiresAt])
+  @@index([placedByRepId])
 }
 
 // F8 — a scheduled follow-up for a quote (reminder nudge, expiry warning, or the
@@ -794,6 +840,8 @@ enum EventType {
   ACCOUNTING_CONNECTED
   INVOICE_SYNCED
   CATALOG_ASSIGNED
+  REP_INVITED
+  ORDER_PLACED_ON_BEHALF
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
