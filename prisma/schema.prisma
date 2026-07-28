@@ -63,8 +63,67 @@ model Shop {
   accountingConnections AccountingConnection[]
   accountingSyncLogs    AccountingSyncLog[]
   accountingMap         AccountingMap?
+  catalogs              Catalog[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F11 — a custom product catalog: which SKUs a buyer/company/group may see.
+// `visibility=ASSIGNED` is deny-by-default (only included items are visible);
+// `visibility=ALL` shows everything except items explicitly flagged hidden.
+model Catalog {
+  id          String              @id @default(cuid())
+  shopId      String
+  shop        Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name        String
+  isDefault   Boolean             @default(false)
+  visibility  CatalogVisibility   @default(ASSIGNED)
+  items       CatalogItem[]
+  assignments CatalogAssignment[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@index([shopId])
+}
+
+// A product/variant membership within a catalog. `hidden=true` blocklists an
+// item (used to hide a SKU inside an ALL catalog); otherwise it's an allow entry.
+model CatalogItem {
+  id        String   @id @default(cuid())
+  catalogId String
+  catalog   Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  productId String // gid://shopify/Product/...
+  variantId String? // gid://shopify/ProductVariant/... (null = whole product)
+  hidden    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@unique([catalogId, productId, variantId])
+  @@index([catalogId])
+}
+
+// Assign a catalog at member > company > group precedence. `customerGroupTag`
+// reuses the F3 notion of a group (a Shopify customer tag / segment). Exactly
+// one of the three targets is set per row.
+model CatalogAssignment {
+  id               String   @id @default(cuid())
+  catalogId        String
+  catalog          Catalog  @relation(fields: [catalogId], references: [id], onDelete: Cascade)
+  companyId        String?
+  company          Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customerGroupTag String?
+  memberId         String?
+  member           Buyer?   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt        DateTime @default(now())
+
+  @@index([catalogId])
+  @@index([companyId])
+  @@index([memberId])
+  @@index([customerGroupTag])
+}
+
+enum CatalogVisibility {
+  ALL
+  ASSIGNED
 }
 
 // F10 — a store's OAuth link to an external accounting provider (QuickBooks
@@ -403,6 +462,7 @@ model Company {
   invoices          Invoice[]
   priceList         CompanyPriceList?
   savedOrderLists   SavedOrderList[]
+  catalogAssignments CatalogAssignment[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -526,6 +586,7 @@ model Buyer {
   quotes                   Quote[]
   requestedApprovals       OrderApproval[] @relation("ApprovalRequester")
   decidedApprovals         OrderApproval[] @relation("ApprovalApprover")
+  catalogAssignments       CatalogAssignment[]
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt
 
@@ -732,6 +793,7 @@ enum EventType {
   ORDER_RULE_APPLIED
   ACCOUNTING_CONNECTED
   INVOICE_SYNCED
+  CATALOG_ASSIGNED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

@@ -4,7 +4,7 @@ import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireBuyerId } from "../services/buyer-session.server";
-import { getCatalog } from "../services/catalog.server";
+import { getVisibleCatalog } from "../services/catalogs.server";
 import {
   buildReorderLines,
   createReorder,
@@ -28,12 +28,18 @@ async function loadContext(request: Request, sourceId: string | undefined) {
   return { buyer, source };
 }
 
-async function resolveReorderLines(shop: string, shopifyOrderId: string) {
+async function resolveReorderLines(
+  shop: string,
+  shopifyOrderId: string,
+  buyerCtx: { buyerId: string; companyId: string },
+) {
   const { unauthenticated } = await import("../shopify.server");
   const { admin } = await unauthenticated.admin(shop);
+  // F11 — reorder only from what this buyer may see; a hidden SKU in a past
+  // order won't reappear in their cart.
   const [orderLines, catalog] = await Promise.all([
     fetchOrderLines(admin, shopifyOrderId),
-    getCatalog(shop),
+    getVisibleCatalog(shop, buyerCtx),
   ]);
   return { admin, catalog, ...buildReorderLines(orderLines, catalog) };
 }
@@ -41,10 +47,7 @@ async function resolveReorderLines(shop: string, shopifyOrderId: string) {
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { buyer, source } = await loadContext(request, params.sourceId);
   try {
-    const { lines, unavailable } = await resolveReorderLines(
-      buyer.company.shop.shopifyDomain,
-      source.shopifyOrderId,
-    );
+    const { lines, unavailable } = await resolveReorderLines(buyer.company.shop.shopifyDomain, source.shopifyOrderId, { buyerId: buyer.id, companyId: buyer.companyId });
     return { ok: true as const, orderName: source.orderName, lines, unavailableCount: unavailable.length };
   } catch {
     return { ok: false as const, orderName: source.orderName, lines: [] as ReorderLine[], unavailableCount: 0 };
@@ -57,10 +60,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   let resolved;
   try {
-    resolved = await resolveReorderLines(
-      buyer.company.shop.shopifyDomain,
-      source.shopifyOrderId,
-    );
+    resolved = await resolveReorderLines(buyer.company.shop.shopifyDomain, source.shopifyOrderId, { buyerId: buyer.id, companyId: buyer.companyId });
   } catch {
     return { error: "We couldn’t load this order just now. Please try again." };
   }

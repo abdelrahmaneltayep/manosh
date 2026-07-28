@@ -4,7 +4,8 @@ import { redirect } from "@remix-run/node";
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import prisma from "../db.server";
 import { requireBuyerId } from "../services/buyer-session.server";
-import { getCatalog, type CatalogItem } from "../services/catalog.server";
+import { type CatalogItem } from "../services/catalog.server";
+import { getVisibleCatalog } from "../services/catalogs.server";
 import {
   parseQuoteSelections,
   submitBuyerQuote,
@@ -29,7 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let catalog: CatalogItem[] = [];
   let catalogError = false;
   try {
-    catalog = await getCatalog(buyer.company.shop.shopifyDomain);
+    catalog = await getVisibleCatalog(buyer.company.shop.shopifyDomain, { buyerId: buyer.id, companyId: buyer.companyId });
   } catch {
     catalogError = true;
   }
@@ -71,7 +72,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   let catalog: CatalogItem[];
   try {
-    catalog = await getCatalog(buyer.company.shop.shopifyDomain);
+    catalog = await getVisibleCatalog(buyer.company.shop.shopifyDomain, { buyerId: buyer.id, companyId: buyer.companyId });
   } catch {
     return { error: "We couldn’t load the catalog just now. Please try again." };
   }

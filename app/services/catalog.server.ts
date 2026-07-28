@@ -10,6 +10,7 @@
 
 export interface CatalogItem {
   variantId: string; // gid://shopify/ProductVariant/...
+  productId: string; // gid://shopify/Product/... (F11 visibility filtering)
   productTitle: string;
   variantTitle: string | null;
   displayTitle: string;
@@ -29,6 +30,7 @@ const CATALOG_QUERY = `#graphql
     shop { currencyCode }
     products(first: 100, query: "status:active") {
       nodes {
+        id
         title
         variants(first: 50) {
           nodes {
@@ -51,7 +53,7 @@ interface RawVariant {
 }
 interface RawCatalogData {
   shop?: { currencyCode?: string };
-  products?: { nodes?: Array<{ title: string; variants?: { nodes?: RawVariant[] } }> };
+  products?: { nodes?: Array<{ id?: string; title: string; variants?: { nodes?: RawVariant[] } }> };
 }
 
 /** Pure mapping from the Admin GraphQL response to flat catalog items. */
@@ -64,6 +66,7 @@ export function mapProductsToCatalog(data: RawCatalogData): CatalogItem[] {
         variant.title && variant.title !== "Default Title" ? variant.title : null;
       items.push({
         variantId: variant.id,
+        productId: product.id ?? "",
         productTitle: product.title,
         variantTitle,
         displayTitle: variantTitle

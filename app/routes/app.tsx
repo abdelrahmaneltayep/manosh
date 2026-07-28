@@ -33,6 +33,7 @@ export default function App() {
         <Link to="/app/buyers">Buyers</Link>
         <Link to="/app/wholesale">Wholesale</Link>
         <Link to="/app/price-lists">Price lists</Link>
+        <Link to="/app/catalogs">Catalogs</Link>
         <Link to="/app/order-rules">Order rules</Link>
         <Link to="/app/credit">Credit</Link>
         <Link to="/app/accounting">Accounting</Link>
