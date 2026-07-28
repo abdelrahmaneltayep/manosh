@@ -9,7 +9,7 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const DAY = 24 * 60 * 60 * 1000;
 
 const CATALOG: CatalogItem[] = [
-  { variantId: "gid://v/1", productTitle: "Widget", variantTitle: null, displayTitle: "Widget", sku: "A-1", price: "9.50", currencyCode: "USD" },
+  { variantId: "gid://v/1", productId: "gid://shopify/Product/gid://v/1", productTitle: "Widget", variantTitle: null, displayTitle: "Widget", sku: "A-1", price: "9.50", currencyCode: "USD" },
 ];
 
 describe.skipIf(!hasDb)("quote-volume cap (DB)", () => {

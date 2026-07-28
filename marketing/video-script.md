@@ -80,6 +80,15 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — custom catalogs (Feature 11)
+
+> **VO:** "Every buyer sees their own catalog — assign it once, and the products
+> they shouldn't see simply aren't there."
+>
+> **On screen:** The **catalog builder** with a **"preview as customer"** split
+> view: the full product list on the left, and the trimmed set a specific buyer
+> sees on the right. _(Optional extended B-roll — not in the ≤60s store reel.)_
+
 ## Extended B-roll — accounting sync (Feature 10)
 
 > **VO:** "Orders land in your books automatically — connect QuickBooks or Xero

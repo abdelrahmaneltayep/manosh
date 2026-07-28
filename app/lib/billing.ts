@@ -96,14 +96,16 @@ export interface PlanLimits {
   wholesaleFormCap: number;
   /** F8: maximum follow-up nudges in a quote's cadence. Starter = 1 (manual). */
   followupCadenceMax: number;
+  /** F11: maximum CUSTOM catalogs (the default catalog is not counted). */
+  customCatalogCap: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6 },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**
@@ -189,6 +191,35 @@ export function packRulesAllowed(plan: string | null | undefined): boolean {
 /** Accounting sync (QuickBooks Online / Xero) is Growth-only. Pure. */
 export function accountingSyncAllowed(plan: string | null | undefined): boolean {
   return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+// --- F11 custom catalog gating -----------------------------------------------
+
+export type CatalogAssignmentScope = "COMPANY" | "GROUP" | "MEMBER";
+
+/**
+ * Which assignment scopes a plan may use. Starter can assign a catalog at the
+ * company level only; Growth adds group (customer tag) and member-level
+ * targeting. Pure.
+ */
+export function catalogAssignmentScopes(plan: string | null | undefined): CatalogAssignmentScope[] {
+  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowth ? ["COMPANY", "GROUP", "MEMBER"] : ["COMPANY"];
+}
+
+/** CSV catalog import is Growth-only. Pure. */
+export function catalogCsvAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** Pure allowance decision for creating another custom catalog. */
+export function evaluateCatalogAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
+  return { allowed: used < cap, used, cap };
+}
+
+/** Merchant-facing copy when the custom-catalog cap is hit. */
+export function catalogCapMessage(cap: number): string {
+  return `Your Starter plan includes ${cap} custom catalog. Upgrade to Growth for unlimited catalogs plus group- and member-level assignment and CSV import.`;
 }
 
 /** Buyer-facing copy when the saved-list cap is hit. */

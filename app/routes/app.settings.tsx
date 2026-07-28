@@ -77,8 +77,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const creditEnabled = process.env.MANNON_FF_CREDIT === "true";
   const accountingEnabled = process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
+  const catalogsEnabled = process.env.MANNON_FF_CUSTOM_CATALOGS === "true";
 
-  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount] =
+  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount] =
     shopId
       ? await Promise.all([
           canCreateQuote(shopId),
@@ -87,8 +88,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           getEmailTemplates(session.shop),
           prisma.creditProfile.count({ where: { company: { shopId } } }),
           prisma.accountingConnection.count({ where: { shopId } }),
+          prisma.catalog.count({ where: { shopId, isDefault: false } }),
         ])
-      : [null, null, [], {}, 0, 0];
+      : [null, null, [], {}, 0, 0, 0];
 
   const TEMPLATE_LABELS: Record<TemplateKey, string> = {
     invoice_issued: "Invoice issued",
@@ -124,6 +126,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasCreditProfile: creditProfileCount > 0,
     accountingEnabled,
     hasAccountingConnection: accountingConnCount > 0,
+    catalogsEnabled,
+    hasCustomCatalog: customCatalogCount > 0,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -350,6 +354,19 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Optional onboarding: build your first custom catalog */}
+        {data.catalogsEnabled && !data.hasCustomCatalog && (
+          <Banner tone="info" title="Optional: build your first custom catalog">
+            <p>
+              Show each buyer only the products they’re allowed to see. Assign a
+              catalog to a company and everything else stays hidden.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/catalogs">Build a custom catalog</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Optional onboarding (Growth): connect accounting */}
         {data.accountingEnabled && data.plan === GROWTH_PLAN && !data.hasAccountingConnection && (
           <Banner tone="info" title="Optional: connect your accounting">
@@ -465,6 +482,12 @@ export default function Settings() {
                     Push invoices + payments to your accounting provider — no re-keying.
                   </Text>
                 )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Custom catalogs
+                </Text>
+                <Badge tone="info">1 on Starter · unlimited + group/member + CSV on Growth</Badge>
               </InlineStack>
             </BlockStack>
 

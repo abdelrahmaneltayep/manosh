@@ -13,6 +13,7 @@ describe("mapProductsToCatalog (pure)", () => {
       products: {
         nodes: [
           {
+            id: "gid://shopify/Product/10",
             title: "Hoodie",
             variants: {
               nodes: [
@@ -36,6 +37,7 @@ describe("mapProductsToCatalog (pure)", () => {
     expect(items).toHaveLength(3);
     expect(items[0]).toMatchObject({
       variantId: "gid://shopify/ProductVariant/1",
+      productId: "gid://shopify/Product/10",
       displayTitle: "Hoodie — Small",
       sku: "H-S",
       price: "40.00",
@@ -59,7 +61,7 @@ describe("getCatalog cache", () => {
   beforeEach(() => clearCatalogCache());
 
   const sample: CatalogItem[] = [
-    { variantId: "v1", productTitle: "P", variantTitle: null, displayTitle: "P", sku: null, price: "1.00", currencyCode: "USD" },
+    { variantId: "v1", productId: "p1", productTitle: "P", variantTitle: null, displayTitle: "P", sku: null, price: "1.00", currencyCode: "USD" },
   ];
 
   it("caches within the TTL (loader runs once)", async () => {

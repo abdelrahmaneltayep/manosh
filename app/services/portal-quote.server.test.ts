@@ -10,8 +10,8 @@ import {
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 const CATALOG: CatalogItem[] = [
-  { variantId: "gid://v/1", productTitle: "Widget", variantTitle: null, displayTitle: "Widget", sku: "A-1", price: "9.50", currencyCode: "USD" },
-  { variantId: "gid://v/2", productTitle: "Gadget", variantTitle: "Blue", displayTitle: "Gadget — Blue", sku: "B-2", price: "20.00", currencyCode: "USD" },
+  { variantId: "gid://v/1", productId: "gid://shopify/Product/gid://v/1", productTitle: "Widget", variantTitle: null, displayTitle: "Widget", sku: "A-1", price: "9.50", currencyCode: "USD" },
+  { variantId: "gid://v/2", productId: "gid://shopify/Product/gid://v/2", productTitle: "Gadget", variantTitle: "Blue", displayTitle: "Gadget — Blue", sku: "B-2", price: "20.00", currencyCode: "USD" },
 ];
 
 function formData(entries: [string, string][]): FormData {

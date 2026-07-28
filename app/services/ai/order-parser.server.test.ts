@@ -8,8 +8,8 @@ import {
 } from "./order-parser.server";
 
 const CATALOG: CatalogItem[] = [
-  { variantId: "gid://shopify/ProductVariant/1", productTitle: "Widget", variantTitle: null, displayTitle: "Widget", sku: "A-1", price: "9.50", currencyCode: "USD" },
-  { variantId: "gid://shopify/ProductVariant/2", productTitle: "Gadget", variantTitle: "Blue", displayTitle: "Gadget — Blue", sku: "B-2", price: "20.00", currencyCode: "USD" },
+  { variantId: "gid://shopify/ProductVariant/1", productId: "gid://shopify/Product/gid://shopify/ProductVariant/1", productTitle: "Widget", variantTitle: null, displayTitle: "Widget", sku: "A-1", price: "9.50", currencyCode: "USD" },
+  { variantId: "gid://shopify/ProductVariant/2", productId: "gid://shopify/Product/gid://shopify/ProductVariant/2", productTitle: "Gadget", variantTitle: "Blue", displayTitle: "Gadget — Blue", sku: "B-2", price: "20.00", currencyCode: "USD" },
 ];
 
 describe("buildCatalogSystemPrompt (pure)", () => {

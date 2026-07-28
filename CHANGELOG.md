@@ -5,6 +5,26 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 11: Custom Catalogs & Per-Customer Product Visibility
+
+- **See only your products.** A `Catalog` (visibility `ASSIGNED` = deny-by-default
+  / `ALL` = everything-but-hidden) is resolved for each buyer by precedence:
+  **member > company > group (customer tag) > store default**. Assigned via
+  `CatalogAssignment`, built from `CatalogItem` include/exclude rows or CSV.
+- **One enforcement point, no leaks.** The portal, order pad (F4), reorder, and
+  quote builder all read products through `getVisibleCatalog`, so a hidden SKU is
+  **removed, never greyed** — and can't leak via the list, a direct/submitted
+  variant id, or the quote line-item picker. Resolution is cached per buyer.
+- **Merchant builder** at `/app/catalogs`: create catalogs, check products in/out,
+  assign to company/group/member, CSV import (Growth), and a **"preview as
+  customer"** split view that matches exactly what the buyer sees.
+- **Plan gating.** Starter = 1 custom catalog, company-level assignment;
+  Growth = unlimited catalogs + group/member assignment + CSV
+  (`PLAN_LIMITS.customCatalogCap`, `catalogAssignmentScopes`, `catalogCsvAllowed`).
+  Event `CATALOG_ASSIGNED`. Dark-launched behind `MANNON_FF_CUSTOM_CATALOGS`.
+  Migration `f11_custom_catalogs`. Optional first-run nudge in Settings. See
+  `docs/custom-catalogs.md` for the visibility-leak guarantees.
+
 ### Added — Feature 10: Accounting Sync (QuickBooks Online & Xero) (Growth)
 
 - **Books, no re-keying.** Connect QuickBooks Online or Xero via OAuth (standard

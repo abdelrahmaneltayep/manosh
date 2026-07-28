@@ -92,6 +92,9 @@ it orchestrates what Shopify already owns.
 - **Customer-specific pricing.** Assign per-company price lists — by customer or
   Shopify tag — so buyers see the right price with no discount codes. Volume
   breaks and CSV import (Growth) handle quantity pricing and bulk updates.
+- **Custom catalogs.** Show each buyer only their products. Assign a catalog to a
+  company (or, on Growth, a group or a single member); hidden SKUs never leak —
+  not via search, direct URL, or the quote picker. "Preview as customer" to QA it.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
@@ -135,6 +138,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
 - QuickBooks Online & Xero sync — invoices + payments, no re-keying (Growth plan)
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
+- Custom catalogs: per-customer product visibility (1 on Starter; group/member + CSV on Growth)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -172,6 +176,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Custom catalogs & per-customer visibility:** show each buyer only the
+  products they're allowed to see — assign a catalog to a company (group/member
+  on Growth); hidden SKUs never leak via search, direct URL, or the quote picker,
+  and "preview as customer" QAs exactly what they'll see.
 - **QuickBooks Online & Xero sync (Growth):** connect your accounting once and
   every net-terms invoice + payment syncs automatically — idempotent (nothing
   double-posts), with a retryable sync log. No more re-keying invoices.
