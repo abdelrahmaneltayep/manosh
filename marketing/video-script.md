@@ -53,6 +53,15 @@ over dialogue.
 > (admin / buyer / approver). Cut to a quote marked **"Waiting for approval"**;
 > the approver taps **Approve order** and the status flips to approved.
 
+## Extended B-roll — wholesale sign-up (Feature 6)
+
+> **VO:** "Buyers apply, you approve in one click — screen every account before it
+> ever sees your prices."
+>
+> **On screen:** The public **apply-to-buy-wholesale** form; cut to the admin
+> **approval queue** with a pending application — the merchant clicks **Approve**
+> and it flips to approved. _(Extended cut only — keep the core reel ≤ 60s.)_
+
 ## Supporting beats (existing pillars)
 
 - **Passwordless portal.** VO: "Your buyer accepts from a secure link — no

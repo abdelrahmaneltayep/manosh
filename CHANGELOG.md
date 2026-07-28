@@ -5,6 +5,25 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 6: Wholesale Registration + Gated Approval
+
+- **Branded application funnel.** A merchant builds a wholesale form in admin
+  (custom fields, types, required flags); a public URL `/apply/:shop` renders it
+  with no login — a honeypot, per-key rate limit, and email dedupe guard it.
+- **Approval queue.** Approve / reject / request-more-info from the admin queue.
+  On approve, Mannon provisions an F5 **Company** + admin member with a
+  passwordless magic link, assigns the F3 **default price list**, tags the
+  application `b2b-approved`, and best-effort tags the Shopify customer (new
+  `write_customers` scope). Trade pricing stays gated until approval.
+- **Auto-approval (Growth).** Applications from allowlisted email domains approve
+  automatically.
+- **Plan gating.** Both plans; `PLAN_LIMITS.wholesaleFormCap` = 1 (Starter) /
+  unlimited (Growth). Multiple forms, file-upload fields, and auto-approval rules
+  are Growth-only. The 2nd form on Starter is blocked with an upgrade CTA.
+- **Emails.** New editable templates: application received, decision, internal
+  notify. Event `WHOLESALE_APPLICATION_DECIDED`. Dark-launched behind
+  `MANNON_FF_WHOLESALE_REG`. Migration `f6_wholesale_registration`.
+
 ### Added — Feature 5: Company Accounts & Multi-Buyer Sub-Accounts
 
 - **Members with roles.** A buyer is now a company member with a role (admin /

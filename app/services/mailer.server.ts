@@ -65,6 +65,21 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi,\n\nYour order request was {{decision}}. See the details here:\n\n{{quoteUrl}}\n\nThank you,\n{{shopName}}",
   },
+  application_received: {
+    subject: "We got your wholesale application — {{companyName}}",
+    body:
+      "Hi,\n\nThanks for applying to buy wholesale with {{shopName}}. We've received {{companyName}}'s application and will review it shortly. You'll hear from us by email.\n\nThank you,\n{{shopName}}",
+  },
+  application_decision: {
+    subject: "Your wholesale application was {{decision}}",
+    body:
+      "Hi,\n\nYour wholesale application for {{companyName}} was {{decision}}. {{portalUrl}}\n\nThank you,\n{{shopName}}",
+  },
+  application_notify: {
+    subject: "New wholesale application: {{companyName}}",
+    body:
+      "A new wholesale application from {{companyName}} ({{contactEmail}}) is waiting for review in Mannon.",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

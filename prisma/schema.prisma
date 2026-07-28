@@ -36,25 +36,101 @@ model Session {
 }
 
 model Shop {
-  id                   String         @id @default(cuid())
-  shopifyDomain        String         @unique // e.g. acme.myshopify.com
-  plan                 Plan           @default(TRIAL)
-  trialEndsAt          DateTime?
-  autoApproveTolerance Float          @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
-  quoteExpiryDays      Int            @default(14) // default quote lifetime
-  magicLinkExpiryDays  Int            @default(7) // how long a buyer magic link stays valid
-  minMarginPct         Float          @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
-  defaultTermsDays     Int            @default(30) // F2: default net-terms days for new invoices
-  emailTemplates       Json? // F2: editable invoice/reminder email templates (keyed by template id)
-  installedAt          DateTime       @default(now())
-  companies            Company[]
-  events               Event[]
-  staffSeats           StaffSeat[]
-  variantCosts         VariantCost[]
-  priceLists           PriceList[]
-  priceListTags        PriceListTag[]
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  id                    String                 @id @default(cuid())
+  shopifyDomain         String                 @unique // e.g. acme.myshopify.com
+  plan                  Plan                   @default(TRIAL)
+  trialEndsAt           DateTime?
+  autoApproveTolerance  Float                  @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
+  quoteExpiryDays       Int                    @default(14) // default quote lifetime
+  magicLinkExpiryDays   Int                    @default(7) // how long a buyer magic link stays valid
+  minMarginPct          Float                  @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
+  defaultTermsDays      Int                    @default(30) // F2: default net-terms days for new invoices
+  emailTemplates        Json? // F2: editable invoice/reminder email templates (keyed by template id)
+  installedAt           DateTime               @default(now())
+  companies             Company[]
+  events                Event[]
+  staffSeats            StaffSeat[]
+  variantCosts          VariantCost[]
+  priceLists            PriceList[]
+  priceListTags         PriceListTag[]
+  wholesaleForms        WholesaleForm[]
+  wholesaleApplications WholesaleApplication[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+}
+
+// F6 — a branded wholesale application form. Starter = 1 form; Growth = multiple
+// forms + auto-approval + file fields (PLAN_LIMITS.wholesaleFormCap). The public
+// URL /apply/:shop renders the shop's default published form.
+model WholesaleForm {
+  id                 String                 @id @default(cuid())
+  shopId             String
+  shop               Shop                   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name               String
+  published          Boolean                @default(false)
+  isDefault          Boolean                @default(false)
+  autoApproveDomains String[] // email domains that auto-approve (Growth)
+  fields             WholesaleFormField[]
+  applications       WholesaleApplication[]
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([shopId])
+}
+
+model WholesaleFormField {
+  id       String             @id @default(cuid())
+  formId   String
+  form     WholesaleForm      @relation(fields: [formId], references: [id], onDelete: Cascade)
+  label    String
+  key      String // stable machine key, used in answers JSON
+  type     WholesaleFieldType @default(TEXT)
+  required Boolean            @default(false)
+  options  Json? // for SELECT
+  order    Int                @default(0)
+
+  @@unique([formId, key])
+  @@index([formId])
+}
+
+// One wholesale application. On approve it links to a Company (F5) and the
+// contact becomes an admin member with a magic link.
+model WholesaleApplication {
+  id           String          @id @default(cuid())
+  shopId       String
+  shop         Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  formId       String?
+  form         WholesaleForm?  @relation(fields: [formId], references: [id], onDelete: SetNull)
+  companyName  String
+  contactEmail String
+  phone        String?
+  taxId        String?
+  website      String?
+  answers      Json // { fieldKey: value }
+  status       WholesaleStatus @default(PENDING)
+  tags         String[]
+  companyId    String? // set on approve (F5 Company)
+  reviewedBy   String?
+  reviewedAt   DateTime?
+  createdAt    DateTime        @default(now())
+
+  @@index([shopId, status])
+  @@index([shopId, contactEmail])
+}
+
+enum WholesaleStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  MORE_INFO
+}
+
+enum WholesaleFieldType {
+  TEXT
+  EMAIL
+  SELECT
+  FILE
+  CHECKBOX
 }
 
 // F3 — Customer-specific price lists. A named set of per-variant prices (+ volume
@@ -459,6 +535,7 @@ enum EventType {
   ORDERPAD_USED
   MEMBER_INVITED
   ORDER_APPROVED
+  WHOLESALE_APPLICATION_DECIDED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
