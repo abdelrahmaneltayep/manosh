@@ -50,6 +50,21 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{buyerName}},\n\nYour saved list \"{{listName}}\" is ready to reorder. Open it in the order pad and send it in a tap:\n\n{{orderPadUrl}}\n\nThank you,\n{{shopName}}",
   },
+  member_invite: {
+    subject: "You're invited to order for {{companyName}}",
+    body:
+      "Hi,\n\nYou've been invited to {{companyName}}'s buyer portal as {{role}}. Use this secure link to sign in — no password needed:\n\n{{inviteUrl}}\n\nThank you,\n{{shopName}}",
+  },
+  approval_request: {
+    subject: "Approval needed: order for {{amount}}",
+    body:
+      "Hi,\n\nAn order for {{amount}} at {{companyName}} needs your approval before it can be placed. Review and approve or reject it here:\n\n{{approvalUrl}}\n\nThank you,\n{{shopName}}",
+  },
+  approval_decision: {
+    subject: "Your order was {{decision}}",
+    body:
+      "Hi,\n\nYour order request was {{decision}}. See the details here:\n\n{{quoteUrl}}\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

@@ -159,20 +159,21 @@ model StaffSeat {
 }
 
 model Company {
-  id               String            @id @default(cuid())
-  shopId           String
-  shop             Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
-  shopifyCompanyId String // gid://shopify/Company/...
-  name             String
-  buyers           Buyer[]
-  quotes           Quote[]
-  reorderSources   ReorderSource[]
-  creditProfile    CreditProfile?
-  invoices         Invoice[]
-  priceList        CompanyPriceList?
-  savedOrderLists  SavedOrderList[]
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                String            @id @default(cuid())
+  shopId            String
+  shop              Shop              @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  shopifyCompanyId  String // gid://shopify/Company/...
+  name              String
+  approvalThreshold Decimal?          @db.Decimal(18, 4) // F5: order total that triggers approval (Growth)
+  buyers            Buyer[]
+  quotes            Quote[]
+  reorderSources    ReorderSource[]
+  creditProfile     CreditProfile?
+  invoices          Invoice[]
+  priceList         CompanyPriceList?
+  savedOrderLists   SavedOrderList[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   @@unique([shopId, shopifyCompanyId])
   @@index([shopId])
@@ -275,22 +276,69 @@ enum ReminderKind {
   OVERDUE_7
 }
 
+// A buyer IS a company member (F5). Roles + status live here so the existing
+// passwordless magic-link invite flow is reused directly. Seat cap is per-company
+// (PLAN_LIMITS.memberCap): Starter 1, Growth 5.
 model Buyer {
-  id                       String    @id @default(cuid())
+  id                       String          @id @default(cuid())
   companyId                String
-  company                  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company                  Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
   email                    String // PII
   name                     String? // PII
+  role                     CompanyRole     @default(BUYER)
+  status                   MemberStatus    @default(ACTIVE)
+  invitedAt                DateTime?
   shopifyContactId         String? // gid://shopify/CompanyContact/...
   shopifyCompanyLocationId String? // gid://shopify/CompanyLocation/... — the location this buyer purchases for (purchasingEntity)
   magicTokenHash           String? // hash only, never raw
   magicTokenExpiresAt      DateTime?
   quotes                   Quote[]
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
+  requestedApprovals       OrderApproval[] @relation("ApprovalRequester")
+  decidedApprovals         OrderApproval[] @relation("ApprovalApprover")
+  createdAt                DateTime        @default(now())
+  updatedAt                DateTime        @updatedAt
 
   @@unique([companyId, email])
   @@index([magicTokenHash])
+  @@index([companyId, status])
+}
+
+enum CompanyRole {
+  ADMIN
+  BUYER
+  APPROVER
+}
+
+enum MemberStatus {
+  INVITED
+  ACTIVE
+}
+
+// F5 — spending-approval record for a quote whose total ≥ the company's
+// approvalThreshold. Growth-only. The order can't be placed until an approver
+// approves.
+model OrderApproval {
+  id            String         @id @default(cuid())
+  quoteId       String         @unique
+  quote         Quote          @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  companyId     String
+  requestedById String
+  requestedBy   Buyer          @relation("ApprovalRequester", fields: [requestedById], references: [id], onDelete: Cascade)
+  approverId    String?
+  approver      Buyer?         @relation("ApprovalApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  amount        Decimal        @db.Decimal(18, 4)
+  currency      String
+  status        ApprovalStatus @default(PENDING)
+  requestedAt   DateTime       @default(now())
+  decidedAt     DateTime?
+
+  @@index([companyId, status])
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 model Quote {
@@ -300,6 +348,7 @@ model Quote {
   buyerId        String
   buyer          Buyer               @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   status         QuoteStatus         @default(SUBMITTED)
+  approval       OrderApproval?
   expiresAt      DateTime
   poReference    String?
   draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
@@ -408,6 +457,8 @@ enum EventType {
   CREDIT_OVERRIDE
   PRICELIST_ASSIGNED
   ORDERPAD_USED
+  MEMBER_INVITED
+  ORDER_APPROVED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

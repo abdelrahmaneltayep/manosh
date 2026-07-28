@@ -31,6 +31,8 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Bulk order pad (search + paste) + saved lists", starter: "3 lists", growth: "Unlimited" },
   { label: "Order-pad CSV upload", starter: "—", growth: "✓" },
   { label: "Net terms + invoice due dates", starter: "✓", growth: "✓" },
+  { label: "Team members per company", starter: "1", growth: "Up to 5" },
+  { label: "Roles + spending approvals", starter: "—", growth: "✓" },
   { label: "Customer price lists", starter: "Up to 3", growth: "Unlimited" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },

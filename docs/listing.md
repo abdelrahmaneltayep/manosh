@@ -57,6 +57,10 @@ it orchestrates what Shopify already owns.
 - **One-tap reorder.** Buyers reprice and resend a past order in a tap. Small
   price moves auto-convert within a tolerance you set; larger ones wait for your
   approval.
+- **Company accounts & approvals (Growth).** Add up to 5 team members per company
+  with roles (admin / buyer / approver). Set a spending threshold and orders above
+  it route to an approver before they're placed — invites use the same passwordless
+  link, no new passwords.
 - **Bulk order pad.** The fastest way to build a big order: type-ahead SKU search
   (Enter to add), paste `SKU,QTY` lines, CSV upload (Growth), and saved lists you
   reorder in one tap — with a live subtotal at each buyer's own price.
@@ -114,6 +118,8 @@ migrate — install, invite a buyer, and send your first quote.
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
+- Company accounts: up to 5 members with roles + a Team tab (Growth plan)
+- Spending approvals: orders over a threshold route to an approver (Growth plan)
 - One-tap reorder with merchant-set auto-approval tolerance
 - Quick-order pad (paste SKUs) + AI Magic Order Pad (paste a PO or email)
 - Native Shopify payment terms + PO reference on every order
@@ -144,6 +150,9 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Company accounts & approvals:** multiple buyers per company with roles
+  (admin / buyer / approver) and a spending-approval chain — orders over your
+  threshold wait for an approver. Passwordless invites, up to 5 members (Growth).
 - **Bulk order pad:** the fastest way to place a big B2B order — type-ahead SKU
   search, paste, CSV upload (Growth), and saved lists to reorder in a tap, with a
   live subtotal at each customer's own price.
