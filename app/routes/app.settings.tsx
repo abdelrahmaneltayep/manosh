@@ -86,6 +86,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const quoteWidgetEnabled = process.env.MANNON_FF_QUOTE_WIDGET === "true";
   const buyerPwaEnabled = process.env.MANNON_FF_BUYER_PWA === "true";
   const catalogShareEnabled = process.env.MANNON_FF_CATALOG_SHARE === "true";
+  const whiteLabelEnabled = process.env.MANNON_FF_WHITE_LABEL === "true";
 
   const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex, erpConnCount] =
     shopId
@@ -136,6 +137,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     pwa_install_nudge: "Buyer app — install nudge",
     catalog_lead_created: "Catalog sharing — new access request (merchant)",
     catalog_access_approved: "Catalog sharing — access approved (buyer)",
+    org_invite: "Agency — workspace ready",
+    store_linked: "Agency — store linked",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -169,6 +172,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasQuoteWidget: shopFlex?.quoteWidgetEnabled === true,
     buyerPwaEnabled,
     catalogShareEnabled,
+    whiteLabelEnabled,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -431,6 +435,20 @@ export default function Settings() {
             </p>
             <Box paddingBlockStart="200">
               <Button url="/app/quote-requests" variant="primary">Set up the widget</Button>
+            </Box>
+          </Banner>
+        )}
+
+        {/* Optional onboarding (Growth, agencies): connect your first client store */}
+        {data.whiteLabelEnabled && data.plan === GROWTH_PLAN && (
+          <Banner tone="info" title="Running client stores? Connect your first one">
+            <p>
+              Agency mode manages every client store from one place — cross-store rollups, quick
+              switching, and per-store white-label branding on the buyer portal. Each managed store
+              keeps its own Growth subscription.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/agency" variant="primary">Open Agency</Button>
             </Box>
           </Banner>
         )}
@@ -703,6 +721,18 @@ export default function Settings() {
                   <Text as="span" variant="bodySm" tone="subdued">
                     Publish a public wholesale catalog and capture new buyers — prices stay
                     protected until you approve access.
+                  </Text>
+                )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Agency mode &amp; white-label (multi-store)
+                </Text>
+                <Badge tone="info">Growth · Agency add-on</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Manage &amp; white-label multiple stores from one place. Each managed store keeps
+                    its own Growth subscription — the org view is management-only.
                   </Text>
                 )}
               </InlineStack>

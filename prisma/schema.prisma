@@ -1204,6 +1204,54 @@ model ReorderSource {
   @@index([companyId])
 }
 
+// F20 — White-Label / Agency Multi-Store Management. An Organization groups
+// several Mannon stores under one agency/brand for cross-store rollups and
+// light white-labeling. Management-only metadata — it never moves money and
+// never crosses per-store data isolation (every store query is keyed by shop).
+// Growth-only (Agency add-on); dark-launched behind MANNON_FF_WHITE_LABEL.
+model Organization {
+  id         String      @id @default(cuid())
+  name       String
+  ownerEmail String
+  stores     OrgStore[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+// A store's membership in an org, with a per-store role. `shop` is the store's
+// shopifyDomain. A store belongs to at most one org (shop @unique).
+model OrgStore {
+  id        String   @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  shop      String // shopifyDomain
+  role      OrgRole  @default(MANAGER)
+  createdAt DateTime @default(now())
+
+  @@unique([shop])
+  @@index([orgId])
+}
+
+enum OrgRole {
+  OWNER
+  MANAGER
+  VIEWER
+}
+
+// F20 — per-store white-label overrides for BUYER-FACING pages only (portal +
+// emails). Never affects the embedded Shopify admin (stays Mannon/Polaris).
+// Colors are validated for AA contrast before they're stored.
+model Branding {
+  id           String   @id @default(cuid())
+  shop         String   @unique // shopifyDomain
+  logoFileId   String? // gid://shopify/... (optional hosted logo)
+  primaryColor String? // hex, overrides indigo on the portal
+  accentColor  String? // hex, overrides lime on the portal
+  portalName   String? // replaces "Mannon" wording on buyer pages
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+}
+
 // APPEND-ONLY. Written only via app/services/events.server.ts insert helper.
 model Event {
   id         String    @id @default(cuid())
@@ -1273,6 +1321,9 @@ enum EventType {
   REORDER_ONECLICK
   PUBLIC_CATALOG_PUBLISHED
   CATALOG_LEAD_CREATED
+  ORG_CREATED
+  STORE_LINKED
+  BRANDING_UPDATED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

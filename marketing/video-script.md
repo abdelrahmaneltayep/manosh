@@ -90,6 +90,17 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — agencies: run every client from one place (Feature 20)
+
+> **VO:** "Running wholesale for a dozen brands? Manage every store from one
+> dashboard — and put each client's own brand on their buyer portal."
+>
+> **On screen:** The **Agency dashboard** with a row of connected stores + combined
+> rollups; a click **switches into a client's store**; then a **buyer portal
+> repaints in the client's logo &amp; colors** while the Shopify admin stays Mannon.
+> _(Extended B-roll — Shopify Partners / agency channel; not part of the ≤60s store
+> reel.)_
+
 ## Extended B-roll — publish a catalog, get discovered (Feature 19)
 
 > **VO:** "Publish a wholesale catalog as a branded page — share the link or get

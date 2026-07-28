@@ -185,6 +185,16 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{companyName}},\n\nYou're approved to buy wholesale from {{shopName}}. Your prices for “{{catalogTitle}}” are now unlocked.\n\nOpen your portal with this secure link — no password needed:\n\n{{portalUrl}}\n\nThank you,\n{{shopName}}",
   },
+  org_invite: {
+    subject: "Your agency workspace is ready — {{orgName}}",
+    body:
+      "Hi,\n\n“{{orgName}}” is now set up to manage your stores from one place. Open the Agency dashboard in Mannon to link more client stores and see cross-store rollups.\n\nEach store keeps its own Shopify subscription — the org view is management-only.\n\n{{portalName}}",
+  },
+  store_linked: {
+    subject: "{{storeDomain}} was linked to {{orgName}}",
+    body:
+      "Hi,\n\n{{storeDomain}} is now part of “{{orgName}}”. You can see its rollup and switch into it from the Agency dashboard:\n\n{{appUrl}}\n\n{{portalName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;
