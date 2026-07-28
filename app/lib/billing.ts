@@ -88,14 +88,16 @@ export interface PlanLimits {
   seatCap: number;
   /** F3: maximum number of price lists. Infinity = unlimited. */
   priceListCap: number;
+  /** F4: maximum saved order lists per company. Infinity = unlimited. */
+  savedListCap: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**
@@ -148,4 +150,14 @@ export function evaluatePriceListAllowance(used: number, cap: number): { allowed
 /** Merchant-facing copy when the price-list cap is hit. */
 export function priceListCapMessage(cap: number): string {
   return `Your Starter plan includes ${cap} price lists. Upgrade to Growth for unlimited price lists, volume breaks, and CSV import.`;
+}
+
+/** Pure allowance decision for creating another saved order list. */
+export function evaluateSavedListAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
+  return { allowed: used < cap, used, cap };
+}
+
+/** Buyer-facing copy when the saved-list cap is hit. */
+export function savedListCapMessage(cap: number): string {
+  return `This store's plan allows ${cap} saved lists. Ask them to upgrade for unlimited saved lists and CSV upload.`;
 }

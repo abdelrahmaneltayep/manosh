@@ -45,6 +45,11 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{buyerName}},\n\nInvoice {{invoiceNumber}} for {{amount}} was due on {{dueDate}} and is now 7 days overdue. Please arrange payment.\n\n{{invoiceUrl}}\n\nThank you,\n{{shopName}}",
   },
+  reorder_list: {
+    subject: "Time to reorder? {{listName}} is one tap away",
+    body:
+      "Hi {{buyerName}},\n\nYour saved list \"{{listName}}\" is ready to reorder. Open it in the order pad and send it in a tap:\n\n{{orderPadUrl}}\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

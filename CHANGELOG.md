@@ -5,6 +5,22 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 4: Enhanced Quick Order / Bulk Order Pad
+
+- **Keyboard-first order pad** in the buyer portal: type-ahead SKU/product search
+  (Enter adds the row and refocuses), paste `SKU,QTY` lines with per-line error
+  flags, and a **live subtotal** priced with the Feature 3 resolver (volume break
+  > list entry > default).
+- **Saved lists.** "Save as list" and one-tap **Reorder** (deep-linkable via
+  `?list=<id>`, e.g. from a reorder email). Capped per plan
+  (`PLAN_LIMITS.savedListCap` = 3 Starter / ∞ Growth).
+- **CSV upload (Growth).** Paste a `sku,qty` CSV with a per-line validation summary;
+  gated with the Growth plan check. Starter keeps search + paste + 3 saved lists.
+- The order pad is now the buyer portal's primary CTA, with first-order coaching.
+- Pure parser + resolver relocated to `app/lib/quick-order.ts` (client-safe) so the
+  pad parses + prices without a round-trip. Event `ORDERPAD_USED`. Dark-launched
+  behind `MANNON_FF_ORDERPAD`. Migration: `f4_quick_order_pad`.
+
 ### Added — Feature 3: Customer-Specific Price Lists & Volume Pricing
 
 - **Price lists.** Named per-variant price lists assigned to a company directly or

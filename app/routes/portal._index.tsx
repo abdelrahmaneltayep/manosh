@@ -55,16 +55,23 @@ export default function PortalHome() {
       </p>
 
       <p className="portal-actions">
-        <Link to="/portal/quotes/new" className="portal-button">
-          Request a quote
+        <Link to="/portal/quick-order" className="portal-button">
+          Open the order pad
         </Link>
-        <Link to="/portal/quick-order" className="portal-link">
-          Quick order by SKU
+        <Link to="/portal/quotes/new" className="portal-link">
+          Request a quote
         </Link>
         <Link to="/portal/invoices" className="portal-link">
           Your invoices
         </Link>
       </p>
+      {quotes.length === 0 && reorderCards.length === 0 && (
+        <p className="muted">
+          New here? The <strong>order pad</strong> is the fastest way to build a big
+          order — search or paste your SKUs, see your price, and save it to reorder
+          in one tap next time.
+        </p>
+      )}
 
       {reorderCards.length > 0 && (
         <>
