@@ -79,8 +79,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const accountingEnabled = process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
   const catalogsEnabled = process.env.MANNON_FF_CUSTOM_CATALOGS === "true";
   const repPortalEnabled = process.env.MANNON_FF_REP_PORTAL === "true";
+  const flexPayEnabled = process.env.MANNON_FF_FLEX_PAY === "true";
 
-  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount] =
+  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex] =
     shopId
       ? await Promise.all([
           canCreateQuote(shopId),
@@ -91,8 +92,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           prisma.accountingConnection.count({ where: { shopId } }),
           prisma.catalog.count({ where: { shopId, isDefault: false } }),
           prisma.salesRep.count({ where: { shopId } }),
+          prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true } }),
         ])
-      : [null, null, [], {}, 0, 0, 0, 0];
+      : [null, null, [], {}, 0, 0, 0, 0, null];
 
   const TEMPLATE_LABELS: Record<TemplateKey, string> = {
     invoice_issued: "Invoice issued",
@@ -113,6 +115,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     accounting_sync_failure: "Accounting — sync failure digest",
     rep_invite: "Sales rep — invite",
     rep_order_placed: "Sales rep — order placed (buyer notice)",
+    deposit_received: "Payments — deposit received",
+    installment_due: "Payments — installment due",
+    installment_overdue: "Payments — installment overdue",
+    paylink: "Payments — pay-by-link",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -134,6 +140,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasCustomCatalog: customCatalogCount > 0,
     repPortalEnabled,
     hasRep: repCount > 0,
+    flexPayEnabled,
+    hasDepositPolicy: shopFlex?.defaultDepositPct != null,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -373,6 +381,19 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Optional onboarding (Growth): set a default deposit policy */}
+        {data.flexPayEnabled && data.plan === GROWTH_PLAN && !data.hasDepositPolicy && (
+          <Banner tone="info" title="Optional: set a default deposit policy">
+            <p>
+              Take a deposit up front on big orders — set a default % so it pre-fills
+              when you create a payment plan. All capture runs through Shopify checkout.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/payments">Set a default deposit policy</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Optional onboarding (Growth): invite sales reps */}
         {data.repPortalEnabled && data.plan === GROWTH_PLAN && !data.hasRep && (
           <Banner tone="info" title="Optional: invite your sales reps">
@@ -516,6 +537,17 @@ export default function Settings() {
                 {data.plan !== GROWTH_PLAN && (
                   <Text as="span" variant="bodySm" tone="subdued">
                     Reps order &amp; negotiate on behalf of buyers, scoped to their accounts.
+                  </Text>
+                )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Flexible payments
+                </Text>
+                <Badge tone="info">Growth</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Deposits, installments &amp; pay-by-link — all via Shopify checkout.
                   </Text>
                 )}
               </InlineStack>

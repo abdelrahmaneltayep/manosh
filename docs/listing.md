@@ -98,6 +98,10 @@ it orchestrates what Shopify already owns.
 - **Sales-rep portal (Growth).** Your reps log in to a scoped portal, see only
   their assigned accounts, and place or negotiate orders on behalf of buyers —
   within each buyer's limits. Every rep-placed order is attributed and audited.
+- **Flexible payments (Growth).** Take a deposit up front, split a big order into
+  installments, or send a secure single-use pay-by-link. Overdue payments chase
+  themselves. Every payment is captured by Shopify checkout — Mannon never stores
+  card data.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
@@ -143,6 +147,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
 - Custom catalogs: per-customer product visibility (1 on Starter; group/member + CSV on Growth)
 - Sales-rep portal: reps order & negotiate on behalf of buyers, scoped to their accounts (Growth plan)
+- Deposits, installments & pay-by-link — captured by Shopify checkout, no card data stored (Growth plan)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -180,6 +185,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Flexible payments (Growth):** take a deposit, split into installments, or send
+  a secure single-use pay-by-link — with automatic due/overdue reminders and an
+  overdue filter. All capture runs through Shopify checkout; Mannon never stores
+  card data.
 - **Sales-rep portal (Growth):** your reps sign in to a scoped portal, see only
   their assigned accounts, and place or negotiate orders on behalf of buyers —
   every rep-placed order is attributed (`placedByRepId`) and audited, and the

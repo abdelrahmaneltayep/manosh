@@ -115,6 +115,26 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{buyerName}},\n\nThis is a courtesy note that {{repName}} placed an order on behalf of {{companyName}} in your Mannon portal. If this wasn't expected, reply to let us know.\n\nThank you,\n{{shopName}}",
   },
+  deposit_received: {
+    subject: "Deposit received — thank you",
+    body:
+      "Hi {{buyerName}},\n\nWe've received your {{amount}} deposit. The balance of {{balance}} is scheduled per your plan — you'll get a reminder before each payment is due.\n\n{{payUrl}}\n\nThank you,\n{{shopName}}",
+  },
+  installment_due: {
+    subject: "A payment of {{amount}} is due {{dueDate}}",
+    body:
+      "Hi {{buyerName}},\n\nA scheduled payment of {{amount}} is due on {{dueDate}}. You can pay securely here — no login needed:\n\n{{payUrl}}\n\nAll payments are processed by {{shopName}}'s Shopify checkout.\n\nThank you,\n{{shopName}}",
+  },
+  installment_overdue: {
+    subject: "Overdue: a payment of {{amount}} was due {{dueDate}}",
+    body:
+      "Hi {{buyerName}},\n\nA scheduled payment of {{amount}} was due on {{dueDate}} and is now overdue. Please pay securely here:\n\n{{payUrl}}\n\nThank you,\n{{shopName}}",
+  },
+  paylink: {
+    subject: "Your secure payment link for {{amount}}",
+    body:
+      "Hi {{buyerName}},\n\nHere's a secure link to pay {{amount}} — no login needed. It's single-use and expires soon:\n\n{{payUrl}}\n\nPayment is processed by {{shopName}}'s Shopify checkout; we never see your card details.\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

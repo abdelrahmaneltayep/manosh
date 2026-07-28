@@ -39,6 +39,7 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Customer price lists", starter: "Up to 3", growth: "Unlimited" },
   { label: "Custom catalogs (per-customer product visibility)", starter: "1 custom · company-level", growth: "Unlimited · group/member + CSV" },
   { label: "Sales-rep portal (order on behalf of buyers)", starter: "—", growth: "Up to 3 rep seats" },
+  { label: "Deposits, installments & pay-by-link", starter: "—", growth: "✓" },
   { label: "Quote analytics (win rate, discount, time-to-close)", starter: "—", growth: "✓" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },
@@ -110,7 +111,8 @@ export default function Pricing() {
 
       <p style={{ color: "#5b5670", marginTop: "1.5rem", fontSize: "0.9rem" }}>
         Billed through Shopify. Totals and tax are always calculated by Shopify —
-        Mannon never computes them.
+        Mannon never computes them. Deposits, installments, and pay-by-link all run
+        through Shopify checkout — Mannon never stores or sees card data.
       </p>
     </main>
   );

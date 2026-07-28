@@ -5,6 +5,32 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 13: Flexible Payments — Deposits, Partial Pay & Pay-by-Link (Growth)
+
+- **Beyond net terms.** On an accepted order the merchant picks **deposit +
+  balance**, an **installment schedule**, or a one-off **pay-by-link**. Amounts are
+  **server-authoritative** — computed in `app/lib/payments.ts` from the order's
+  stored totals snapshot in integer cents, so deposit + installments always sum to
+  the exact total (rounding remainder lands on the last line).
+- **Pay-by-link.** A tokenized, single-use, expiring link for a specific amount.
+  Only the token **hash** is stored (guardrail #7); no amount/PII is ever put in
+  the URL beyond the opaque token. The public `/pay/:token` page shows the amount
+  and hands off to Shopify checkout.
+- **No card data — ever.** All capture runs through Shopify checkout / draft
+  orders; Mannon never stores or sees a card. Documented in
+  `docs/flexible-payments.md`.
+- **Chases itself + reconciles.** `/internal/cron/payment-reminders` (CRON_SECRET)
+  flips overdue installments and sends due/overdue reminders (idempotent per
+  installment+stage, reusing the F8 mailer conventions). A completed plan marks the
+  net-terms invoice paid and (if F10 is on) triggers an accounting sync. Merchant
+  **overdue filter** on `/app/payments`.
+- **Plan gating.** Growth-only (`flexPayAllowed`); Starter sees "Deposits & payment
+  plans — upgrade to Growth." New Shop setting `defaultDepositPct` (optional
+  onboarding). Events `PAYMENT_PLAN_CREATED`, `INSTALLMENT_PAID`, `PAYLINK_PAID`.
+  New templates: deposit received / installment due / installment overdue /
+  pay-link. Dark-launched behind `MANNON_FF_FLEX_PAY`. Migration
+  `f13_flexible_payments`.
+
 ### Added — Feature 12: Sales-Rep Portal (Order-on-Behalf & Assigned Accounts) (Growth)
 
 - **Reps sell through Mannon.** A `SalesRep` signs in via the same passwordless
