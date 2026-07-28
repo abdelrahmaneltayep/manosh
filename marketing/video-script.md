@@ -80,6 +80,12 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Docs GIF only — order rules (Feature 9)
+
+> **Not in the store reel** (keep it ≤ 60s). A short docs/help GIF: a buyer sets
+> qty 20 on a case-of-12 product → it rounds to **24** with "sold in cases of 12
+> — rounded to 24", and a **minimum-order progress bar** fills as items are added.
+
 ## Supporting beats (existing pillars)
 
 - **Passwordless portal.** VO: "Your buyer accepts from a secure link — no

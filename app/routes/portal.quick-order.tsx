@@ -7,6 +7,8 @@ import { requireBuyerId } from "../services/buyer-session.server";
 import { getCatalog, type CatalogItem } from "../services/catalog.server";
 import { resolveSkuLines, parseSkuQuantityText } from "../lib/quick-order";
 import { getCompanyPricing } from "../services/price-list.server";
+import { getRulesForShop } from "../services/order-rules.server";
+import { evaluateCart, shortfallMessage, type OrderRuleLite } from "../lib/order-rules";
 import { parseOrderPad } from "../services/ai/order-parser.server";
 import {
   listSavedLists,
@@ -60,6 +62,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const plan = buyer.company.shop.plan;
   const limits = getPlanLimits(plan);
   const savedLists = await listSavedLists(buyer.companyId);
+  const moqEnabled = process.env.MANNON_FF_MOQ === "true";
+  const orderRules: OrderRuleLite[] = moqEnabled ? await getRulesForShop(shopDomain) : [];
 
   // Deep-link: /portal/quick-order?list=<id> preloads a saved list into the pad.
   const listId = new URL(request.url).searchParams.get("list");
@@ -72,6 +76,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currency: items[0]?.currency ?? "USD",
     items,
     savedLists: ENABLED() ? savedLists : [],
+    moqEnabled,
+    orderRules,
+    companyId: buyer.companyId,
     isGrowth: plan === "GROWTH",
     savedListCap: Number.isFinite(limits.savedListCap) ? limits.savedListCap : null,
     savedUsed: savedLists.length,
@@ -315,6 +322,21 @@ export default function OrderPad() {
     return resolvePrice(qty || 1, { listPrice: item.listPrice, entryPrice: item.entryPrice, breaks: item.breaks }).price;
   };
 
+  // F9 — live order-rule evaluation (MOQ / pack / min order value).
+  const ruleEval = useMemo(() => {
+    if (!data.moqEnabled || data.orderRules.length === 0) return null;
+    return evaluateCart(
+      cartLines.map((l) => ({ variantId: l.variantId, qty: l.qty, price: unitPrice(l.variantId, l.qty) })),
+      data.orderRules,
+      { companyId: data.companyId },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, data.moqEnabled, data.orderRules, data.companyId]);
+  const ruleByVariant = useMemo(
+    () => new Map((ruleEval?.lines ?? []).map((l) => [l.variantId, l])),
+    [ruleEval],
+  );
+
   const results = search.trim()
     ? data.items
         .filter((i) => {
@@ -505,6 +527,11 @@ export default function OrderPad() {
                     {" "}
                     · {data.currency} {unitPrice(l.variantId, l.qty).toFixed(2)} ea
                   </span>
+                  {ruleByVariant.get(l.variantId)?.changed && (
+                    <span className="save-badge" style={{ background: "#eceafb", color: "#3730a3" }}>
+                      {ruleByVariant.get(l.variantId)!.reason}
+                    </span>
+                  )}
                 </div>
                 <label className="catalog-qty">
                   <span className="visually-hidden">Quantity for {l.title}</span>
@@ -539,6 +566,33 @@ export default function OrderPad() {
             <p className="muted" style={{ fontSize: "0.82rem" }}>
               Final tax &amp; totals are calculated by the store at checkout.
             </p>
+
+            {/* F9 — minimum order value progress */}
+            {ruleEval && ruleEval.minOrderValue != null && (
+              <div style={{ marginTop: "0.75rem" }}>
+                <div
+                  style={{
+                    height: "8px",
+                    borderRadius: "999px",
+                    background: "#eae7f2",
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "100%",
+                      width: `${Math.min(100, (ruleEval.subtotal / ruleEval.minOrderValue) * 100).toFixed(0)}%`,
+                      background: ruleEval.ok ? "#c6e94b" : "#4f46e5",
+                    }}
+                  />
+                </div>
+                <p className={ruleEval.ok ? "muted" : "error"} style={{ fontSize: "0.85rem", marginTop: "0.35rem" }}>
+                  {ruleEval.ok
+                    ? `Minimum order of ${data.currency} ${ruleEval.minOrderValue.toFixed(2)} met.`
+                    : shortfallMessage(data.currency, ruleEval.shortfall, ruleEval.minOrderValue)}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Submit as a quote */}

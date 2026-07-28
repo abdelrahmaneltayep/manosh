@@ -5,6 +5,24 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 9: MOQ, Order Minimums & Pack/Case-Size Rules
+
+- **Wholesale order controls.** Minimum order quantity (MOQ), order-value
+  minimums, and pack/case-size multiples via `OrderRule`, resolved by specificity
+  (product > customer-group > collection > store; most-specific wins).
+- **One resolver, three surfaces.** The pure `app/lib/order-rules.ts` enforces
+  identically in the **portal cart / order pad**, the **F4 order pad** display
+  (live rounding hints + minimum-order progress bar), and **quote → order
+  conversion**. Quantities round **up** and are never silently dropped — every
+  change is explained ("sold in cases of 12 — rounded to 24"). A cart under the
+  store minimum is blocked with an "add $X more" shortfall.
+- **Merchant editor** at `/app/order-rules`: rule table, a live **"test this
+  cart"** preview, and CSV bulk import (Growth).
+- **Plan gating.** Both plans; Starter = store + product scope; Growth adds
+  collection + customer-group scopes, pack multiples, and CSV
+  (`allowedRuleScopes` / `packRulesAllowed`). Event `ORDER_RULE_APPLIED`. Dark-
+  launched behind `MANNON_FF_MOQ`. Migration `f9_moq_rules`.
+
 ### Added — Feature 8: Automated Quote Follow-ups, Expiry & Reminders
 
 - **Stop quotes going cold.** A store follow-up policy (expiry days + nudge

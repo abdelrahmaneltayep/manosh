@@ -80,6 +80,9 @@ it orchestrates what Shopify already owns.
   live catalog before anything is created.
 - **Native terms & PO.** Attach your existing Shopify payment terms and a PO
   reference to the draft order. Display and attach only — Shopify enforces terms.
+- **Order minimums, MOQ & case-size rules.** Enforce minimum order quantities,
+  order-value minimums, and pack/case multiples across the portal, order pad, and
+  quote conversion — quantities round up with a plain-language explanation.
 - **Net terms & credit control (Growth).** Give each company a credit limit and
   terms; net-terms orders raise an invoice with a due date. An aging dashboard,
   automatic payment reminders, and downloadable invoices keep receivables tidy.
@@ -124,6 +127,7 @@ migrate — install, invite a buyer, and send your first quote.
 - AI Quote Assistant: one-click AI counter-offers with a margin read (Growth plan)
 - Negotiation analytics: win rate, avg discount, time-to-close, pipeline (Growth plan)
 - Auto quote follow-ups + expiry with buyer reminders (full cadence on Growth)
+- Order minimums, MOQ & pack/case-size rules (group/collection + CSV on Growth)
 - Net terms + invoice due dates on every terms order (all plans)
 - Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
 - Customer/tag price lists with "you save X%" in the portal (up to 3 on Starter)
@@ -164,6 +168,9 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Order minimums & case-size rules:** minimum order quantities, order-value
+  minimums, and pack/case multiples — enforced identically in the portal, the
+  order pad, and quote conversion, with quantities rounded up and explained.
 - **Automated quote follow-ups & expiry:** set an expiry, nudge buyers on a
   cadence (accept/counter links in every email), and auto-expire cold quotes —
   accepting cancels the rest. Recovers deals that used to go cold. Starter sends a
