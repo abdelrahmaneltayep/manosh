@@ -40,6 +40,7 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Custom catalogs (per-customer product visibility)", starter: "1 custom · company-level", growth: "Unlimited · group/member + CSV" },
   { label: "Sales-rep portal (order on behalf of buyers)", starter: "—", growth: "Up to 3 rep seats" },
   { label: "Deposits, installments & pay-by-link", starter: "—", growth: "✓" },
+  { label: "Tax exemption & VAT/GST handling", starter: "Default rate + manual exempt", growth: "Regions + certificates + ID validation" },
   { label: "Quote analytics (win rate, discount, time-to-close)", starter: "—", growth: "✓" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },

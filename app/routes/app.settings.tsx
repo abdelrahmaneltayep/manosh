@@ -80,6 +80,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const catalogsEnabled = process.env.MANNON_FF_CUSTOM_CATALOGS === "true";
   const repPortalEnabled = process.env.MANNON_FF_REP_PORTAL === "true";
   const flexPayEnabled = process.env.MANNON_FF_FLEX_PAY === "true";
+  const taxVatEnabled = process.env.MANNON_FF_TAX_VAT === "true";
 
   const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex] =
     shopId
@@ -92,7 +93,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           prisma.accountingConnection.count({ where: { shopId } }),
           prisma.catalog.count({ where: { shopId, isDefault: false } }),
           prisma.salesRep.count({ where: { shopId } }),
-          prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true } }),
+          prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true, defaultTaxRate: true } }),
         ])
       : [null, null, [], {}, 0, 0, 0, 0, null];
 
@@ -119,6 +120,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     installment_due: "Payments — installment due",
     installment_overdue: "Payments — installment overdue",
     paylink: "Payments — pay-by-link",
+    tax_certificate_received: "Tax — documents received",
+    tax_verified: "Tax — verified",
+    tax_rejected: "Tax — rejected",
+    tax_cert_expiring: "Tax — certificate expiring",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -142,6 +147,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasRep: repCount > 0,
     flexPayEnabled,
     hasDepositPolicy: shopFlex?.defaultDepositPct != null,
+    taxVatEnabled,
+    hasTaxRules: shopFlex?.defaultTaxRate != null,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -381,6 +388,20 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Recommended onboarding: set your tax rules */}
+        {data.taxVatEnabled && !data.hasTaxRules && (
+          <Banner tone="info" title="Recommended: set your tax rules">
+            <p>
+              Set a default tax rate (e.g. KSA 15%, UAE 5%), collect exemption
+              certificates, and verify buyers so their quotes and invoices show the
+              right tax. Mannon never computes tax — Shopify does.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/tax">Set your tax rules</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Optional onboarding (Growth): set a default deposit policy */}
         {data.flexPayEnabled && data.plan === GROWTH_PLAN && !data.hasDepositPolicy && (
           <Banner tone="info" title="Optional: set a default deposit policy">
@@ -550,6 +571,12 @@ export default function Settings() {
                     Deposits, installments &amp; pay-by-link — all via Shopify checkout.
                   </Text>
                 )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Tax exemption &amp; VAT/GST
+                </Text>
+                <Badge tone="info">Basic on Starter · regions + certificates on Growth</Badge>
               </InlineStack>
             </BlockStack>
 

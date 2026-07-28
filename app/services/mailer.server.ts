@@ -135,6 +135,26 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{buyerName}},\n\nHere's a secure link to pay {{amount}} — no login needed. It's single-use and expires soon:\n\n{{payUrl}}\n\nPayment is processed by {{shopName}}'s Shopify checkout; we never see your card details.\n\nThank you,\n{{shopName}}",
   },
+  tax_certificate_received: {
+    subject: "We received your tax documents — {{companyName}}",
+    body:
+      "Hi {{buyerName}},\n\nThanks — we've received the tax details for {{companyName}} and will review them shortly. Until they're verified, orders are charged tax as usual.\n\nThank you,\n{{shopName}}",
+  },
+  tax_verified: {
+    subject: "Your tax status is verified — {{companyName}}",
+    body:
+      "Hi {{buyerName}},\n\nGood news — {{companyName}}'s tax status is now verified ({{status}}). Your quotes and invoices will reflect the correct tax from now on.\n\nThank you,\n{{shopName}}",
+  },
+  tax_rejected: {
+    subject: "We couldn't verify your tax documents",
+    body:
+      "Hi {{buyerName}},\n\nWe weren't able to verify {{companyName}}'s tax documents: {{reason}}\n\nPlease re-submit from your portal. Orders remain taxed until verified.\n\nThank you,\n{{shopName}}",
+  },
+  tax_cert_expiring: {
+    subject: "Your tax certificate expires soon — {{expiresAt}}",
+    body:
+      "Hi {{buyerName}},\n\n{{companyName}}'s exemption certificate expires on {{expiresAt}}. Please upload a renewed certificate from your portal so your exemption continues without interruption.\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

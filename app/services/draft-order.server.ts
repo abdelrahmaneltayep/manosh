@@ -52,6 +52,8 @@ export interface DraftOrderInput {
   }>;
   poNumber?: string;
   paymentTerms?: { paymentTermsTemplateId: string };
+  /** F14: when true, Shopify zeroes tax on the draft order (verified-exempt buyer). */
+  taxExempt?: boolean;
 }
 
 export class DraftOrderError extends Error {
@@ -73,6 +75,8 @@ export function buildDraftOrderInput(params: {
   poReference?: string | null;
   /** Native payment terms template to attach (display + attach only). */
   paymentTermsTemplateId?: string | null;
+  /** F14: pass true for a verified-exempt buyer — Shopify removes tax (we never compute it). */
+  taxExempt?: boolean;
 }): DraftOrderInput {
   const input: DraftOrderInput = {
     purchasingEntity: {
@@ -95,6 +99,9 @@ export function buildDraftOrderInput(params: {
   }
   if (params.paymentTermsTemplateId) {
     input.paymentTerms = { paymentTermsTemplateId: params.paymentTermsTemplateId };
+  }
+  if (params.taxExempt) {
+    input.taxExempt = true;
   }
   return input;
 }
