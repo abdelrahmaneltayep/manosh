@@ -2,9 +2,9 @@
 # client_id is filled in by `shopify app config link` against your Partner app.
 # Confirm current webhook api_version + scope names via the Shopify Dev MCP.
 
-client_id = ""
+client_id = "ad4c04f1bcb8aab2dc441ea8bf947a00"
 name = "Mannon"
-application_url = "https://example.com"
+application_url = "https://manosh.fly.dev"
 embedded = true
 
 [access_scopes]
@@ -15,9 +15,9 @@ scopes = "read_products,read_orders,write_draft_orders,read_companies,read_payme
 
 [auth]
 redirect_urls = [
-  "https://example.com/auth/callback",
-  "https://example.com/auth/shopify/callback",
-  "https://example.com/api/auth/callback"
+  "https://manosh.fly.dev/auth/callback",
+  "https://manosh.fly.dev/auth/shopify/callback",
+  "https://manosh.fly.dev/api/auth/callback"
 ]
 
 [webhooks]
