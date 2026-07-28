@@ -5,6 +5,21 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 7: Quote Analytics & Sales Dashboard (Growth)
+
+- **Negotiation analytics** at `/app/analytics`: win rate, average discount,
+  time-to-close, and open pipeline as KPI cards with trend sparklines and a 30/90-
+  day switcher — plus top accounts, a most-discounted-SKU leaderboard, and stale
+  quotes needing action. All money is in one store currency (never mixed).
+- **Derived, not duplicated.** Metrics come from existing `Quote` data; discount
+  is measured against the customer's F3 price list. A `QuoteMetricDaily` rollup +
+  `/internal/cron/analytics` (CRON_SECRET) build daily rows and, on Mondays, send
+  the opt-in **weekly digest** (`Shop.weeklyDigest`, `weekly_digest` template).
+- **CSV export** of the underlying quotes; empty state before {MIN} quotes.
+- **Plan gating.** Growth-only — Starter sees a locked, blurred preview with an
+  upgrade CTA. Event `ANALYTICS_VIEWED`. Dark-launched behind
+  `MANNON_FF_QUOTE_ANALYTICS`. Migration `f7_quote_analytics`.
+
 ### Added — Feature 6: Wholesale Registration + Gated Approval
 
 - **Branded application funnel.** A merchant builds a wholesale form in admin
