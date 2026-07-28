@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mannon — App Store Screenshots</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1B1730; --slate:#6B6785; --mist:#9A96B3;
+    --indigo:#4F46E5; --indigo-deep:#3730A3; --indigo-soft:#ECEAFB;
+    --lime:#C6E94B; --lime-deep:#A8D423; --lime-soft:#F0F7D6;
+    --emerald:#10B981; --pink:#F7CDE8; --pink-soft:#FCEAF6;
+    --cream:#FBF8F4; --cloud:#FFFFFF; --line:#EAE7F2;
+    --shadow:0 30px 70px -30px rgba(27,23,48,.28);
+    --shadow-sm:0 12px 30px -14px rgba(27,23,48,.22);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#E9E5DF;font-family:'Inter',system-ui,sans-serif;color:var(--ink);padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:44px}
+  .label{font-family:'Outfit';font-weight:600;color:#8a8577;font-size:13px;letter-spacing:.04em;text-transform:uppercase;align-self:flex-start;max-width:1600px;margin:0 auto;width:100%;padding-left:6px}
+  .stack{display:flex;flex-direction:column;gap:10px;width:100%;align-items:center}
+
+  /* ---- FRAME ---- */
+  .frame{width:1600px;height:900px;border-radius:36px;overflow:hidden;position:relative;
+    display:grid;box-shadow:var(--shadow)}
+  .frame h1{font-family:'Outfit';font-weight:800;line-height:1.02;letter-spacing:-.02em}
+  .frame .sub{font-family:'Outfit';font-weight:500;color:var(--slate);line-height:1.4}
+  .em{color:var(--indigo)}
+  .em-lime{color:var(--lime-deep)}
+
+  /* copy side */
+  .copy{padding:96px 84px;display:flex;flex-direction:column;justify-content:center;gap:22px;z-index:2}
+  .copy h1{font-size:66px}
+  .copy .sub{font-size:24px;max-width:520px}
+  .pill{display:inline-flex;align-items:center;gap:9px;background:var(--cloud);border:1px solid var(--line);
+    padding:9px 16px;border-radius:999px;font-family:'Outfit';font-weight:600;font-size:15px;color:var(--ink);width:fit-content;box-shadow:var(--shadow-sm)}
+  .dot{width:9px;height:9px;border-radius:50%}
+  .brandmark{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .clover{width:38px;height:38px}
+  .wordmark{font-family:'Outfit';font-weight:700;font-size:22px;letter-spacing:-.01em}
+
+  /* generic app window (desktop / admin) */
+  .win{background:var(--cloud);border-radius:22px;box-shadow:var(--shadow);overflow:hidden;border:1px solid var(--line)}
+  .win-bar{height:46px;background:#F4F1FB;display:flex;align-items:center;gap:8px;padding:0 18px;border-bottom:1px solid var(--line)}
+  .tl{width:11px;height:11px;border-radius:50%}
+  .win-url{margin-left:14px;font-family:'Inter';font-size:12.5px;color:var(--mist);background:#fff;border:1px solid var(--line);border-radius:8px;padding:5px 12px}
+  .win-body{padding:26px 28px}
+  .row{display:flex;align-items:center}
+  .muted{color:var(--slate)}
+  .h-tag{font-family:'Outfit';font-weight:700;font-size:18px}
+  .card{background:var(--cloud);border:1px solid var(--line);border-radius:16px}
+
+  /* line-item table */
+  .li{display:grid;grid-template-columns:1fr 74px 96px 104px;align-items:center;gap:10px;padding:14px 4px;border-top:1px solid var(--line);font-size:15px}
+  .li .prod{display:flex;align-items:center;gap:12px}
+  .sw{width:40px;height:40px;border-radius:10px;flex:none}
+  .li .qty{font-family:'Outfit';font-weight:600;text-align:center;background:var(--indigo-soft);border-radius:8px;padding:6px 0;color:var(--indigo-deep)}
+  .li .price{text-align:right;color:var(--slate);font-variant-numeric:tabular-nums}
+  .li .tot{text-align:right;font-family:'Outfit';font-weight:700;font-variant-numeric:tabular-nums}
+  .totline{display:flex;justify-content:space-between;font-size:15px;padding:7px 4px}
+  .grand{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 2px;border-top:2px solid var(--ink);margin-top:6px}
+  .grand b{font-family:'Outfit';font-weight:800;font-size:26px;font-variant-numeric:tabular-nums}
+  .btn{font-family:'Outfit';font-weight:700;font-size:16px;border-radius:12px;padding:14px 22px;border:none;display:inline-flex;align-items:center;gap:10px}
+  .btn-primary{background:var(--indigo);color:#fff}
+  .term-chip{font-family:'Outfit';font-weight:600;font-size:13.5px;padding:8px 14px;border-radius:999px;border:1.5px solid var(--line);color:var(--slate)}
+  .term-chip.on{background:var(--indigo);border-color:var(--indigo);color:#fff}
+
+  /* phone */
+  .phone{width:360px;height:740px;background:#fff;border-radius:44px;border:10px solid #1B1730;box-shadow:var(--shadow);overflow:hidden;position:relative}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:26px;background:#1B1730;border-radius:0 0 16px 16px;z-index:5}
+  .p-head{padding:40px 22px 16px;background:linear-gradient(160deg,var(--indigo-soft),#fff)}
+  .p-body{padding:6px 22px 22px;display:flex;flex-direction:column;gap:14px}
+
+  /* kanban */
+  .kb{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+  .kcol{background:#F7F5FC;border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .kcol h4{font-family:'Outfit';font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:.03em;color:var(--slate);display:flex;justify-content:space-between}
+  .kcard{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:13px;box-shadow:var(--shadow-sm)}
+  .kcard .b{font-family:'Outfit';font-weight:700;font-size:14px}
+  .badge{font-family:'Outfit';font-weight:700;font-size:11px;padding:3px 9px;border-radius:999px}
+
+  .stamp{font-family:'Outfit';font-weight:800;font-size:13px;letter-spacing:.02em;padding:7px 14px;border-radius:999px;display:inline-flex;gap:8px;align-items:center}
+</style>
+</head>
+<body>
+
+<!-- ============ SCREENSHOT 1 — QUOTE BUILDER ============ -->
+<div class="stack">
+  <div class="label">Screenshot 1 / 5 · 1600×900 · file: mannon-01-quote.png</div>
+  <section class="frame" style="grid-template-columns:620px 1fr;background:linear-gradient(135deg,#ECEAFB 0%,#F6F2FB 45%,#FBF8F4 100%)">
+    <div class="copy">
+      <div class="brandmark">
+        <svg class="clover" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 28.5V12.5l9.5 9 9.5-9v16" fill="none" stroke="#4F46E5" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="25.5" r="3" fill="#B6E02F"/></svg>
+        <span class="wordmark">mannon</span>
+      </div>
+      <h1>Send a branded B2B quote in <span class="em">under a minute</span></h1>
+      <p class="sub">Add products, set wholesale prices, pick terms. Mannon prices it with Shopify's own tax engine — so the total is always right.</p>
+      <span class="pill"><span class="dot" style="background:var(--emerald)"></span> Priced by Shopify · tax always correct</span>
+    </div>
+    <div class="row" style="align-items:center;padding:0 70px 0 0">
+      <div class="win" style="width:100%">
+        <div class="win-bar"><span class="tl" style="background:#F7A6B4"></span><span class="tl" style="background:#F7D38B"></span><span class="tl" style="background:#9BE0A8"></span><span class="win-url">admin.shopify.com › apps › mannon › new-quote</span></div>
+        <div class="win-body">
+          <div class="row" style="justify-content:space-between;margin-bottom:14px">
+            <div><div class="h-tag">New quote · Cedar &amp; Co.</div><div class="muted" style="font-size:13.5px;margin-top:2px">Buyer: Layla Haddad · layla@cedarco.sa</div></div>
+            <span class="stamp" style="background:var(--indigo-soft);color:var(--indigo-deep)">DRAFT</span>
+          </div>
+          <div class="card" style="padding:6px 16px 14px">
+            <div class="li" style="border-top:none;color:var(--mist);font-family:'Outfit';font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em"><span>Product</span><span style="text-align:center">Qty</span><span style="text-align:right">Unit</span><span style="text-align:right">Total</span></div>
+            <div class="li"><span class="prod"><span class="sw" style="background:#D9D4F5"></span>Merino Beanie — Charcoal</span><span class="qty">120</span><span class="price">$14.00</span><span class="tot">$1,680.00</span></div>
+            <div class="li"><span class="prod"><span class="sw" style="background:#F7CDE8"></span>Canvas Tote 16oz — Natural</span><span class="qty">80</span><span class="price">$9.50</span><span class="tot">$760.00</span></div>
+            <div class="li"><span class="prod"><span class="sw" style="background:#DCEFA6"></span>Enamel Mug 12oz — Cream</span><span class="qty">150</span><span class="price">$6.25</span><span class="tot">$937.50</span></div>
+          </div>
+          <div style="padding:12px 4px 0">
+            <div class="totline muted"><span>Subtotal</span><span>$3,377.50</span></div>
+            <div class="totline muted"><span>VAT (15%)</span><span>$506.63</span></div>
+            <div class="grand"><span class="muted" style="font-family:'Outfit';font-weight:600">Total due · <b style="font-size:15px;color:var(--indigo)">Net 30</b></span><b>$3,884.13</b></div>
+          </div>
+          <div class="row" style="justify-content:space-between;margin-top:18px">
+            <div class="row" style="gap:8px"><span class="term-chip">Net 7</span><span class="term-chip">Net 15</span><span class="term-chip on">Net 30</span><span class="term-chip">Net 60</span></div>
+            <button class="btn btn-primary">Send quote →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ SCREENSHOT 2 — BUYER PORTAL (MOBILE) ============ -->
+<div class="stack">
+  <div class="label">Screenshot 2 / 5 · 1600×900 · file: mannon-02-portal.png</div>
+  <section class="frame" style="grid-template-columns:1fr 560px;background:linear-gradient(135deg,#FCEAF6 0%,#F6F2FB 55%,#ECEAFB 100%)">
+    <div class="copy">
+      <div class="brandmark">
+        <svg class="clover" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 28.5V12.5l9.5 9 9.5-9v16" fill="none" stroke="#4F46E5" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="25.5" r="3" fill="#B6E02F"/></svg>
+        <span class="wordmark">mannon</span>
+      </div>
+      <h1>Your buyers accept it <span class="em">themselves</span> — no login</h1>
+      <p class="sub">One secure magic link opens a clean, branded portal. Buyers accept, counter, or reorder in a single tap. No password, no account wall.</p>
+      <span class="pill"><span class="dot" style="background:var(--indigo)"></span> Passwordless · higher accept rates</span>
+    </div>
+    <div class="row" style="align-items:center;justify-content:center">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="p-head">
+          <div class="row" style="gap:9px;margin-bottom:14px"><svg width="26" height="26" viewBox="0 0 40 40"><path d="M9 28.5V12.5l9.5 9 9.5-9v16" fill="none" stroke="#4F46E5" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="25.5" r="3" fill="#B6E02F"/></svg><span style="font-family:'Outfit';font-weight:700">Nordic Supply Co.</span></div>
+          <div class="muted" style="font-size:13px">Quote #Q-2048 · for Cedar &amp; Co.</div>
+          <div style="font-family:'Outfit';font-weight:800;font-size:34px;margin-top:6px">$3,884.13</div>
+          <div class="row" style="gap:8px;margin-top:8px"><span class="stamp" style="background:var(--indigo);color:#fff">NET 30</span><span class="stamp" style="background:#fff;color:var(--slate);border:1px solid var(--line)">Expires in 12 days</span></div>
+        </div>
+        <div class="p-body">
+          <div class="card" style="padding:14px 16px">
+            <div class="row" style="justify-content:space-between;font-size:14px;padding:5px 0"><span class="muted">Merino Beanie ×120</span><b style="font-family:'Outfit'">$1,680</b></div>
+            <div class="row" style="justify-content:space-between;font-size:14px;padding:5px 0"><span class="muted">Canvas Tote ×80</span><b style="font-family:'Outfit'">$760</b></div>
+            <div class="row" style="justify-content:space-between;font-size:14px;padding:5px 0"><span class="muted">Enamel Mug ×150</span><b style="font-family:'Outfit'">$937.50</b></div>
+          </div>
+          <button class="btn" style="background:var(--lime);color:var(--ink);justify-content:center;width:100%;font-size:17px">✓ Accept quote</button>
+          <div class="row" style="gap:10px">
+            <button class="btn" style="background:#fff;border:1.5px solid var(--line);color:var(--ink);flex:1;justify-content:center;font-size:14px">Request change</button>
+            <button class="btn" style="background:#fff;border:1.5px solid var(--line);color:var(--ink);flex:1;justify-content:center;font-size:14px">Reorder</button>
+          </div>
+          <div class="row" style="justify-content:center;gap:7px;color:var(--mist);font-size:12px;margin-top:2px"><span>🔒</span> Secure link · no password needed</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ SCREENSHOT 3 — AI MAGIC ORDER PAD ============ -->
+<div class="stack">
+  <div class="label">Screenshot 3 / 5 · 1600×900 · file: mannon-03-ai.png</div>
+  <section class="frame" style="grid-template-columns:560px 1fr;background:linear-gradient(135deg,#F0F7D6 0%,#F6F2FB 55%,#ECEAFB 100%)">
+    <div class="copy">
+      <div class="brandmark">
+        <svg class="clover" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 28.5V12.5l9.5 9 9.5-9v16" fill="none" stroke="#4F46E5" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="25.5" r="3" fill="#B6E02F"/></svg>
+        <span class="wordmark">mannon</span>
+      </div>
+      <h1>Paste any list. Get a <span class="em-lime">ready cart.</span></h1>
+      <p class="sub">The AI Magic Order Pad reads messy buyer lists — SKUs, names, quantities — and drafts a cart. AI drafts; a human always confirms.</p>
+      <span class="pill"><span class="dot" style="background:var(--lime-deep)"></span> AI drafts · you confirm every time</span>
+    </div>
+    <div class="row" style="align-items:center;padding:0 70px 0 0">
+      <div class="win" style="width:100%">
+        <div class="win-bar"><span class="tl" style="background:#F7A6B4"></span><span class="tl" style="background:#F7D38B"></span><span class="tl" style="background:#9BE0A8"></span><span class="win-url">admin.shopify.com › apps › mannon › order-pad</span></div>
+        <div class="win-body">
+          <div class="kb" style="grid-template-columns:1fr 1fr;gap:20px">
+            <div>
+              <div class="h-tag" style="font-size:14px;color:var(--slate);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px">Buyer pasted</div>
+              <div class="card" style="padding:16px;font-family:'Inter';font-size:14px;line-height:2;color:var(--ink);background:#F7F5FC">12x blue hoodie (L)<br>6 × SKU-4471<br>two dozen enamel mugs, cream<br>beanies — 120, charcoal</div>
+            </div>
+            <div>
+              <div class="h-tag" style="font-size:14px;color:var(--slate);text-transform:uppercase;letter-spacing:.03em;margin-bottom:10px">Mannon drafted</div>
+              <div class="card" style="padding:8px 14px">
+                <div class="row" style="justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px"><span class="row" style="gap:9px"><span class="sw" style="width:26px;height:26px;background:#C9D6F7"></span>Hoodie — Blue / L ×12</span><span style="color:var(--emerald);font-weight:700">✓ matched</span></div>
+                <div class="row" style="justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px"><span class="row" style="gap:9px"><span class="sw" style="width:26px;height:26px;background:#DCEFA6"></span>SKU-4471 ×6</span><span style="color:var(--emerald);font-weight:700">✓ matched</span></div>
+                <div class="row" style="justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px"><span class="row" style="gap:9px"><span class="sw" style="width:26px;height:26px;background:#F7CDE8"></span>Enamel Mug — Cream ×24</span><span style="color:var(--emerald);font-weight:700">✓ matched</span></div>
+                <div class="row" style="justify-content:space-between;padding:9px 0;font-size:13.5px"><span class="row" style="gap:9px"><span class="sw" style="width:26px;height:26px;background:#D9D4F5"></span>Beanie — Charcoal ×120</span><span style="color:#D9822B;font-weight:700">⚠ confirm size</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="row" style="justify-content:flex-end;gap:12px;margin-top:20px"><button class="btn" style="background:#fff;border:1.5px solid var(--line);color:var(--ink)">Review items</button><button class="btn btn-primary">Confirm &amp; build cart →</button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ SCREENSHOT 4 — PIPELINE / STATUS ============ -->
+<div class="stack">
+  <div class="label">Screenshot 4 / 5 · 1600×900 · file: mannon-04-pipeline.png</div>
+  <section class="frame" style="grid-template-columns:540px 1fr;background:linear-gradient(135deg,#ECEAFB 0%,#FCEAF6 60%,#FBF8F4 100%)">
+    <div class="copy">
+      <div class="brandmark">
+        <svg class="clover" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 28.5V12.5l9.5 9 9.5-9v16" fill="none" stroke="#4F46E5" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="25.5" r="3" fill="#B6E02F"/></svg>
+        <span class="wordmark">mannon</span>
+      </div>
+      <h1>Track every quote from <span class="em">sent to paid</span></h1>
+      <p class="sub">A clear pipeline shows exactly where each deal stands. Every accepted quote becomes a real Shopify order — nothing lost in email.</p>
+      <span class="pill"><span class="dot" style="background:var(--indigo)"></span> One record · fully reorderable</span>
+    </div>
+    <div class="row" style="align-items:center;padding:0 60px 0 0">
+      <div class="win" style="width:100%">
+        <div class="win-bar"><span class="tl" style="background:#F7A6B4"></span><span class="tl" style="background:#F7D38B"></span><span class="tl" style="background:#9BE0A8"></span><span class="win-url">admin.shopify.com › apps › mannon › quotes</span></div>
+        <div class="win-body">
+          <div class="kb">
+            <div class="kcol"><h4>Sent <span>3</span></h4>
+              <div class="kcard"><div class="b">Cedar &amp; Co.</div><div class="muted" style="margin:3px 0 8px">$3,884 · Net 30</div><span class="badge" style="background:var(--indigo-soft);color:var(--indigo-deep)">Sent 2d ago</span></div>
+              <div class="kcard"><div class="b">Atlas Outfitters</div><div class="muted" style="margin:3px 0 8px">$1,240 · Net 15</div><span class="badge" style="background:var(--indigo-soft);color:var(--indigo-deep)">Sent 4h ago</span></div>
+            </div>
+            <div class="kcol"><h4>Countered <span>1</span></h4>
+              <div class="kcard"><div class="b">Bloom Grocers</div><div class="muted" style="margin:3px 0 8px">$6,010 · Net 45</div><span class="badge" style="background:var(--pink-soft);color:#C43E93">Buyer replied</span></div>
+            </div>
+            <div class="kcol"><h4>Accepted <span>2</span></h4>
+              <div class="kcard"><div class="b">Nordic Interiors</div><div class="muted" style="margin:3px 0 8px">$2,455 · Net 30</div><span class="badge" style="background:var(--lime-soft);color:#6E8B14">Accepted ✓</span></div>
+              <div class="kcard"><div class="b">Harbor Supply</div><div class="muted" style="margin:3px 0 8px">$980 · Net 7</div><span class="badge" style="background:var(--lime-soft);color:#6E8B14">Accepted ✓</span></div>
+            </div>
+            <div class="kcol"><h4>Ordered <span>4</span></h4>
+              <div class="kcard"><div class="b">Cedar &amp; Co.</div><div class="muted" style="margin:3px 0 8px">$4,120 · Net 30</div><span class="badge" style="background:#E7F6EF;color:var(--emerald)">Order #1043</span></div>
+              <div class="kcard"><div class="b">Maple Café</div><div class="muted" style="margin:3px 0 8px">$1,760 · Net 30</div><span class="badge" style="background:#E7F6EF;color:var(--emerald)">Order #1041</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ============ SCREENSHOT 5 — NATIVE TERMS / ANY PLAN ============ -->
+<div class="stack">
+  <div class="label">Screenshot 5 / 5 · 1600×900 · file: mannon-05-terms.png</div>
+  <section class="frame" style="grid-template-columns:1fr 620px;background:linear-gradient(135deg,#FBF8F4 0%,#F0F7D6 60%,#ECEAFB 100%)">
+    <div class="copy">
+      <div class="brandmark">
+        <svg class="clover" viewBox="0 0 40 40" aria-hidden="true"><path d="M9 28.5V12.5l9.5 9 9.5-9v16" fill="none" stroke="#4F46E5" stroke-width="4.8" stroke-linecap="round" stroke-linejoin="round"/><circle cx="32" cy="25.5" r="3" fill="#B6E02F"/></svg>
+        <span class="wordmark">mannon</span>
+      </div>
+      <h1>Native net terms — on <span class="em">any</span> Shopify plan</h1>
+      <p class="sub">Net 7 to 90 days or due-on-fulfillment, built on Shopify's own B2B. No Plus upgrade required.</p>
+      <span class="pill"><span class="dot" style="background:var(--emerald)"></span> Works on Basic · Shopify · Advanced</span>
+    </div>
+    <div class="row" style="align-items:center;padding:0 70px 0 0">
+      <div class="win" style="width:100%">
+        <div class="win-bar"><span class="tl" style="background:#F7A6B4"></span><span class="tl" style="background:#F7D38B"></span><span class="tl" style="background:#9BE0A8"></span><span class="win-url">admin.shopify.com › apps › mannon › terms</span></div>
+        <div class="win-body">
+          <div class="h-tag" style="margin-bottom:4px">Payment terms</div>
+          <div class="muted" style="font-size:13.5px;margin-bottom:18px">Choose what buyers can be offered at checkout.</div>
+          <div class="kb" style="grid-template-columns:repeat(3,1fr);gap:14px">
+            <div class="card" style="padding:20px 16px;text-align:center"><div style="font-family:'Outfit';font-weight:800;font-size:30px">Net 7</div><div class="muted" style="font-size:12.5px;margin-top:4px">Due in 7 days</div></div>
+            <div class="card" style="padding:20px 16px;text-align:center"><div style="font-family:'Outfit';font-weight:800;font-size:30px">Net 15</div><div class="muted" style="font-size:12.5px;margin-top:4px">Due in 15 days</div></div>
+            <div class="card" style="padding:20px 16px;text-align:center;border:2px solid var(--indigo);box-shadow:var(--shadow-sm)"><div style="font-family:'Outfit';font-weight:800;font-size:30px;color:var(--indigo)">Net 30</div><div style="font-size:12.5px;margin-top:4px;color:var(--indigo)">Default ✓</div></div>
+            <div class="card" style="padding:20px 16px;text-align:center"><div style="font-family:'Outfit';font-weight:800;font-size:30px">Net 45</div><div class="muted" style="font-size:12.5px;margin-top:4px">Due in 45 days</div></div>
+            <div class="card" style="padding:20px 16px;text-align:center"><div style="font-family:'Outfit';font-weight:800;font-size:30px">Net 60</div><div class="muted" style="font-size:12.5px;margin-top:4px">Due in 60 days</div></div>
+            <div class="card" style="padding:20px 16px;text-align:center"><div style="font-family:'Outfit';font-weight:800;font-size:30px">Net 90</div><div class="muted" style="font-size:12.5px;margin-top:4px">Due in 90 days</div></div>
+          </div>
+          <div class="card" style="margin-top:14px;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;background:var(--lime-soft);border-color:#E4EFBF">
+            <span style="font-family:'Outfit';font-weight:700;font-size:15px">Due on fulfillment</span>
+            <span class="stamp" style="background:var(--lime);color:var(--ink)">Enabled</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+</body>
+</html>
