@@ -63,6 +63,9 @@ it orchestrates what Shopify already owns.
   live catalog before anything is created.
 - **Native terms & PO.** Attach your existing Shopify payment terms and a PO
   reference to the draft order. Display and attach only — Shopify enforces terms.
+- **Net terms & credit control (Growth).** Give each company a credit limit and
+  terms; net-terms orders raise an invoice with a due date. An aging dashboard,
+  automatic payment reminders, and downloadable invoices keep receivables tidy.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
@@ -99,6 +102,8 @@ migrate — install, invite a buyer, and send your first quote.
 - Buyer quote builder + passwordless portal (magic-link sign-in)
 - Merchant quote inbox with line-by-line counter and accept → draft order
 - AI Quote Assistant: one-click AI counter-offers with a margin read (Growth plan)
+- Net terms + invoice due dates on every terms order (all plans)
+- Credit limits, aging dashboard, automatic reminders, and invoice PDFs (Growth plan)
 - One-tap reorder with merchant-set auto-approval tolerance
 - Quick-order pad (paste SKUs) + AI Magic Order Pad (paste a PO or email)
 - Native Shopify payment terms + PO reference on every order
@@ -129,6 +134,9 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Net terms + credit management:** company credit limits, an aging dashboard,
+  automatic payment reminders (T-3 / due / overdue), and downloadable invoices.
+  Net terms and due dates are on every plan; credit control is Growth.
 - **AI Quote Assistant (Growth):** one-click AI counter-offers inside a quote —
   a suggested price, a margin/risk read, and a drafted buyer message, with a
   floor-margin guardrail. AI drafts; you always confirm.

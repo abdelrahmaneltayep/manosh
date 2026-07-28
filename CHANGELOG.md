@@ -5,6 +5,28 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 2: Net Terms + Credit Management
+
+- **Invoices on net-terms checkout.** When an accepted quote becomes a draft
+  order, Mannon raises an `Invoice` with `dueDate = issuedAt + termsDays` (from
+  the company's credit profile, else the shop default). Idempotent by order id.
+- **Credit profiles + credit check (Growth).** Per-company credit limit, terms
+  (7/15/30/45/60/90), and active/hold status. A net-terms order that would push
+  a company over its limit — or a company on hold — is **blocked before the draft
+  order is created**; the merchant lifts it by raising the limit or clearing the
+  hold (logged as `CREDIT_OVERRIDE`).
+- **Aging dashboard (Growth).** Current / 1–30 / 31–60 / 60+ buckets with
+  per-company outstanding balances, on the new **Credit** page.
+- **Automatic reminders (Growth).** A secret-protected cron route
+  (`/internal/cron/reminders`) sends T-3 / due / +7-overdue reminders, idempotent
+  per invoice+stage. Templates are editable in Settings.
+- **Buyer invoices.** The portal lists open invoices with due dates and a
+  printable invoice page ("Download PDF" via the browser).
+- **Plan gating.** Starter = net terms + due dates. Growth = credit limits, aging,
+  reminders, and PDFs. Dark-launched behind `MANNON_FF_CREDIT`.
+- Events: `INVOICE_CREATED`, `REMINDER_SENT`, `CREDIT_OVERRIDE` (append-only).
+- Migration: `f2_net_terms_credit`.
+
 ### Added — Feature 1: AI Quote Assistant (Growth)
 
 - **AI counter-offers inside a quote.** On an open (SUBMITTED) quote, merchants

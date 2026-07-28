@@ -14,7 +14,12 @@ export interface ShopSettings {
   /** Fraction (0.15 = 15%). AI Quote Assistant floor margin — suggestions never
    * knowingly go below this. */
   minMarginPct: number;
+  /** F2 default net-terms length for new invoices (7|15|30|45|60|90). */
+  defaultTermsDays: number;
 }
+
+/** Allowed net-terms lengths (shared with credit profiles). */
+export const TERM_DAYS_OPTIONS = [7, 15, 30, 45, 60, 90];
 
 export type ValidateResult =
   | { ok: true; settings: ShopSettings }
@@ -26,6 +31,7 @@ export function validateSettings(input: {
   quoteExpiryDays: number;
   magicLinkExpiryDays: number;
   minMarginPct: number;
+  defaultTermsDays: number;
 }): ValidateResult {
   if (
     !Number.isFinite(input.autoApproveTolerance) ||
@@ -47,7 +53,32 @@ export function validateSettings(input: {
   ) {
     return { ok: false, error: "Floor margin must be between 0% and 95%." };
   }
+  if (!TERM_DAYS_OPTIONS.includes(input.defaultTermsDays)) {
+    return { ok: false, error: "Default net terms must be 7, 15, 30, 45, 60, or 90 days." };
+  }
   return { ok: true, settings: input };
+}
+
+// --- F2 email templates (stored on Shop.emailTemplates JSON) -----------------
+
+export type EmailTemplateMap = Record<string, { subject?: string; body?: string }>;
+
+export async function getEmailTemplates(shopDomain: string): Promise<EmailTemplateMap> {
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: shopDomain },
+    select: { emailTemplates: true },
+  });
+  return (shop?.emailTemplates as EmailTemplateMap | null) ?? {};
+}
+
+export async function saveEmailTemplates(
+  shopDomain: string,
+  templates: EmailTemplateMap,
+): Promise<void> {
+  await prisma.shop.update({
+    where: { shopifyDomain: shopDomain },
+    data: { emailTemplates: templates },
+  });
 }
 
 export async function getShopSettings(
@@ -61,6 +92,7 @@ export async function getShopSettings(
       quoteExpiryDays: true,
       magicLinkExpiryDays: true,
       minMarginPct: true,
+      defaultTermsDays: true,
     },
   });
   return shop;
@@ -78,6 +110,7 @@ export async function updateShopSettings(
       quoteExpiryDays: true,
       magicLinkExpiryDays: true,
       minMarginPct: true,
+      defaultTermsDays: true,
     },
   });
   return updated;
