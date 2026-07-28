@@ -288,6 +288,26 @@ export function shortcutCapMessage(cap: number): string {
   return `This store's plan allows ${cap} saved reorder shortcut. Ask them to upgrade for unlimited saved bundles.`;
 }
 
+// --- F20 white-label / agency multi-store gating -----------------------------
+// The agency org + white-label is a Growth-only add-on. Each managed store still
+// needs its OWN Growth subscription — the org view is management-only, never a
+// billing bypass. `agencyAllowed` gates org creation + store linking;
+// `whiteLabelAllowed` gates buyer-portal branding.
+
+/** Agency org management (create org, link stores) is Growth-only. Pure. */
+export function agencyAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** White-label buyer-portal branding is Growth-only. Pure. */
+export function whiteLabelAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** Merchant-facing copy when the agency add-on is hit on Starter. */
+export const AGENCY_UPGRADE_MESSAGE =
+  "Agency mode manages and white-labels multiple stores from one place — upgrade to Growth to turn it on. Each managed store keeps its own Growth subscription.";
+
 // --- F19 catalog sharing / B2B discovery gating ------------------------------
 
 /** Publishing a shareable public catalog + the discovery listing is Growth-only. Pure. */

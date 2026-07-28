@@ -17,6 +17,19 @@
   box-sizing: border-box;
 }
 
+/* F20 — white-label brand bar (buyer-facing only). Shown when a store applies
+   its own branding; inherits the injected --accent for the underline. */
+.portal-brandbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+  margin-bottom: 0.5rem;
+  border-bottom: 2px solid var(--accent);
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
 body {
   margin: 0;
   background: var(--bg);

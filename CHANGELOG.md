@@ -5,6 +5,32 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 20: White-Label / Agency Multi-Store Management
+
+- **Agency org dashboard.** New models `Organization`, `OrgStore` (per-store role
+  OWNER/MANAGER/VIEWER), `Branding` (migration `f20_white_label`); admin at
+  **/app/agency**. An agency links several Mannon stores into one org and sees
+  **cross-store rollups** (quotes, orders, revenue) that reuse the F7/dashboard
+  metrics. **Growth-only Agency add-on** (`agencyAllowed`/`whiteLabelAllowed`);
+  dark-launched behind `MANNON_FF_WHITE_LABEL`.
+- **Per-store data isolation (guardrail).** Every rollup metric is queried strictly
+  by that store's `shopId` — data never crosses stores. The org is management-only
+  metadata; **each store still bills separately** through Shopify (never a billing
+  bypass). Linking a store requires it to have installed Mannon **and** be on its
+  own Growth plan.
+- **Switch without re-login.** Each connected store has an "Open" deep link to its
+  Shopify admin — the agency member is already a Shopify staff user, so Mannon rides
+  that session (org-scoped navigation, no separate Mannon login). Role-based:
+  viewers are read-only; owners/managers link/unlink and edit branding.
+- **White-label (buyer-facing only).** `Branding` overrides the portal name, logo,
+  and primary/accent colors on the **buyer portal + emails** — the embedded Shopify
+  admin always stays Mannon/Polaris. Colors are **AA-contrast-validated**
+  (`validateBranding`, `readableTextOn`) before storage; the portal injects them as
+  CSS custom properties, and text color on the primary is chosen for legibility.
+- **Emails** `org_invite` + `store_linked` (white-label-aware wording). Events
+  `ORG_CREATED`, `STORE_LINKED`, `BRANDING_UPDATED`. Isolation + billing model
+  documented in `docs/white-label.md`.
+
 ### Added — Feature 19: Catalog Sharing & B2B Discovery (Faire-Style)
 
 - **Publish a shareable catalog.** A merchant turns any **F11 custom catalog** into

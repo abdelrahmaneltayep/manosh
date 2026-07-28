@@ -46,6 +46,7 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Storefront “Request a Quote” widget (no code)", starter: "PDP button + form", growth: "Cart + gated + custom fields" },
   { label: "Installable buyer app & one-tap mobile reorder", starter: "Install + one-tap reorder", growth: "Push reminders + saved bundles" },
   { label: "Shareable wholesale catalog & B2B discovery (Faire-style)", starter: "—", growth: "Public catalog + discovery listing" },
+  { label: "Agency mode & white-label (multi-store management)", starter: "—", growth: "Agency add-on · per-store Growth" },
   { label: "Quote analytics (win rate, discount, time-to-close)", starter: "—", growth: "✓" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },
@@ -114,6 +115,17 @@ export default function Pricing() {
           ))}
         </tbody>
       </table>
+
+      <section style={{ marginTop: "2rem", background: "#faf9ff", border: "1px solid #e7e3f5", borderRadius: "1rem", padding: "1.5rem" }}>
+        <h2 style={{ fontSize: "1.25rem", margin: "0 0 0.35rem" }}>For agencies</h2>
+        <p style={{ color: "#4a4560", margin: 0 }}>
+          Run wholesale for multiple clients? <strong>Agency mode</strong> manages and
+          white-labels every store from one place — cross-store rollups, one-click switching, and a
+          client’s own logo &amp; colors on each buyer portal. It’s a Growth add-on: each managed
+          store keeps its own Growth subscription, and the org view is management-only (never a
+          billing bypass). <a href="mailto:agencies@mannon.app" style={{ color: "#4f46e5", fontWeight: 600 }}>Talk to us about agency onboarding →</a>
+        </p>
+      </section>
 
       <p style={{ color: "#5b5670", marginTop: "1.5rem", fontSize: "0.9rem" }}>
         Billed through Shopify. Totals and tax are always calculated by Shopify —

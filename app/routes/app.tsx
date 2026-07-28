@@ -44,6 +44,7 @@ export default function App() {
         <Link to="/app/i18n">Languages</Link>
         <Link to="/app/erp">ERP sync</Link>
         <Link to="/app/accounting">Accounting</Link>
+        <Link to="/app/agency">Agency</Link>
         <Link to="/app/settings">Settings</Link>
       </NavMenu>
       <Outlet />

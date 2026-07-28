@@ -27,6 +27,7 @@ faithful mocks built in the container, which can't reach a store).
 | 17 | `f17-quote-widget.png` | F17 Quote Widget | Storefront PDP with the "Request a Quote" block + the resulting request in admin | core 8 · **reel opener** (funnel) |
 | 18 | `f18-buyer-pwa.png` | F18 Buyer PWA | Phone home screen with the Mannon app icon + the one-tap reorder screen | candidate (mobile story) |
 | 19 | `f19-catalog-sharing.png` | F19 Catalog Sharing | Branded public wholesale catalog page with hidden prices + "Request access" | candidate (later-phase growth differentiator) |
+| 20 | `f20-white-label.png` | F20 White-Label / Agency | Org dashboard with multiple stores + a white-labeled buyer-portal preview | candidate (partner/agency channel) |
 
 ## Reel order (extended cut)
 
