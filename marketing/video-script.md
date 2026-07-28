@@ -3,14 +3,24 @@
 One-line VO + on-screen action per beat. Keep it calm and concrete; no music
 over dialogue.
 
-## Opening beat — the bulk order pad (Feature 4)
+## Opening hook — Request a Quote on your storefront (Feature 17) — NEW beat 1
+
+> **VO:** "It starts on your storefront — a wholesale buyer taps **Request a
+> Quote** right on the product page, and the lead lands in Mannon instantly."
+>
+> **On screen:** A storefront **product page** with the **"Request a Quote"**
+> button → a quick modal (email + quantity) → cut to the request appearing in the
+> Mannon admin as **New**, one click to **Convert to quote**. _(New reel opener —
+> the funnel entry point; F4 order pad moves to beat 2.)_
+
+## Beat 2 — the bulk order pad (Feature 4)
 
 > **VO:** "A 40-line reorder in seconds — search or paste your SKUs, watch the
 > subtotal land at your price, and save the list to reorder next month in one tap."
 >
 > **On screen:** The buyer's **order pad**: paste a block of `SKU,QTY` lines →
 > rows populate with a **live subtotal**; a bad line is flagged; click **Save
-> list**. (Open the reel here — it's the speed moment.)
+> list**. (The speed moment.)
 
 ## Hero beat — AI counter-offer (Feature 1)
 

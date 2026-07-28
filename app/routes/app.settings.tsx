@@ -83,6 +83,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const taxVatEnabled = process.env.MANNON_FF_TAX_VAT === "true";
   const erpEnabled = process.env.MANNON_FF_ERP_SYNC === "true";
   const i18nEnabled = process.env.MANNON_FF_I18N === "true";
+  const quoteWidgetEnabled = process.env.MANNON_FF_QUOTE_WIDGET === "true";
 
   const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex, erpConnCount] =
     shopId
@@ -95,7 +96,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           prisma.accountingConnection.count({ where: { shopId } }),
           prisma.catalog.count({ where: { shopId, isDefault: false } }),
           prisma.salesRep.count({ where: { shopId } }),
-          prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true, defaultTaxRate: true, supportedLocales: true, supportedCurrencies: true } }),
+          prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true, defaultTaxRate: true, supportedLocales: true, supportedCurrencies: true, quoteWidgetEnabled: true } }),
           prisma.erpConnection.count({ where: { shopId } }),
         ])
       : [null, null, [], {}, 0, 0, 0, 0, null, 0];
@@ -119,6 +120,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     accounting_sync_failure: "Accounting — sync failure digest",
     rep_invite: "Sales rep — invite",
     rep_order_placed: "Sales rep — order placed (buyer notice)",
+    quote_request_created: "Widget — new request (merchant)",
+    quote_request_ack: "Widget — request acknowledgement (visitor)",
     deposit_received: "Payments — deposit received",
     installment_due: "Payments — installment due",
     installment_overdue: "Payments — installment overdue",
@@ -157,6 +160,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasErpConnection: erpConnCount > 0,
     i18nEnabled,
     hasI18nSetup: ((shopFlex?.supportedLocales as string[] | null)?.length ?? 0) > 1 || ((shopFlex?.supportedCurrencies as string[] | null)?.length ?? 0) > 0,
+    quoteWidgetEnabled,
+    hasQuoteWidget: shopFlex?.quoteWidgetEnabled === true,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -410,6 +415,19 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Recommended onboarding (high activation): add the storefront widget */}
+        {data.quoteWidgetEnabled && !data.hasQuoteWidget && (
+          <Banner tone="info" title="Recommended: add the Request-a-Quote button to your theme">
+            <p>
+              Turn any product page into a B2B lead source — no code. Enable the
+              widget, then add the app block in your theme editor.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/quote-requests" variant="primary">Set up the widget</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Recommended onboarding: set your tax rules */}
         {data.taxVatEnabled && !data.hasTaxRules && (
           <Banner tone="info" title="Recommended: set your tax rules">
@@ -630,6 +648,12 @@ export default function Settings() {
                   Multi-currency &amp; language (Arabic/RTL)
                 </Text>
                 <Badge tone="info">1 extra currency + EN/AR on Starter · unlimited + contract rates on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Storefront “Request a Quote” widget
+                </Text>
+                <Badge tone="info">PDP form on Starter · cart + gated + custom fields on Growth</Badge>
               </InlineStack>
             </BlockStack>
 
