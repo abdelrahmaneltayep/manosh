@@ -72,6 +72,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     tolerancePercent: settings ? Math.round(settings.autoApproveTolerance * 100) : 0,
     quoteExpiryDays: settings?.quoteExpiryDays ?? 14,
     magicLinkExpiryDays: settings?.magicLinkExpiryDays ?? 7,
+    minMarginPercent: settings ? Math.round(settings.minMarginPct * 100) : 15,
     plan: status.plan,
     onTrial: status.onTrial,
     upgradeTarget:
@@ -142,6 +143,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     autoApproveTolerance: Number(form.get("tolerancePercent")) / 100,
     quoteExpiryDays: Number(form.get("quoteExpiryDays")),
     magicLinkExpiryDays: Number(form.get("magicLinkExpiryDays")),
+    minMarginPct: Number(form.get("minMarginPercent")) / 100,
   });
   if (!parsed.ok) {
     return { ok: false, kind: "settings", error: parsed.error } satisfies ActionResult;
@@ -214,6 +216,7 @@ export default function Settings() {
   const [tolerance, setTolerance] = useState(String(data.tolerancePercent));
   const [quoteExpiry, setQuoteExpiry] = useState(String(data.quoteExpiryDays));
   const [linkExpiry, setLinkExpiry] = useState(String(data.magicLinkExpiryDays));
+  const [minMargin, setMinMargin] = useState(String(data.minMarginPercent));
   const [seatEmail, setSeatEmail] = useState("");
 
   const settingsError =
@@ -248,10 +251,23 @@ export default function Settings() {
               <Badge tone={data.plan ? "success" : "attention"}>{planLabel}</Badge>
             </InlineStack>
             <Text as="p" tone="subdued" variant="bodyMd">
-              Every feature — quote builder, buyer portal, net terms, AI Order Pad,
-              and reorder — is included on both plans. Plans differ only by quote
-              volume and team seats.
+              The core workflow — quote builder, buyer portal, net terms, AI Order
+              Pad, and reorder — is on both plans. Plans differ by quote volume and
+              team seats. The <b>AI Quote Assistant</b> (AI counter-offers) is a
+              Growth-only feature.
             </Text>
+
+            <InlineStack gap="200" blockAlign="center" wrap>
+              <Text as="span" variant="bodySm" fontWeight="semibold">
+                AI Quote Assistant
+              </Text>
+              <Badge tone="info">Growth</Badge>
+              {data.plan !== GROWTH_PLAN && (
+                <Text as="span" variant="bodySm" tone="subdued">
+                  Upgrade to Growth to suggest AI counter-offers inside a quote.
+                </Text>
+              )}
+            </InlineStack>
 
             <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
               <PlanOption
@@ -423,6 +439,18 @@ export default function Settings() {
                 max={90}
                 autoComplete="off"
                 helpText="How long a buyer sign-in link stays valid."
+              />
+              <TextField
+                label="AI floor margin (%)"
+                type="number"
+                name="minMarginPercent"
+                value={minMargin}
+                onChange={setMinMargin}
+                min={0}
+                max={95}
+                suffix="%"
+                autoComplete="off"
+                helpText="The AI Quote Assistant never knowingly suggests a counter-offer below this margin. Suggestions that would breach it are flagged and can’t be accepted in one click."
               />
               <Text as="p" tone="subdued" variant="bodySm">
                 Totals and tax are always calculated by Shopify — Mannon never

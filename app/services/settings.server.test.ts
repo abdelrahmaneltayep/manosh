@@ -9,10 +9,20 @@ import {
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe("validateSettings (pure)", () => {
-  const base = { autoApproveTolerance: 0.05, quoteExpiryDays: 14, magicLinkExpiryDays: 7 };
+  const base = {
+    autoApproveTolerance: 0.05,
+    quoteExpiryDays: 14,
+    magicLinkExpiryDays: 7,
+    minMarginPct: 0.15,
+  };
 
   it("accepts valid settings", () => {
     expect(validateSettings(base).ok).toBe(true);
+  });
+
+  it("rejects a floor margin outside 0..0.95", () => {
+    expect(validateSettings({ ...base, minMarginPct: 0.99 }).ok).toBe(false);
+    expect(validateSettings({ ...base, minMarginPct: -0.1 }).ok).toBe(false);
   });
 
   it("rejects a tolerance outside 0..1", () => {
@@ -46,9 +56,15 @@ describe.skipIf(!hasDb)("shop settings (DB)", () => {
       autoApproveTolerance: 0.1,
       quoteExpiryDays: 30,
       magicLinkExpiryDays: 14,
+      minMarginPct: 0.2,
     });
 
     const after = await getShopSettings("settings.myshopify.com");
-    expect(after).toMatchObject({ autoApproveTolerance: 0.1, quoteExpiryDays: 30, magicLinkExpiryDays: 14 });
+    expect(after).toMatchObject({
+      autoApproveTolerance: 0.1,
+      quoteExpiryDays: 30,
+      magicLinkExpiryDays: 14,
+      minMarginPct: 0.2,
+    });
   });
 });

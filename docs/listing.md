@@ -50,6 +50,10 @@ it orchestrates what Shopify already owns.
 - **Quote loop.** Buyers build a basket and submit; you counter line-by-line
   from your inbox; they accept. Every quote has a clear status and a merchant-set
   expiry.
+- **AI counter-offers (Growth).** Inside any quote, get a suggested price, a
+  margin read, and a ready-to-send message in one click. Suggestions never go
+  below the floor margin you set, and you confirm every counter — the AI drafts,
+  you decide.
 - **One-tap reorder.** Buyers reprice and resend a past order in a tap. Small
   price moves auto-convert within a tolerance you set; larger ones wait for your
   approval.
@@ -94,6 +98,7 @@ migrate — install, invite a buyer, and send your first quote.
 
 - Buyer quote builder + passwordless portal (magic-link sign-in)
 - Merchant quote inbox with line-by-line counter and accept → draft order
+- AI Quote Assistant: one-click AI counter-offers with a margin read (Growth plan)
 - One-tap reorder with merchant-set auto-approval tolerance
 - Quick-order pad (paste SKUs) + AI Magic Order Pad (paste a PO or email)
 - Native Shopify payment terms + PO reference on every order
@@ -104,22 +109,29 @@ migrate — install, invite a buyer, and send your first quote.
 
 ## Pricing (from billing config)
 
-**Every feature is included on both plans** — quote builder, buyer portal, native
-terms/PO, AI Magic Order Pad, reorder, and the ROI dashboard. Plans differ only
-by enforceable **limits**, so merchants upgrade when their wholesale desk grows,
-not to unlock features.
+The core workflow — quote builder, buyer portal, native terms/PO, AI Magic Order
+Pad, reorder, and the ROI dashboard — is on **both** plans. Plans differ by
+enforceable **limits** (quote volume, seats), plus one Growth-only capability:
+the **AI Quote Assistant** (AI counter-offers).
 
-| Plan | Price | Active-quote cap | Seats |
-|---|---|---|---|
-| **Starter** | **$29 / month** | Up to 50 active quotes / mo (rolling 30-day) | 1 |
-| **Growth** | **$79 / month** | Unlimited | Up to 5 |
+| Plan | Price | Active-quote cap | Seats | AI counter-offers |
+|---|---|---|---|---|
+| **Starter** | **$29 / month** | Up to 50 active quotes / mo (rolling 30-day) | 1 | — |
+| **Growth** | **$79 / month** | Unlimited | Up to 5 | ✓ AI Quote Assistant |
 
 - **14-day free trial** on either plan.
 - Billed through Shopify's Billing API; upgrade, downgrade, or cancel anytime
   from the app's Settings.
-- Gate mechanics live in `app/lib/billing.ts` (`PLAN_LIMITS`) and are enforced by
-  `canCreateQuote` (quote volume) and `canAddSeat` (seats). Feature access is
-  identical across tiers.
+- Limit mechanics live in `app/lib/billing.ts` (`PLAN_LIMITS`), enforced by
+  `canCreateQuote` (quote volume) and `canAddSeat` (seats). The AI Quote
+  Assistant is gated with `requirePlan(billing, GROWTH_PLAN)` /
+  `featureAccess(status, GROWTH_PLAN)`.
+
+## What's new
+
+- **AI Quote Assistant (Growth):** one-click AI counter-offers inside a quote —
+  a suggested price, a margin/risk read, and a drafted buyer message, with a
+  floor-margin guardrail. AI drafts; you always confirm.
 
 ---
 

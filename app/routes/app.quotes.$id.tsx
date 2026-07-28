@@ -1,6 +1,12 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import {
+  Form,
+  useActionData,
+  useFetcher,
+  useLoaderData,
+  useNavigation,
+} from "@remix-run/react";
 import {
   Page,
   Card,
@@ -13,6 +19,7 @@ import {
   Banner,
   Box,
   Divider,
+  Spinner,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -26,16 +33,48 @@ import {
   IllegalQuoteTransitionError,
   QuoteNotFoundError,
 } from "../services/quote.server";
+import { requireBilling } from "../services/billing.server";
+import { featureAccess, GROWTH_PLAN } from "../lib/billing";
+import {
+  generateSuggestionForLine,
+  generateSuggestionsForQuote,
+  getLatestSuggestions,
+  AiRateLimitedError,
+  QuoteLineNotFoundError,
+  type SuggestionView,
+} from "../services/quote-ai.server";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate } from "../lib/format";
 
+const IS_TEST = process.env.NODE_ENV !== "production";
+// Dark-launch flag for Feature 1. AI UI + action are inert unless this is on.
+const AI_QUOTE_ENABLED = () => process.env.MANNON_FF_AI_QUOTE === "true";
+
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const quote = await getQuoteDetailForShop(session.shop, params.id!);
   if (!quote) {
     throw new Response("Quote not found", { status: 404 });
   }
+
+  const aiEnabled = AI_QUOTE_ENABLED();
+  let aiAllowed = false;
+  if (aiEnabled) {
+    const status = await requireBilling(billing, { isTest: IS_TEST });
+    aiAllowed = featureAccess(status, GROWTH_PLAN).allowed;
+  }
+
+  // Latest suggestion per line (cached view) — only when the feature is on.
+  const suggestionsByLine = aiEnabled ? await getLatestSuggestions(quote.id) : new Map();
+  const suggestions: Record<string, SuggestionView> = {};
+  for (const [key, view] of suggestionsByLine) {
+    if (key !== "__quote__") suggestions[key] = view;
+  }
+
   return {
+    aiEnabled,
+    aiAllowed,
+    suggestions,
     quote: {
       id: quote.id,
       status: quote.status,
@@ -57,27 +96,63 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
   const quoteId = params.id!;
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
 
+  // --- AI Quote Assistant (Growth-only, feature-flagged) --------------------
+  if (intent === "ai-suggest" || intent === "ai-suggest-all") {
+    if (!AI_QUOTE_ENABLED()) {
+      return { ok: false as const, kind: "ai" as const, error: "This feature isn’t available." };
+    }
+    const status = await requireBilling(billing, { isTest: IS_TEST });
+    if (!featureAccess(status, GROWTH_PLAN).allowed) {
+      return {
+        ok: false as const,
+        kind: "ai" as const,
+        error: "Upgrade to Growth for AI counter-offers.",
+        upgrade: true as const,
+      };
+    }
+    try {
+      if (intent === "ai-suggest-all") {
+        await generateSuggestionsForQuote(session.shop, quoteId);
+      } else {
+        await generateSuggestionForLine(session.shop, quoteId, String(form.get("lineId") ?? ""));
+      }
+      return { ok: true as const, kind: "ai" as const };
+    } catch (error) {
+      if (error instanceof AiRateLimitedError) {
+        return { ok: false as const, kind: "ai" as const, error: error.message };
+      }
+      if (error instanceof QuoteLineNotFoundError) {
+        return { ok: false as const, kind: "ai" as const, error: "That line is no longer on this quote." };
+      }
+      return {
+        ok: false as const,
+        kind: "ai" as const,
+        error: "Couldn’t get an AI suggestion right now. Please try again.",
+      };
+    }
+  }
+
   try {
     if (intent === "decline") {
       await declineQuoteForShop(session.shop, quoteId);
-      return { ok: true as const, message: "Quote declined." };
+      return { ok: true as const, kind: "quote" as const, message: "Quote declined." };
     }
 
     if (intent === "counter") {
       const parsed = parseCounterForm(form);
       if (!parsed.ok) {
-        return { ok: false as const, error: parsed.error };
+        return { ok: false as const, kind: "quote" as const, error: parsed.error };
       }
       await counterQuoteForShop(session.shop, quoteId, parsed.lines);
-      return { ok: true as const, message: "Counter sent to the buyer." };
+      return { ok: true as const, kind: "quote" as const, message: "Counter sent to the buyer." };
     }
 
-    return { ok: false as const, error: "Unknown action." };
+    return { ok: false as const, kind: "quote" as const, error: "Unknown action." };
   } catch (error) {
     if (error instanceof QuoteNotFoundError) {
       throw new Response("Quote not found", { status: 404 });
@@ -85,6 +160,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     if (error instanceof IllegalQuoteTransitionError) {
       return {
         ok: false as const,
+        kind: "quote" as const,
         error:
           intent === "decline"
             ? "This quote can no longer be declined."
@@ -95,10 +171,21 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 };
 
+/** Trim a stored Decimal string ("12.5000") to a clean input value ("12.5"). */
+function cleanPrice(value: string): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? String(n) : value;
+}
+function money(value: string): string {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : value;
+}
+
 export default function QuoteDetail() {
-  const { quote } = useLoaderData<typeof loader>();
+  const { quote, aiEnabled, aiAllowed, suggestions } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const aiFetcher = useFetcher<typeof action>();
   const submitting = navigation.state === "submitting";
 
   const badge = quoteStatusBadge(quote.status);
@@ -108,15 +195,32 @@ export default function QuoteDetail() {
   const [lines, setLines] = useState(() =>
     quote.lines.map((line) => ({
       ...line,
-      priceInput: line.price,
+      priceInput: cleanPrice(line.price),
       quantityInput: String(line.quantity),
     })),
   );
+  // Locally dismissed suggestions (client-only; the row stays cached in the DB).
+  const [dismissed, setDismissed] = useState<Set<string>>(() => new Set());
 
   const setLine = (id: string, field: "priceInput" | "quantityInput", value: string) =>
-    setLines((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)),
-    );
+    setLines((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)));
+
+  const quoteAction = actionData?.kind === "quote" ? actionData : null;
+  const aiActionError =
+    actionData?.kind === "ai" && !actionData.ok ? actionData.error : null;
+
+  const generatingLineId =
+    aiFetcher.state !== "idle" ? String(aiFetcher.formData?.get("lineId") ?? "") : null;
+  const generatingAll =
+    aiFetcher.state !== "idle" && aiFetcher.formData?.get("intent") === "ai-suggest-all";
+  const aiFetcherError =
+    aiFetcher.data && aiFetcher.data.kind === "ai" && !aiFetcher.data.ok
+      ? aiFetcher.data.error
+      : null;
+
+  const hasAnySuggestion = Object.keys(suggestions).length > 0;
+  const showAi = aiEnabled && isSubmitted;
+  const countered = quote.status === "COUNTERED";
 
   return (
     <Page
@@ -127,13 +231,44 @@ export default function QuoteDetail() {
     >
       <TitleBar title="Quote" />
       <BlockStack gap="400">
-        {actionData && !actionData.ok && (
+        {quoteAction && !quoteAction.ok && (
           <Banner tone="critical" title="Couldn’t update this quote">
-            <p>{actionData.error}</p>
+            <p>{quoteAction.error}</p>
           </Banner>
         )}
-        {actionData && actionData.ok && (
-          <Banner tone="success" title={actionData.message} />
+        {quoteAction && quoteAction.ok && (
+          <Banner tone="success" title={quoteAction.message} />
+        )}
+        {(aiActionError || aiFetcherError) && (
+          <Banner tone="warning" title="AI Quote Assistant">
+            <p>{aiActionError || aiFetcherError}</p>
+          </Banner>
+        )}
+
+        {/* First-run tip: only for eligible merchants with no suggestions yet. */}
+        {showAi && aiAllowed && !hasAnySuggestion && (
+          <Banner tone="info" title="New: AI counter-offers">
+            <p>
+              Click <b>AI suggest</b> on any line to get a suggested price, a
+              margin read, and a ready-to-send message. AI drafts it — you always
+              confirm before it’s sent.
+            </p>
+          </Banner>
+        )}
+
+        {/* Starter upsell: feature on, but plan too low. */}
+        {showAi && !aiAllowed && (
+          <Banner tone="warning" title="AI counter-offers are a Growth feature">
+            <p>
+              Upgrade to Growth to let Mannon suggest counter-offers with a margin
+              read and a drafted buyer message.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/settings" variant="primary">
+                Upgrade to Growth
+              </Button>
+            </Box>
+          </Banner>
         )}
 
         <Card>
@@ -162,52 +297,107 @@ export default function QuoteDetail() {
             {isSubmitted ? (
               <Form method="post">
                 <input type="hidden" name="intent" value="counter" />
-                <BlockStack gap="300">
-                  {lines.map((line) => (
-                    <div key={line.id}>
-                      <input type="hidden" name="lineId" value={line.id} />
-                      <InlineStack gap="300" align="space-between" blockAlign="end" wrap>
-                        <Box minWidth="16rem">
-                          <Text as="p" fontWeight="semibold">
-                            {line.title}
-                          </Text>
-                          {line.sku && (
-                            <Text as="p" tone="subdued" variant="bodySm">
-                              SKU {line.sku}
+                <BlockStack gap="400">
+                  {lines.map((line) => {
+                    const suggestion = suggestions[line.id];
+                    const showSuggestion = suggestion && !dismissed.has(line.id);
+                    return (
+                      <BlockStack key={line.id} gap="200">
+                        <input type="hidden" name="lineId" value={line.id} />
+                        <InlineStack gap="300" align="space-between" blockAlign="end" wrap>
+                          <Box minWidth="16rem">
+                            <Text as="p" fontWeight="semibold">
+                              {line.title}
                             </Text>
-                          )}
-                        </Box>
-                        <Box minWidth="7rem">
-                          <TextField
-                            label="Quantity"
-                            type="number"
-                            name={`quantity_${line.id}`}
-                            value={line.quantityInput}
-                            onChange={(v) => setLine(line.id, "quantityInput", v)}
-                            min={1}
-                            autoComplete="off"
+                            {line.sku && (
+                              <Text as="p" tone="subdued" variant="bodySm">
+                                SKU {line.sku}
+                              </Text>
+                            )}
+                          </Box>
+                          <Box minWidth="7rem">
+                            <TextField
+                              label="Quantity"
+                              type="number"
+                              name={`quantity_${line.id}`}
+                              value={line.quantityInput}
+                              onChange={(v) => setLine(line.id, "quantityInput", v)}
+                              min={1}
+                              autoComplete="off"
+                            />
+                          </Box>
+                          <Box minWidth="9rem">
+                            <TextField
+                              label="Unit price"
+                              type="number"
+                              name={`price_${line.id}`}
+                              value={line.priceInput}
+                              onChange={(v) => setLine(line.id, "priceInput", v)}
+                              min={0}
+                              step={0.01}
+                              prefix="$"
+                              autoComplete="off"
+                            />
+                          </Box>
+                        </InlineStack>
+
+                        {/* AI suggest control (per line) */}
+                        {showAi && aiAllowed && (
+                          <InlineStack gap="200" blockAlign="center">
+                            <Button
+                              size="slim"
+                              disabled={aiFetcher.state !== "idle"}
+                              onClick={() =>
+                                aiFetcher.submit(
+                                  { intent: "ai-suggest", lineId: line.id },
+                                  { method: "post" },
+                                )
+                              }
+                            >
+                              {suggestion ? "Refresh AI suggestion" : "AI suggest"}
+                            </Button>
+                            {generatingLineId === line.id && (
+                              <InlineStack gap="100" blockAlign="center">
+                                <Spinner accessibilityLabel="Getting suggestion" size="small" />
+                                <Text as="span" tone="subdued" variant="bodySm">
+                                  Thinking…
+                                </Text>
+                              </InlineStack>
+                            )}
+                          </InlineStack>
+                        )}
+
+                        {showSuggestion && (
+                          <AiSuggestionPanel
+                            suggestion={suggestion}
+                            onAccept={() =>
+                              setLine(line.id, "priceInput", cleanPrice(suggestion.suggestedPrice))
+                            }
+                            onDismiss={() =>
+                              setDismissed((prev) => new Set(prev).add(line.id))
+                            }
                           />
-                        </Box>
-                        <Box minWidth="9rem">
-                          <TextField
-                            label="Unit price"
-                            type="number"
-                            name={`price_${line.id}`}
-                            value={line.priceInput}
-                            onChange={(v) => setLine(line.id, "priceInput", v)}
-                            min={0}
-                            step={0.01}
-                            prefix="$"
-                            autoComplete="off"
-                          />
-                        </Box>
-                      </InlineStack>
-                    </div>
-                  ))}
+                        )}
+                        <Divider />
+                      </BlockStack>
+                    );
+                  })}
+
                   <InlineStack gap="200">
                     <Button variant="primary" submit loading={submitting}>
                       Send counter
                     </Button>
+                    {showAi && aiAllowed && (
+                      <Button
+                        disabled={aiFetcher.state !== "idle"}
+                        loading={Boolean(generatingAll)}
+                        onClick={() =>
+                          aiFetcher.submit({ intent: "ai-suggest-all" }, { method: "post" })
+                        }
+                      >
+                        Suggest counter-offer for all lines
+                      </Button>
+                    )}
                   </InlineStack>
                 </BlockStack>
               </Form>
@@ -226,7 +416,7 @@ export default function QuoteDetail() {
                       )}
                     </Box>
                     <Text as="span" numeric>
-                      {line.quantity} × ${line.price}
+                      {line.quantity} × ${money(line.price)}
                     </Text>
                   </InlineStack>
                 ))}
@@ -235,10 +425,18 @@ export default function QuoteDetail() {
           </BlockStack>
         </Card>
 
-        {!isSubmitted && !isTerminal && (
-          <Text as="p" tone="subdued">
-            You’ve countered this quote. It’s now with the buyer to accept.
-          </Text>
+        {countered && (
+          <BlockStack gap="150">
+            <Text as="p" tone="subdued">
+              You’ve countered this quote. It’s now with the buyer to accept.
+            </Text>
+            {aiEnabled && hasAnySuggestion && (
+              <Text as="p" tone="subdued" variant="bodySm">
+                Internal note: an AI suggestion was used on this quote. Buyers never
+                see this.
+              </Text>
+            )}
+          </BlockStack>
         )}
 
         {!isTerminal && (
@@ -251,5 +449,71 @@ export default function QuoteDetail() {
         )}
       </BlockStack>
     </Page>
+  );
+}
+
+function AiSuggestionPanel({
+  suggestion,
+  onAccept,
+  onDismiss,
+}: {
+  // Loader-serialized shape (createdAt is a string over the wire and unused here).
+  suggestion: Omit<SuggestionView, "createdAt">;
+  onAccept: () => void;
+  onDismiss: () => void;
+}) {
+  const marginLabel =
+    suggestion.marginPct == null
+      ? "Margin: unknown (no cost on file)"
+      : `Margin ${Math.round(suggestion.marginPct * 100)}%`;
+  return (
+    <Box
+      background={suggestion.belowFloor ? "bg-surface-critical" : "bg-surface-secondary"}
+      borderRadius="200"
+      padding="300"
+    >
+      <BlockStack gap="200">
+        <InlineStack gap="200" align="space-between" blockAlign="center" wrap>
+          <InlineStack gap="200" blockAlign="center">
+            <Text as="span" fontWeight="semibold">
+              AI suggests ${money(suggestion.suggestedPrice)}
+            </Text>
+            <Badge tone={suggestion.belowFloor ? "critical" : "success"}>{marginLabel}</Badge>
+          </InlineStack>
+          <Text as="span" tone="subdued" variant="bodySm">
+            Floor ${money(suggestion.floorPrice)}
+          </Text>
+        </InlineStack>
+
+        {suggestion.belowFloor && (
+          <Text as="p" tone="critical" variant="bodySm">
+            This price is below your floor margin. Review before sending — one-click
+            accept is disabled.
+          </Text>
+        )}
+
+        <Text as="p" variant="bodySm">
+          {suggestion.rationale}
+        </Text>
+
+        <Box background="bg-surface" borderRadius="100" padding="200">
+          <Text as="p" variant="bodySm" tone="subdued">
+            Draft message to buyer
+          </Text>
+          <Text as="p" variant="bodySm">
+            {suggestion.draftMessage}
+          </Text>
+        </Box>
+
+        <InlineStack gap="200">
+          <Button size="slim" variant="primary" disabled={suggestion.belowFloor} onClick={onAccept}>
+            Accept (use this price)
+          </Button>
+          <Button size="slim" variant="plain" onClick={onDismiss}>
+            Dismiss
+          </Button>
+        </InlineStack>
+      </BlockStack>
+    </Box>
   );
 }
