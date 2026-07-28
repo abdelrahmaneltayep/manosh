@@ -17,6 +17,7 @@ faithful mocks built in the container, which can't reach a store).
 | 7 | `f7-quote-analytics.png` | F7 Quote Analytics | Analytics dashboard: KPI cards + trend sparklines + top accounts | candidate (strong — promote into store 7) |
 | 8 | `f8-followups.png` | F8 Quote Follow-ups | A quote with its expiry + scheduled follow-up timeline (day 3/7/12 + expiry) | candidate |
 | 9 | `f9-moq-rules.png` | F9 MOQ / Order Rules | Buyer order pad rounding qty 20→24 (case of 12) + a minimum-order progress bar | candidate (docs GIF) |
+| 10 | `f10-accounting-sync.png` | F10 Accounting Sync | Accounting settings: "Connected to QuickBooks" + a green sync log | core 8 (Growth story) |
 
 ## Reel order (extended cut)
 

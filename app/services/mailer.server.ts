@@ -100,6 +100,11 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{buyerName}},\n\nYour quote has expired. Reach out if you'd still like to order — we're happy to re-quote.\n\n{{quoteUrl}}\n\nThank you,\n{{shopName}}",
   },
+  accounting_sync_failure: {
+    subject: "{{failed}} invoice(s) didn't reach {{provider}}",
+    body:
+      "Hi,\n\n{{failed}} invoice sync(s) to {{provider}} need your attention. Nothing was double-posted and your Shopify orders are unaffected.\n\nReview and retry them here:\n\n{{syncLogUrl}}\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

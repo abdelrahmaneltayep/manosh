@@ -76,8 +76,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const upgradeTarget = new URL(request.url).searchParams.get("upgrade");
 
   const creditEnabled = process.env.MANNON_FF_CREDIT === "true";
+  const accountingEnabled = process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
 
-  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount] =
+  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount] =
     shopId
       ? await Promise.all([
           canCreateQuote(shopId),
@@ -85,8 +86,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           listSeats(shopId),
           getEmailTemplates(session.shop),
           prisma.creditProfile.count({ where: { company: { shopId } } }),
+          prisma.accountingConnection.count({ where: { shopId } }),
         ])
-      : [null, null, [], {}, 0];
+      : [null, null, [], {}, 0, 0];
 
   const TEMPLATE_LABELS: Record<TemplateKey, string> = {
     invoice_issued: "Invoice issued",
@@ -104,6 +106,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     followup_reminder: "Follow-up — reminder nudge",
     followup_expiry_warning: "Follow-up — expiry warning",
     followup_expired: "Follow-up — expired",
+    accounting_sync_failure: "Accounting — sync failure digest",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -119,6 +122,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     termDaysOptions: TERM_DAYS_OPTIONS,
     creditEnabled,
     hasCreditProfile: creditProfileCount > 0,
+    accountingEnabled,
+    hasAccountingConnection: accountingConnCount > 0,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -345,6 +350,19 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Optional onboarding (Growth): connect accounting */}
+        {data.accountingEnabled && data.plan === GROWTH_PLAN && !data.hasAccountingConnection && (
+          <Banner tone="info" title="Optional: connect your accounting">
+            <p>
+              Sync every net-terms invoice and payment to QuickBooks Online or Xero
+              automatically — no re-keying. You can set this up any time.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/accounting">Connect your accounting</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Plan & billing */}
         <Card>
           <BlockStack gap="400">
@@ -436,6 +454,17 @@ export default function Settings() {
                   Order minimums &amp; pack rules
                 </Text>
                 <Badge tone="info">Store + product on Starter · groups + packs + CSV on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  QuickBooks &amp; Xero accounting sync
+                </Text>
+                <Badge tone="info">Growth</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Push invoices + payments to your accounting provider — no re-keying.
+                  </Text>
+                )}
               </InlineStack>
             </BlockStack>
 

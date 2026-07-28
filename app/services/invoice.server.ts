@@ -63,6 +63,17 @@ export async function createInvoiceForOrder(input: CreateInvoiceInput): Promise<
     payload: { companyId: input.companyId, termsDays: input.termsDays },
   });
 
+  // F10 — queue an accounting sync (QBO/Xero) for this invoice. Best-effort and
+  // dark-launched: enqueueInvoiceSync no-ops unless MANNON_FF_ACCOUNTING_SYNC is
+  // on and a provider is connected, and it never throws into the order flow.
+  try {
+    const { enqueueInvoiceSync } = await import("./accounting.server");
+    await enqueueInvoiceSync(input.shopId, invoice.id);
+  } catch (error) {
+    const { captureException } = await import("../lib/sentry.server");
+    captureException(error);
+  }
+
   return invoice;
 }
 

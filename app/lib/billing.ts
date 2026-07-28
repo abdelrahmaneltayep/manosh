@@ -184,6 +184,13 @@ export function packRulesAllowed(plan: string | null | undefined): boolean {
   return plan === "GROWTH" || plan === GROWTH_PLAN;
 }
 
+// --- F10 accounting sync gating ----------------------------------------------
+
+/** Accounting sync (QuickBooks Online / Xero) is Growth-only. Pure. */
+export function accountingSyncAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
 /** Buyer-facing copy when the saved-list cap is hit. */
 export function savedListCapMessage(cap: number): string {
   return `This store's plan allows ${cap} saved lists. Ask them to upgrade for unlimited saved lists and CSV upload.`;

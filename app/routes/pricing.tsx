@@ -40,6 +40,7 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Quote analytics (win rate, discount, time-to-close)", starter: "—", growth: "✓" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },
+  { label: "QuickBooks Online & Xero accounting sync", starter: "—", growth: "✓" },
   { label: "Volume-break pricing + CSV import", starter: "—", growth: "✓" },
   { label: "Invoice PDFs", starter: "—", growth: "✓" },
 ];

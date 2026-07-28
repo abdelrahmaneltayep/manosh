@@ -60,8 +60,96 @@ model Shop {
   quoteMetrics          QuoteMetricDaily[]
   followupPolicy        FollowupPolicy?
   orderRules            OrderRule[]
+  accountingConnections AccountingConnection[]
+  accountingSyncLogs    AccountingSyncLog[]
+  accountingMap         AccountingMap?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F10 — a store's OAuth link to an external accounting provider (QuickBooks
+// Online or Xero). Tokens are AES-256-GCM encrypted at rest (app/lib/crypto)
+// and NEVER logged. One connection per (shop, provider).
+model AccountingConnection {
+  id           String              @id @default(cuid())
+  shopId       String
+  shop         Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  provider     AccountingProvider
+  accessToken  String // encrypted
+  refreshToken String // encrypted
+  realmId      String? // QBO company id
+  tenantId     String? // Xero tenant id
+  expiresAt    DateTime? // access-token expiry (drives silent refresh)
+  status       AccountingConnStatus @default(CONNECTED)
+  sandbox      Boolean             @default(false) // test-mode toggle
+  connectedAt  DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@unique([shopId, provider])
+}
+
+// F10 — one row per entity we try to push to the provider. Idempotent: unique
+// on (shop, provider, entity, localId) so a retry or double-checkout never
+// double-posts. `attempts` drives capped backoff.
+model AccountingSyncLog {
+  id        String             @id @default(cuid())
+  shopId    String
+  shop      Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  provider  AccountingProvider
+  entity    SyncEntity
+  localId   String // Mannon Invoice.id (or company/payment id)
+  remoteId  String? // provider-side id once created
+  status    SyncStatus         @default(PENDING)
+  attempts  Int                @default(0)
+  error     String? // last error message (never contains tokens/PII)
+  digested  Boolean            @default(false) // included in a failure digest already
+  createdAt DateTime           @default(now())
+  syncedAt  DateTime?
+  updatedAt DateTime           @updatedAt
+
+  @@unique([shopId, provider, entity, localId])
+  @@index([shopId, status])
+}
+
+// F10 — per-shop field mapping: Mannon tax classes → provider tax codes, the
+// default income account, and how to match/create the provider customer.
+model AccountingMap {
+  id                    String                @id @default(cuid())
+  shopId                String                @unique
+  shop                  Shop                  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  taxCodeMap            Json                  @default("{}") // { "<mannon tax class>": "<provider tax code>" }
+  accountMap            Json                  @default("{}") // { "income": "<account id>" }
+  customerMatchStrategy CustomerMatchStrategy @default(EMAIL)
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+}
+
+enum AccountingProvider {
+  QBO
+  XERO
+}
+
+enum AccountingConnStatus {
+  CONNECTED
+  EXPIRED
+  ERROR
+}
+
+enum SyncEntity {
+  INVOICE
+  PAYMENT
+  CUSTOMER
+}
+
+enum SyncStatus {
+  PENDING
+  SYNCED
+  FAILED
+}
+
+enum CustomerMatchStrategy {
+  EMAIL
+  NAME
 }
 
 // F9 — wholesale order controls: minimum order quantity, pack/case-size
@@ -642,6 +730,8 @@ enum EventType {
   ANALYTICS_VIEWED
   FOLLOWUP_SENT
   ORDER_RULE_APPLIED
+  ACCOUNTING_CONNECTED
+  INVOICE_SYNCED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
