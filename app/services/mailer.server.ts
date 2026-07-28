@@ -160,6 +160,16 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi,\n\n{{failed}} order export(s) to your ERP have failed after retries. Your Shopify orders are unaffected — this only concerns the ERP export.\n\nReview and retry them here:\n\n{{syncLogUrl}}\n\nThank you,\n{{shopName}}",
   },
+  quote_request_created: {
+    subject: "New quote request from {{email}}",
+    body:
+      "A new quote request came in from your storefront.\n\nFrom: {{email}}{{companyLine}}\nItems: {{itemCount}}\n\nReview and convert it to a quote in one click:\n\n{{requestUrl}}",
+  },
+  quote_request_ack: {
+    subject: "We got your quote request — {{shopName}}",
+    body:
+      "Hi,\n\nThanks for requesting a quote from {{shopName}}. We've received it and our team will get back to you shortly with pricing.\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

@@ -24,10 +24,12 @@ faithful mocks built in the container, which can't reach a store).
 | 14 | `f14-tax-vat.png` | F14 Tax & VAT | Company tax profile "VAT verified — exempt" + a quote showing the correct tax line | docs only (not in the reel) |
 | 15 | `f15-erp-sync.png` | F15 ERP Sync | ERP settings "Connected" + a two-way sync log (inbound stock / outbound orders) | core 8 (Growth · enterprise credibility) |
 | 16 | `f16-multi-currency-language.png` | F16 Multi-Currency & Language | Buyer portal in Arabic RTL priced in SAR | core 8 (GCC listing region) |
+| 17 | `f17-quote-widget.png` | F17 Quote Widget | Storefront PDP with the "Request a Quote" block + the resulting request in admin | core 8 · **reel opener** (funnel) |
 
 ## Reel order (extended cut)
 
-Opening → **F4** order pad · **F1** AI counter-offer (hero) · **F2** net-terms
-invoice · **F3** custom pricing · **F5** team approvals (closing) · **F6** wholesale
-sign-up (extended B-roll) · **F7** analytics (standalone 15s social cut). Keep the
-core store reel ≤ 60s — see `marketing/video-script.md`.
+Opening hook → **F17** Request-a-Quote on the storefront (funnel entry) · **F4**
+order pad · **F1** AI counter-offer (hero) · **F2** net-terms invoice · **F3**
+custom pricing · **F5** team approvals (closing) · **F6** wholesale sign-up
+(extended B-roll) · **F7** analytics (standalone 15s social cut). Keep the core
+store reel ≤ 60s — see `marketing/video-script.md`.

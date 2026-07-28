@@ -1,0 +1,41 @@
+{% comment %}
+  F17 — Mannon "Request a Quote" app block. Drop it on a product or cart section
+  from the theme editor. It loads async (never blocks the storefront), fetches
+  the merchant's widget config from Mannon, and posts submissions to the public
+  API. Product context is read from Liquid; no hidden-catalog data is exposed.
+{% endcomment %}
+
+<div
+  class="mannon-qw"
+  data-mannon-qw
+  data-shop="{{ shop.permanent_domain }}"
+  data-app-url="{{ block.settings.app_url | default: 'https://manosh.fly.dev' }}"
+  data-source="{% if template contains 'cart' %}CART{% else %}PDP{% endif %}"
+  {% if product %}
+    data-product-title="{{ product.title | escape }}"
+    data-variant-id="gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"
+    data-sku="{{ product.selected_or_first_available_variant.sku | escape }}"
+  {% endif %}
+  {% if customer %}data-customer-email="{{ customer.email | escape }}"{% endif %}
+  style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
+>
+  <button type="button" class="mannon-qw-btn" hidden data-mannon-qw-open>
+    {{ block.settings.label | default: 'Request a Quote' }}
+  </button>
+</div>
+
+<script src="{{ 'quote-widget.js' | asset_url }}" defer></script>
+{{ 'quote-widget.css' | asset_url | stylesheet_tag }}
+
+{% schema %}
+{
+  "name": "Request a Quote",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button label", "default": "Request a Quote" },
+    { "type": "color", "id": "accent", "label": "Accent colour", "default": "#4F46E5" },
+    { "type": "url", "id": "app_url", "label": "Mannon app URL (advanced)" }
+  ],
+  "presets": [{ "name": "Request a Quote" }]
+}
+{% endschema %}

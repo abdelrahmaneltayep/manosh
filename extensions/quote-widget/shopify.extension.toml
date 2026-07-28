@@ -1,0 +1,12 @@
+# F17 — Mannon "Request a Quote" theme app extension.
+# Merchants add the app block from the theme editor (Online Store → Customize)
+# on any product or cart section — no theme code editing.
+api_version = "2025-01"
+
+[[extensions]]
+name = "Request a Quote"
+handle = "quote-widget"
+type = "theme"
+
+  [extensions.capabilities]
+  block_only = true

@@ -43,6 +43,7 @@ const rows: Array<{ label: string; starter: string; growth: string }> = [
   { label: "Tax exemption & VAT/GST handling", starter: "Default rate + manual exempt", growth: "Regions + certificates + ID validation" },
   { label: "ERP & inventory sync (stock in, orders out)", starter: "—", growth: "✓ · Enterprise add-on: contact us" },
   { label: "Multi-currency & language (Arabic/RTL)", starter: "1 extra currency · EN + AR", growth: "Unlimited + contract rates" },
+  { label: "Storefront “Request a Quote” widget (no code)", starter: "PDP button + form", growth: "Cart + gated + custom fields" },
   { label: "Quote analytics (win rate, discount, time-to-close)", starter: "—", growth: "✓" },
   { label: "AI Quote Assistant (AI counter-offers)", starter: "—", growth: "✓" },
   { label: "Credit limits, aging dashboard & auto-reminders", starter: "—", growth: "✓" },

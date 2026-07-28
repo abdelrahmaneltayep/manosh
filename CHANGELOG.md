@@ -5,6 +5,30 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 17: Embedded "Request a Quote" Storefront Widget
+
+- **Top of funnel, no code.** A **theme app extension** (`extensions/quote-widget`)
+  adds a "Request a Quote" app block to any product or cart page — merchants add it
+  from the theme editor. It loads **async** (never blocks the storefront), fetches
+  its config, and posts to Mannon's public API.
+- **Public API, hardened.** `/api/quote-widget-config` (GET) and `/api/quote-request`
+  (POST) are CORS-enabled and public by design. Every submission is **validated +
+  escaped** server-side; anti-spam is a **honeypot** (shared with F6) + **rate limit**
+  + a **too-fast-submit** timer — spam gets a generic OK so bots learn nothing.
+- **One-click convert.** A `QuoteRequest` (NEW) converts to a real **F1 Quote** in
+  one click and enters the AI counter-offer flow. Known buyers reuse their company +
+  price list; unknown leads get a lightweight "lead" company (synthetic Shopify
+  company id, reconciled on first order). Lines resolve against the buyer's **F11
+  visible** catalog — a hidden SKU can never be quoted.
+- **Gated mode (Growth).** Restrict the button to already-approved (F6) wholesale
+  buyers; PDP form is on both plans, cart-level + custom fields + auto-prefill are
+  Growth (`quoteWidgetFeatures`).
+- **Plan gating.** Both plans (partial by capability). Event `QUOTE_REQUEST_CREATED`.
+  New editable templates: new-request notice (merchant) + acknowledgement (visitor).
+  Dark-launched behind `MANNON_FF_QUOTE_WIDGET` **and** a per-shop enable toggle.
+  Migration `f17_quote_widget`. Recommended high-activation onboarding nudge; the
+  storefront hook is promoted to **reel beat 1**. See `docs/quote-widget.md`.
+
 ### Added — Feature 16: Multi-Currency & Multi-Language (GCC-First)
 
 - **Their language, their currency.** Buyers see the portal in their locale

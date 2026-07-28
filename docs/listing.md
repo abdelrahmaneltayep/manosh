@@ -112,6 +112,11 @@ it orchestrates what Shopify already owns.
   blocked before checkout), and paid orders export automatically (webhook, SFTP,
   NetSuite, or custom) with a two-way sync log. Credentials encrypted; failures
   never block Shopify.
+- **“Request a Quote” storefront button — no code.** Add a theme app block to any
+  product or cart page and capture B2B leads straight into your quote pipeline —
+  convert a request to a real quote in one click. Gate it to approved wholesale
+  buyers (Growth); it never exposes hidden-catalog SKUs and loads async so it
+  never slows your storefront.
 - **Multi-currency & Arabic/RTL buyer portal.** Buyers see the portal in their
   language — Arabic is full RTL, not just translated text — and prices in their
   currency (Shopify Markets rates or your fixed contract rates). Every quote locks
@@ -167,6 +172,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Tax exemption & VAT/GST-correct invoices — GCC 15%/5%, EU VAT, US resale (regions + certificates on Growth)
 - ERP & inventory sync — real-time stock + order export, oversell guard (Growth plan)
 - Multi-currency & Arabic/RTL buyer portal — FX locked per quote (1 extra currency + EN/AR on Starter)
+- “Request a Quote” storefront button (theme app block, no code) — one-click convert to a quote
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -204,6 +210,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **“Request a Quote” storefront widget (no code):** add a theme app block to any
+  product or cart page to capture B2B leads directly from your storefront — convert
+  a request into a real quote (and the AI counter-offer flow) in one click. PDP form
+  on both plans; cart-level, gated-to-wholesale mode, and custom fields on Growth.
 - **Multi-currency & Arabic/RTL (GCC-first):** buyers get the portal in their
   language (Arabic = full RTL) and prices in their currency, with the FX rate
   **locked per quote** so a counter-offer never drifts. Starter includes one extra

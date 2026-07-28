@@ -267,6 +267,27 @@ export function erpSyncAllowed(plan: string | null | undefined): boolean {
   return plan === "GROWTH" || plan === GROWTH_PLAN;
 }
 
+// --- F17 storefront quote-widget gating --------------------------------------
+
+export interface QuoteWidgetFeatures {
+  /** The PDP button + basic form is on both plans. */
+  pdpForm: boolean;
+  /** Cart-level requests (whole cart → one quote). Growth. */
+  cartLevel: boolean;
+  /** Gate the button to approved wholesale buyers only. Growth. */
+  gatedMode: boolean;
+  /** Custom form fields. Growth. */
+  customFields: boolean;
+  /** Auto-prefill company/price-list for known buyers. Growth. */
+  autoPrefill: boolean;
+}
+
+/** Which quote-widget capabilities a plan unlocks. Both plans get the PDP form. Pure. */
+export function quoteWidgetFeatures(plan: string | null | undefined): QuoteWidgetFeatures {
+  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  return { pdpForm: true, cartLevel: isGrowth, gatedMode: isGrowth, customFields: isGrowth, autoPrefill: isGrowth };
+}
+
 // --- F16 i18n / multi-currency gating ----------------------------------------
 
 /**

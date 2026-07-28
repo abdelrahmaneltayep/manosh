@@ -53,6 +53,11 @@ model Shop {
   supportedLocales      Json? // F16: enabled locales, e.g. ["en","ar"]
   supportedCurrencies   Json? // F16: enabled currencies (besides the store default), e.g. ["SAR"]
   i18nStrings           Json? // F16: custom UI string overrides, keyed by locale (Growth)
+  quoteWidgetEnabled    Boolean                @default(false) // F17: storefront Request-a-Quote widget on/off
+  quoteWidgetLabel      String? // F17: button label (falls back to a default)
+  quoteWidgetGated      Boolean                @default(false) // F17: only approved wholesale buyers see it (Growth)
+  quoteWidgetCartEnabled Boolean               @default(false) // F17: cart-level requests (Growth)
+  quoteWidgetCustomFields Json? // F17: extra form fields (Growth)
   weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
   timezone              String? // F8: IANA tz for quiet-hours-safe follow-up sends
   installedAt           DateTime               @default(now())
@@ -77,8 +82,43 @@ model Shop {
   erpSyncLogs           ErpSyncLog[]
   stockOverrides        StockOverride[]
   currencyRates         CurrencyRate[]
+  quoteRequests         QuoteRequest[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F17 — a lead captured by the storefront "Request a Quote" widget (theme app
+// extension). Converts to a real F1 Quote in one click. Anonymous input is
+// validated + escaped; hidden-catalog SKUs (F11) are never exposed.
+model QuoteRequest {
+  id               String              @id @default(cuid())
+  shopId           String
+  shop             Shop                @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  source           QuoteRequestSource  @default(PDP)
+  email            String
+  companyName      String?
+  lines            Json // [{ variantId?, sku?, title?, quantity }]
+  note             String?
+  customFields     Json? // extra fields (Growth)
+  status           QuoteRequestStatus  @default(NEW)
+  convertedQuoteId String?             @unique // set on conversion → Quote.id
+  convertedQuote   Quote?              @relation("QuoteFromRequest", fields: [convertedQuoteId], references: [id], onDelete: SetNull)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([shopId, status])
+}
+
+enum QuoteRequestSource {
+  PDP
+  CART
+  WIDGET
+}
+
+enum QuoteRequestStatus {
+  NEW
+  CONVERTED
+  DECLINED
 }
 
 // F16 — an FX rate from `base` to `quote`. `source` = live Shopify Markets rate
@@ -888,6 +928,7 @@ model Quote {
   placedByRep    SalesRep?           @relation("QuotePlacedByRep", fields: [placedByRepId], references: [id], onDelete: SetNull)
   displayCurrency String? // F16: buyer-facing currency locked at issue time
   displayRate    Decimal?            @db.Decimal(18, 8) // F16: FX rate (store base -> displayCurrency) locked at issue
+  fromRequest    QuoteRequest?       @relation("QuoteFromRequest")
   lines          QuoteLine[]
   aiSuggestions  QuoteAiSuggestion[]
   followups      QuoteFollowup[]
@@ -1133,6 +1174,7 @@ enum EventType {
   STOCK_SYNCED
   ORDER_EXPORTED
   LOCALE_CHANGED
+  QUOTE_REQUEST_CREATED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
