@@ -20,6 +20,7 @@ faithful mocks built in the container, which can't reach a store).
 | 10 | `f10-accounting-sync.png` | F10 Accounting Sync | Accounting settings: "Connected to QuickBooks" + a green sync log | core 8 (Growth story) |
 | 11 | `f11-custom-catalogs.png` | F11 Custom Catalogs | Catalog builder with a "preview as customer" split view | core 8 (pairs with price lists) |
 | 12 | `f12-sales-rep-portal.png` | F12 Sales-Rep Portal | Rep view: assigned-accounts list + "ordering on behalf of Gulf Medical Supplies" banner | core 8 (Growth · sales-team story) |
+| 13 | `f13-flexible-payments.png` | F13 Flexible Payments | Order with a "30% deposit paid · balance due" schedule + a copy-able pay-link | core 8 (Growth · cashflow story) |
 
 ## Reel order (extended cut)
 

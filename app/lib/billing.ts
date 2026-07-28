@@ -231,6 +231,11 @@ export function repPortalAllowed(plan: string | null | undefined): boolean {
   return plan === "GROWTH" || plan === GROWTH_PLAN;
 }
 
+/** Flexible payments (deposits / installments / pay-by-link) are Growth-only. */
+export function flexPayAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
 /** Pure allowance decision for inviting another sales rep. */
 export function evaluateRepSeatAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
   return { allowed: used < cap, used, cap };

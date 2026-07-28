@@ -80,6 +80,16 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — flexible payments (Feature 13)
+
+> **VO:** "Take a deposit up front and send a secure pay-link for the balance —
+> big orders without the cashflow risk."
+>
+> **On screen:** An order with a **"30% deposit paid · balance due"** schedule;
+> the merchant clicks **Create pay-by-link** and copies it. Cut to the buyer's
+> **secure pay page** (Shopify checkout). _(Extended B-roll — also flag a **15s
+> social clip** on the cashflow angle; not part of the ≤60s store reel.)_
+
 ## Extended B-roll — sales-rep portal (Feature 12)
 
 > **VO:** "Your reps sell through Mannon — they see only their accounts and place

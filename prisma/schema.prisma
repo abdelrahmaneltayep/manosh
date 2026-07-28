@@ -46,6 +46,7 @@ model Shop {
   minMarginPct          Float                  @default(0.15) // AI Quote Assistant floor margin, fraction (0.15 = 15%)
   defaultTermsDays      Int                    @default(30) // F2: default net-terms days for new invoices
   emailTemplates        Json? // F2: editable invoice/reminder email templates (keyed by template id)
+  defaultDepositPct     Float? // F13: default deposit policy (fraction, e.g. 0.30 = 30%); null = none
   weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
   timezone              String? // F8: IANA tz for quiet-hours-safe follow-up sends
   installedAt           DateTime               @default(now())
@@ -694,12 +695,98 @@ model Quote {
   lines          QuoteLine[]
   aiSuggestions  QuoteAiSuggestion[]
   followups      QuoteFollowup[]
+  paymentPlan    PaymentPlan?
+  payLinks       PayLink[]
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
 
   @@index([companyId, status])
   @@index([status, expiresAt])
   @@index([placedByRepId])
+}
+
+// F13 — Flexible Payments. A payment plan for an accepted quote/order: full
+// deposit, an installment schedule, or a one-off pay-by-link. Mannon NEVER
+// stores card data — all capture runs through Shopify checkout / draft orders.
+// Amounts are server-authoritative (computed in app/lib/payments.ts).
+model PaymentPlan {
+  id           String              @id @default(cuid())
+  quoteId      String              @unique // the "order" is the accepted quote (+ its draftOrderId)
+  quote        Quote               @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  type         PaymentPlanType
+  depositPct   Decimal?            @db.Decimal(5, 4) // fraction, e.g. 0.3000 = 30%
+  schedule     Json? // snapshot of the requested schedule input (audit)
+  totalAmount  Decimal             @db.Decimal(18, 4)
+  currency     String
+  status       PaymentPlanStatus   @default(ACTIVE)
+  installments PaymentInstallment[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+// F13 — one scheduled payment within a plan (the deposit is installment #0).
+model PaymentInstallment {
+  id             String            @id @default(cuid())
+  paymentPlanId  String
+  paymentPlan    PaymentPlan       @relation(fields: [paymentPlanId], references: [id], onDelete: Cascade)
+  sortOrder      Int               @default(0)
+  label          String?
+  amount         Decimal           @db.Decimal(18, 4)
+  dueDate        DateTime
+  paidAt         DateTime?
+  status         InstallmentStatus @default(PENDING)
+  reminderStages Json? // stages already reminded (idempotent), e.g. ["DUE","OVERDUE"]
+  payLinks       PayLink[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([paymentPlanId])
+  @@index([status, dueDate])
+}
+
+// F13 — a tokenized, single-use, expiring pay-by-link for a specific amount.
+// Only the token HASH is stored (guardrail #7); the opaque token exists only in
+// the emailed URL. No amount/PII is ever placed in the URL beyond the token.
+model PayLink {
+  id            String              @id @default(cuid())
+  quoteId       String
+  quote         Quote               @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  installmentId String?
+  installment   PaymentInstallment? @relation(fields: [installmentId], references: [id], onDelete: SetNull)
+  tokenHash     String              @unique
+  amount        Decimal             @db.Decimal(18, 4)
+  currency      String
+  status        PayLinkStatus       @default(ACTIVE)
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime            @default(now())
+
+  @@index([quoteId])
+  @@index([tokenHash])
+}
+
+enum PaymentPlanType {
+  DEPOSIT
+  INSTALLMENTS
+  PAYLINK
+}
+
+enum PaymentPlanStatus {
+  ACTIVE
+  COMPLETED
+  OVERDUE
+}
+
+enum InstallmentStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum PayLinkStatus {
+  ACTIVE
+  PAID
+  EXPIRED
 }
 
 // F8 — a scheduled follow-up for a quote (reminder nudge, expiry warning, or the
@@ -842,6 +929,9 @@ enum EventType {
   CATALOG_ASSIGNED
   REP_INVITED
   ORDER_PLACED_ON_BEHALF
+  PAYMENT_PLAN_CREATED
+  INSTALLMENT_PAID
+  PAYLINK_PAID
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
