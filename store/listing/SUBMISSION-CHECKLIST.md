@@ -39,7 +39,8 @@ All copy is within Shopify's character limits — nothing over.
 | **Screenshot 4** | `screenshot-4.png` | 3200×1800 | Quote pipeline (sent→ordered) |
 | **Screenshot 5** | `screenshot-5.png` | 3200×1800 | Native net terms |
 | Brand review sheet | `logo-preview.png` | 2240×2862 | Internal reference (not submitted) |
-| **Demo video** | `Mannon-Demo-Video.mp4` | 1920×1080 · 78s · 5 MB | Within Shopify limits (≤30 MB, 1080p, 60–90s) |
+| **Demo video (public listing)** | `Mannon-Demo-Video.mp4` | 1920×1080 · 78s · 5 MB | Within Shopify limits (≤30 MB, 1080p, 60–90s) |
+| **Reviewer demo video (App Review)** | record per `Mannon-Reviewer-Demo-Script.md` | 1080p · ~7–9 min | Covers all 20 shipped features (F1–F20) + how to reach the gated ones. NOT the public reel. |
 
 > Screenshots are rendered at **3200×1800** (the 1600×900 design at deviceScaleFactor 2).
 > This exceeds Shopify's 1600×900 minimum at the exact 16:9 ratio. If you specifically
@@ -79,7 +80,7 @@ actually gates (`app/lib/billing.ts` → `GROWTH_FEATURES`, and the shipped rout
 | Starter: "Up to 50 active quotes/mo" | **No quote quota is implemented** — no 50/mo limit exists in code |
 | Growth-only: "AI Magic Order Pad" | The AI Order Pad ships to **all** plans (portal quick-order), not gated to Growth |
 | Growth-only: "reorder history" | Reorder is a **core** feature, not Growth-gated |
-| (not mentioned) | The app's actual Growth-gated features are **Quote Copilot** and **Reorder Radar** — and per `docs/self-review.md` these are hooks, not fully shipped |
+| (not mentioned) | **Superseded — this row predates the F1–F20 build.** The shipped, Growth-gated features are now real and testable: AI Quote Assistant (F1), Company accounts (F5), Quote analytics (F7), Accounting sync (F10), Sales-rep portal (F12), Flexible payments (F13), ERP sync (F15), Catalog sharing (F19), White-label/Agency (F20). Gates live in `app/lib/billing.ts`; the full plan/flag map is in `docs/go-live-checklist.md` and `Mannon-Reviewer-Demo-Script.md`. |
 
 **Action:** reconcile the copy with the product before submitting — either adjust
 the plan/feature split in the listing to match the shipped gates, or implement
