@@ -14,7 +14,7 @@ describe("plan limits (pure)", () => {
   });
 
   it("Starter is capped (50 quotes / 1 seat); Growth is unlimited / 5 seats", () => {
-    expect(PLAN_LIMITS.starter).toEqual({ activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1 });
+    expect(PLAN_LIMITS.starter).toEqual({ activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1, repSeatCap: 0 });
     expect(PLAN_LIMITS.growth.seatCap).toBe(5);
     expect(Number.isFinite(PLAN_LIMITS.growth.activeQuoteCap)).toBe(false);
   });

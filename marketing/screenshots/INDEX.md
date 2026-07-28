@@ -19,6 +19,7 @@ faithful mocks built in the container, which can't reach a store).
 | 9 | `f9-moq-rules.png` | F9 MOQ / Order Rules | Buyer order pad rounding qty 20→24 (case of 12) + a minimum-order progress bar | candidate (docs GIF) |
 | 10 | `f10-accounting-sync.png` | F10 Accounting Sync | Accounting settings: "Connected to QuickBooks" + a green sync log | core 8 (Growth story) |
 | 11 | `f11-custom-catalogs.png` | F11 Custom Catalogs | Catalog builder with a "preview as customer" split view | core 8 (pairs with price lists) |
+| 12 | `f12-sales-rep-portal.png` | F12 Sales-Rep Portal | Rep view: assigned-accounts list + "ordering on behalf of Gulf Medical Supplies" banner | core 8 (Growth · sales-team story) |
 
 ## Reel order (extended cut)
 

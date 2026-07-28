@@ -80,6 +80,17 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — sales-rep portal (Feature 12)
+
+> **VO:** "Your reps sell through Mannon — they see only their accounts and place
+> orders on behalf of buyers, all attributed back to them."
+>
+> **On screen:** The rep portal: an **assigned-accounts list**, then an
+> **"Ordering on behalf of Gulf Medical Supplies"** banner as the rep builds an
+> order. Cut to the merchant's **rep leaderboard** (quotes / orders / win rate).
+> _(Extended B-roll — also flag a **15s LinkedIn clip** on the sales-team angle;
+> not part of the ≤60s store reel.)_
+
 ## Extended B-roll — custom catalogs (Feature 11)
 
 > **VO:** "Every buyer sees their own catalog — assign it once, and the products

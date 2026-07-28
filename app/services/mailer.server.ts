@@ -105,6 +105,16 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi,\n\n{{failed}} invoice sync(s) to {{provider}} need your attention. Nothing was double-posted and your Shopify orders are unaffected.\n\nReview and retry them here:\n\n{{syncLogUrl}}\n\nThank you,\n{{shopName}}",
   },
+  rep_invite: {
+    subject: "You've been added as a sales rep for {{shopName}}",
+    body:
+      "Hi {{repName}},\n\nYou've been added as a sales rep for {{shopName}} on Mannon. Use this secure link to sign in — no password needed:\n\n{{inviteUrl}}\n\nYou'll see only the accounts assigned to you.\n\nThank you,\n{{shopName}}",
+  },
+  rep_order_placed: {
+    subject: "{{repName}} placed an order on your account",
+    body:
+      "Hi {{buyerName}},\n\nThis is a courtesy note that {{repName}} placed an order on behalf of {{companyName}} in your Mannon portal. If this wasn't expected, reply to let us know.\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;
