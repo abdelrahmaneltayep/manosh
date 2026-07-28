@@ -39,6 +39,7 @@ export default function App() {
         <Link to="/app/credit">Credit</Link>
         <Link to="/app/payments">Payments</Link>
         <Link to="/app/tax">Tax &amp; VAT</Link>
+        <Link to="/app/erp">ERP sync</Link>
         <Link to="/app/accounting">Accounting</Link>
         <Link to="/app/settings">Settings</Link>
       </NavMenu>

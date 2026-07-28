@@ -80,6 +80,16 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — ERP & inventory sync (Feature 15)
+
+> **VO:** "Stock and orders stay in sync with your ERP — sell what you actually
+> have, and every order lands in your system automatically."
+>
+> **On screen:** The ERP settings page showing **"Connected"** and a two-way sync
+> log (inbound stock ⬇ / outbound orders ⬆). Cut to an order pad where an
+> out-of-stock SKU is blocked. _(Extended B-roll — **enterprise angle only**; not
+> part of the ≤60s store reel.)_
+
 ## Docs screenshot only — tax & VAT (Feature 14)
 
 > **Not in the reel.** A docs/help screenshot only: a company tax profile showing

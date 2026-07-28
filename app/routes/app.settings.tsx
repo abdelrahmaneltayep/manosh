@@ -81,8 +81,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const repPortalEnabled = process.env.MANNON_FF_REP_PORTAL === "true";
   const flexPayEnabled = process.env.MANNON_FF_FLEX_PAY === "true";
   const taxVatEnabled = process.env.MANNON_FF_TAX_VAT === "true";
+  const erpEnabled = process.env.MANNON_FF_ERP_SYNC === "true";
 
-  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex] =
+  const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex, erpConnCount] =
     shopId
       ? await Promise.all([
           canCreateQuote(shopId),
@@ -94,8 +95,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           prisma.catalog.count({ where: { shopId, isDefault: false } }),
           prisma.salesRep.count({ where: { shopId } }),
           prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true, defaultTaxRate: true } }),
+          prisma.erpConnection.count({ where: { shopId } }),
         ])
-      : [null, null, [], {}, 0, 0, 0, 0, null];
+      : [null, null, [], {}, 0, 0, 0, 0, null, 0];
 
   const TEMPLATE_LABELS: Record<TemplateKey, string> = {
     invoice_issued: "Invoice issued",
@@ -124,6 +126,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     tax_verified: "Tax — verified",
     tax_rejected: "Tax — rejected",
     tax_cert_expiring: "Tax — certificate expiring",
+    erp_sync_failure: "ERP — sync failure digest",
   };
   const templates = (Object.keys(DEFAULT_TEMPLATES) as TemplateKey[]).map((key) => {
     const t = resolveTemplate(key, templateOverrides);
@@ -149,6 +152,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasDepositPolicy: shopFlex?.defaultDepositPct != null,
     taxVatEnabled,
     hasTaxRules: shopFlex?.defaultTaxRate != null,
+    erpEnabled,
+    hasErpConnection: erpConnCount > 0,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -415,6 +420,20 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Optional onboarding (Growth): connect ERP */}
+        {data.erpEnabled && data.plan === GROWTH_PLAN && !data.hasErpConnection && (
+          <Banner tone="info" title="Optional: connect your ERP">
+            <p>
+              Keep stock accurate and export orders to your ERP/WMS (webhook, SFTP,
+              NetSuite, or custom). Credentials are encrypted; sync failures never
+              block a Shopify order.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/erp">Connect your ERP</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Optional onboarding (Growth): invite sales reps */}
         {data.repPortalEnabled && data.plan === GROWTH_PLAN && !data.hasRep && (
           <Banner tone="info" title="Optional: invite your sales reps">
@@ -577,6 +596,17 @@ export default function Settings() {
                   Tax exemption &amp; VAT/GST
                 </Text>
                 <Badge tone="info">Basic on Starter · regions + certificates on Growth</Badge>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  ERP &amp; inventory sync
+                </Text>
+                <Badge tone="info">Growth</Badge>
+                {data.plan !== GROWTH_PLAN && (
+                  <Text as="span" variant="bodySm" tone="subdued">
+                    Real-time stock in, orders out (webhook / SFTP / NetSuite).
+                  </Text>
+                )}
               </InlineStack>
             </BlockStack>
 
