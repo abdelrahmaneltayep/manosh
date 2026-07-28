@@ -90,6 +90,16 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — publish a catalog, get discovered (Feature 19)
+
+> **VO:** "Publish a wholesale catalog as a branded page — share the link or get
+> listed — and new buyers request access. Prices stay hidden until you approve."
+>
+> **On screen:** A **branded public catalog page** with products and a **"Request
+> wholesale access"** button; cut to the merchant's **access-requests queue** where
+> one **Approve** click turns a lead into an approved buyer. _(Extended B-roll /
+> growth-marketing angle — not part of the ≤60s store reel.)_
+
 ## Extended B-roll — buyer app & one-tap reorder (Feature 18)
 
 > **VO:** "Reorder from your phone in one tap — your buyers add your store to

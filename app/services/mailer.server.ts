@@ -175,6 +175,16 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{buyerName}},\n\nAdd {{shopName}}'s wholesale portal to your phone's home screen and reorder your usual in one tap.\n\nOpen your portal, then choose “Add to Home Screen”:\n\n{{portalUrl}}\n\nThank you,\n{{shopName}}",
   },
+  catalog_lead_created: {
+    subject: "New wholesale access request — {{catalogTitle}}",
+    body:
+      "{{companyName}} ({{buyerEmail}}) requested wholesale access to your “{{catalogTitle}}” catalog.\n\nReview and approve them in Mannon → Catalog sharing. Approving provisions their account and unlocks their prices automatically.\n\n{{shopName}}",
+  },
+  catalog_access_approved: {
+    subject: "You're approved for wholesale — {{shopName}}",
+    body:
+      "Hi {{companyName}},\n\nYou're approved to buy wholesale from {{shopName}}. Your prices for “{{catalogTitle}}” are now unlocked.\n\nOpen your portal with this secure link — no password needed:\n\n{{portalUrl}}\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;
