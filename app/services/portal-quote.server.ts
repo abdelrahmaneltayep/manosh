@@ -112,6 +112,18 @@ export async function submitBuyerQuote(
     }
   }
 
+  // F15 — oversell guard: block a line whose quantity exceeds ERP-known stock
+  // before it becomes a quote/order. No signal → allowed; flag off → allowed.
+  if (process.env.MANNON_FF_ERP_SYNC === "true" && company) {
+    try {
+      const { checkStockForCart } = await import("./erp.server");
+      const stock = await checkStockForCart(company.shop.shopifyDomain, built.lines.map((l) => ({ variantId: l.variantId, quantity: l.quantity, sku: l.sku })));
+      if (!stock.ok) return { ok: false, error: stock.message ?? "One or more items are out of stock." };
+    } catch {
+      /* stock guard is best-effort — never hard-block on a lookup error */
+    }
+  }
+
   const quote = await submitQuote({
     companyId: buyer.companyId,
     buyerId: buyer.id,

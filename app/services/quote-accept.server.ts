@@ -209,5 +209,17 @@ export async function acceptAndOrder(
     }
   }
 
+  // F15 — queue the placed order for outbound ERP export (best-effort; a sync
+  // hiccup must never fail a placed order — it surfaces in the ERP sync log).
+  if (process.env.MANNON_FF_ERP_SYNC === "true") {
+    try {
+      const { enqueueOrderExport } = await import("./erp.server");
+      await enqueueOrderExport(quote.company.shopId, quoteId);
+    } catch (error) {
+      const { captureException } = await import("../lib/sentry.server");
+      captureException(error);
+    }
+  }
+
   return { quote: ordered, totals };
 }

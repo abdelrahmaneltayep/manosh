@@ -155,6 +155,11 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{buyerName}},\n\n{{companyName}}'s exemption certificate expires on {{expiresAt}}. Please upload a renewed certificate from your portal so your exemption continues without interruption.\n\nThank you,\n{{shopName}}",
   },
+  erp_sync_failure: {
+    subject: "{{failed}} ERP sync(s) need attention",
+    body:
+      "Hi,\n\n{{failed}} order export(s) to your ERP have failed after retries. Your Shopify orders are unaffected — this only concerns the ERP export.\n\nReview and retry them here:\n\n{{syncLogUrl}}\n\nThank you,\n{{shopName}}",
+  },
 };
 
 export type TemplateKey = keyof typeof DEFAULT_TEMPLATES;

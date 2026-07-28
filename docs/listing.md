@@ -107,6 +107,11 @@ it orchestrates what Shopify already owns.
   UAE 5%), EU VAT, and US resale. Buyers are charged tax until verified;
   certificates are stored privately. Growth adds per-region rules, ID validation,
   and compliant invoice numbering.
+- **ERP & inventory sync — stock that's always right (Growth).** Real-time stock
+  updates from your ERP/WMS feed an oversell guard (a SKU that's out of stock is
+  blocked before checkout), and paid orders export automatically (webhook, SFTP,
+  NetSuite, or custom) with a two-way sync log. Credentials encrypted; failures
+  never block Shopify.
 - **ROI dashboard.** See the revenue Mannon made you, quotes sent and accepted,
   reorders, and how fast you're quoting — all from your own activity.
 
@@ -154,6 +159,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Sales-rep portal: reps order & negotiate on behalf of buyers, scoped to their accounts (Growth plan)
 - Deposits, installments & pay-by-link — captured by Shopify checkout, no card data stored (Growth plan)
 - Tax exemption & VAT/GST-correct invoices — GCC 15%/5%, EU VAT, US resale (regions + certificates on Growth)
+- ERP & inventory sync — real-time stock + order export, oversell guard (Growth plan)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -191,6 +197,10 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **ERP & inventory sync (Growth):** real-time stock updates from your ERP/WMS
+  feed an oversell guard, and paid orders export automatically (webhook / SFTP /
+  NetSuite / custom) with a two-way, retryable sync log. Credentials are
+  encrypted; a sync failure never blocks a Shopify order.
 - **Tax exemption & VAT/GST handling:** collect exemption certificates and tax
   IDs, verify them, and apply the right tax at quote/checkout — GCC VAT (KSA 15% /
   UAE 5%), EU VAT, US resale. Default-taxed until verified; certificates stored

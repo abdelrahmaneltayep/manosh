@@ -69,8 +69,88 @@ model Shop {
   catalogs              Catalog[]
   salesReps             SalesRep[]
   taxRuleOverrides      TaxRuleOverride[]
+  erpConnection         ErpConnection?
+  erpSyncLogs           ErpSyncLog[]
+  stockOverrides        StockOverride[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F15 — a store's link to its ERP/WMS (webhook, SFTP, NetSuite, or custom).
+// Credentials are AES-256-GCM encrypted at rest (app/lib/crypto) and never
+// logged. `sourceOfTruth` decides who wins on a stock conflict. Growth-only.
+model ErpConnection {
+  id              String     @id @default(cuid())
+  shopId          String     @unique
+  shop            Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  kind            ErpKind
+  endpoint        String? // non-secret: outbound webhook URL / SFTP host / connector base
+  config          Json       @default("{}") // non-secret settings + field mapping
+  secretEncrypted String? // encrypted credentials (token / password / inbound secret)
+  sandbox         Boolean    @default(true) // dry-run / sandbox mode
+  sourceOfTruth   StockSource @default(SHOPIFY)
+  status          ErpStatus  @default(CONNECTED)
+  lastSyncAt      DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+// F15 — one row per sync attempt, in either direction. Outbound order exports
+// are deduped in code by (shop, direction, localId); `attempts` drives backoff.
+model ErpSyncLog {
+  id        String        @id @default(cuid())
+  shopId    String
+  shop      Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  direction SyncDirection
+  entity    String // "stock" | "order"
+  localId   String? // Mannon Quote.id (order) or variantId (stock)
+  remoteId  String? // ERP-side id once exported
+  status    SyncStatus    @default(PENDING)
+  attempts  Int           @default(0)
+  error     String? // last error (never contains credentials)
+  digested  Boolean       @default(false)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([shopId, status])
+  @@index([shopId, direction])
+}
+
+// F15 — the Mannon stock cache used by the oversell guard, MOQ (F9), and
+// catalogs (F11). One row per variant; `source` records who last set it.
+model StockOverride {
+  id        String      @id @default(cuid())
+  shopId    String
+  shop      Shop        @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  variantId String
+  source    StockSource
+  qty       Int
+  updatedAt DateTime    @updatedAt
+
+  @@unique([shopId, variantId])
+  @@index([shopId])
+}
+
+enum ErpKind {
+  WEBHOOK
+  SFTP
+  NETSUITE
+  CUSTOM
+}
+
+enum ErpStatus {
+  CONNECTED
+  ERROR
+}
+
+enum SyncDirection {
+  INBOUND_STOCK
+  OUTBOUND_ORDER
+}
+
+enum StockSource {
+  SHOPIFY
+  ERP
 }
 
 // F14 — a company's tax profile: their tax id, whether they're exempt, and the
@@ -991,6 +1071,9 @@ enum EventType {
   INSTALLMENT_PAID
   PAYLINK_PAID
   TAX_PROFILE_VERIFIED
+  ERP_CONNECTED
+  STOCK_SYNCED
+  ORDER_EXPORTED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

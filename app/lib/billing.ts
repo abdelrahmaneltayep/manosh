@@ -256,6 +256,13 @@ export function compliantInvoiceNumbering(plan: string | null | undefined): bool
   return plan === "GROWTH" || plan === GROWTH_PLAN;
 }
 
+// --- F15 ERP / inventory sync gating -----------------------------------------
+
+/** ERP / inventory sync (stock in, orders out) is Growth-only. Pure. */
+export function erpSyncAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
 /** Pure allowance decision for inviting another sales rep. */
 export function evaluateRepSeatAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
   return { allowed: used < cap, used, cap };

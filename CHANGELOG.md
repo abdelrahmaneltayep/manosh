@@ -5,6 +5,32 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 15: ERP / Inventory Sync — Real-Time Stock & Order Export (Growth)
+
+- **Stock in.** An ERP posts stock to `/internal/erp/stock` (per-connection secret,
+  JSON or `variant_id,qty` CSV) → Mannon's `StockOverride` cache. The
+  **oversell guard** (`checkStockForCart`, pure `oversellCheck`) then blocks any
+  quote/order line whose quantity exceeds ERP-known stock **before checkout** — no
+  signal for a variant means allowed (never block on missing data).
+  **Source-of-truth** is configurable (Shopify / ERP).
+- **Orders out.** A placed order (accepted quote) queues for outbound export
+  (idempotent per order — never double-posts), exported by `/internal/cron/erp`
+  (CRON_SECRET) with capped exponential backoff, parked **FAILED** with a **Retry**
+  button after the ceiling. **A sync failure never hard-blocks Shopify** — it
+  surfaces loudly in a two-way sync log. Connectors: webhook (live), SFTP /
+  NetSuite / custom (stubbed pending integration; the engine is tested via an
+  injected fake connector).
+- **Security + ops.** ERP credentials are **AES-256-GCM encrypted at rest**
+  (`MANNON_ENCRYPTION_KEY`, shared with F10) and never logged. Sandbox/dry-run
+  mode, a field-mapping (JSON) UI, a **sync-lag** alert (`syncLagExceeded`), and a
+  merchant **failure digest** (`erp_sync_failure`, not per-event spam). Retry /
+  backoff / digest helpers are shared with F10.
+- **Plan gating.** Growth-only (`erpSyncAllowed`); Starter sees "ERP & inventory
+  sync — upgrade to Growth" plus an **Enterprise sync add-on — contact us**
+  placeholder. Events `ERP_CONNECTED`, `STOCK_SYNCED`, `ORDER_EXPORTED`.
+  Dark-launched behind `MANNON_FF_ERP_SYNC`. Migration `f15_erp_sync` (reuses the
+  F10 `SyncStatus` enum). Optional onboarding nudge. See `docs/erp-sync.md`.
+
 ### Added — Feature 14: Tax Exemption & VAT/GST Handling
 
 - **Right tax, correct invoices.** Buyers submit a tax ID and/or an exemption

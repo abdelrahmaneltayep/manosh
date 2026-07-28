@@ -22,6 +22,7 @@ faithful mocks built in the container, which can't reach a store).
 | 12 | `f12-sales-rep-portal.png` | F12 Sales-Rep Portal | Rep view: assigned-accounts list + "ordering on behalf of Gulf Medical Supplies" banner | core 8 (Growth · sales-team story) |
 | 13 | `f13-flexible-payments.png` | F13 Flexible Payments | Order with a "30% deposit paid · balance due" schedule + a copy-able pay-link | core 8 (Growth · cashflow story) |
 | 14 | `f14-tax-vat.png` | F14 Tax & VAT | Company tax profile "VAT verified — exempt" + a quote showing the correct tax line | docs only (not in the reel) |
+| 15 | `f15-erp-sync.png` | F15 ERP Sync | ERP settings "Connected" + a two-way sync log (inbound stock / outbound orders) | core 8 (Growth · enterprise credibility) |
 
 ## Reel order (extended cut)
 
