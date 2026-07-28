@@ -7,6 +7,7 @@ import { isExpired } from "../services/quote.server";
 import { listReorderCards } from "../services/reorder.server";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate } from "../lib/format";
+import { PWA_ENABLED } from "../services/pwa.server";
 
 const ACCOUNTS_ENABLED = () => process.env.MANNON_FF_COMPANY_ACCOUNTS === "true";
 
@@ -33,6 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     name: buyer.name,
     company: buyer.company.name,
     showTeam: ACCOUNTS_ENABLED(),
+    showShortcuts: PWA_ENABLED(),
     reorderCards: reorderCards.map((card) => ({
       id: card.id,
       orderName: card.orderName,
@@ -49,7 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export default function PortalHome() {
-  const { email, name, company, quotes, reorderCards, showTeam } = useLoaderData<typeof loader>();
+  const { email, name, company, quotes, reorderCards, showTeam, showShortcuts } = useLoaderData<typeof loader>();
   return (
     <section className="portal-card">
       <h1>Welcome{name ? `, ${name}` : ""}</h1>
@@ -67,6 +69,11 @@ export default function PortalHome() {
         <Link to="/portal/invoices" className="portal-link">
           Your invoices
         </Link>
+        {showShortcuts && (
+          <Link to="/portal/shortcuts" className="portal-link">
+            One-tap reorder
+          </Link>
+        )}
         {showTeam && (
           <Link to="/portal/team" className="portal-link">
             Team

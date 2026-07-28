@@ -117,6 +117,11 @@ it orchestrates what Shopify already owns.
   convert a request to a real quote in one click. Gate it to approved wholesale
   buyers (Growth); it never exposes hidden-catalog SKUs and loads async so it
   never slows your storefront.
+- **Installable buyer app — one-tap mobile reorder.** Repeat buyers add your
+  wholesale portal to their phone's home screen and reorder their usual in one
+  tap — no app store, no login each time. Save common orders as shortcuts;
+  Growth adds opt-in push "time to reorder?" reminders and multi-bundle
+  shortcuts. Works offline-friendly and never breaks on older browsers.
 - **Multi-currency & Arabic/RTL buyer portal.** Buyers see the portal in their
   language — Arabic is full RTL, not just translated text — and prices in their
   currency (Shopify Markets rates or your fixed contract rates). Every quote locks
@@ -173,6 +178,7 @@ migrate — install, invite a buyer, and send your first quote.
 - ERP & inventory sync — real-time stock + order export, oversell guard (Growth plan)
 - Multi-currency & Arabic/RTL buyer portal — FX locked per quote (1 extra currency + EN/AR on Starter)
 - “Request a Quote” storefront button (theme app block, no code) — one-click convert to a quote
+- Installable buyer app (PWA): add to home screen + one-tap mobile reorder (push reminders + saved bundles on Growth)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
 - Order-pad CSV upload + unlimited saved lists (Growth plan)
@@ -210,6 +216,11 @@ the **AI Quote Assistant** (AI counter-offers).
 
 ## What's new
 
+- **Installable buyer app + one-tap reorder:** repeat buyers add your wholesale
+  portal to their phone's home screen and reorder their usual in one tap — no app
+  store, no re-login. Save common orders as shortcuts. Install + one-tap reorder on
+  both plans; opt-in push "time to reorder?" reminders and multi-bundle shortcuts on
+  Growth. Progressive enhancement — never breaks the portal on older browsers.
 - **“Request a Quote” storefront widget (no code):** add a theme app block to any
   product or cart page to capture B2B leads directly from your storefront — convert
   a request into a real quote (and the AI counter-offer flow) in one click. PDP form

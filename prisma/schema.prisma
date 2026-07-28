@@ -109,6 +109,33 @@ model QuoteRequest {
   @@index([shopId, status])
 }
 
+// F18 — a buyer's Web Push subscription (installable PWA). Opt-in only; stores
+// just the endpoint + keys needed to deliver a "time to reorder?" nudge (Growth).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  memberId  String
+  member    Buyer    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  keys      Json // { p256dh, auth }
+  createdAt DateTime @default(now())
+
+  @@index([memberId])
+}
+
+// F18 — a saved "usual order" bundle for one-tap reorder. Capped per plan
+// (Starter 1 / Growth unlimited).
+model ReorderShortcut {
+  id        String   @id @default(cuid())
+  memberId  String
+  member    Buyer    @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  label     String
+  lines     Json // [{ variantId, quantity }]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([memberId])
+}
+
 enum QuoteRequestSource {
   PDP
   CART
@@ -865,6 +892,8 @@ model Buyer {
   decidedApprovals         OrderApproval[] @relation("ApprovalApprover")
   catalogAssignments       CatalogAssignment[]
   localePreference         LocalePreference?
+  pushSubscriptions        PushSubscription[]
+  reorderShortcuts         ReorderShortcut[]
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt
 
@@ -1175,6 +1204,8 @@ enum EventType {
   ORDER_EXPORTED
   LOCALE_CHANGED
   QUOTE_REQUEST_CREATED
+  PWA_INSTALLED
+  REORDER_ONECLICK
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

@@ -104,14 +104,16 @@ export interface PlanLimits {
   extraCurrencyCap: number;
   /** F16: maximum enabled locales. Starter = 2 (EN + AR). */
   localeCap: number;
+  /** F18: saved one-tap reorder shortcuts per buyer. Starter = 1. */
+  reorderShortcutCap: number;
 }
 
 /** How far back the "active quotes" window looks. */
 export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
-  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1, repSeatCap: 0, extraCurrencyCap: 1, localeCap: 2 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity, repSeatCap: 3, extraCurrencyCap: Infinity, localeCap: 3 },
+  starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1, repSeatCap: 0, extraCurrencyCap: 1, localeCap: 2, reorderShortcutCap: 1 },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity, repSeatCap: 3, extraCurrencyCap: Infinity, localeCap: 3, reorderShortcutCap: Infinity },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**
@@ -265,6 +267,25 @@ export function compliantInvoiceNumbering(plan: string | null | undefined): bool
 /** ERP / inventory sync (stock in, orders out) is Growth-only. Pure. */
 export function erpSyncAllowed(plan: string | null | undefined): boolean {
   return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+// --- F18 buyer PWA gating ----------------------------------------------------
+// The installable PWA + one-tap reorder is on BOTH plans. Web-push reorder
+// reminders and multiple saved shortcut bundles are Growth.
+
+/** Web-push reorder reminders are Growth-only. Pure. */
+export function pushRemindersAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** Pure allowance decision for saving another reorder shortcut. */
+export function evaluateShortcutAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
+  return { allowed: used < cap, used, cap };
+}
+
+/** Buyer-facing copy when the shortcut cap is hit. */
+export function shortcutCapMessage(cap: number): string {
+  return `This store's plan allows ${cap} saved reorder shortcut. Ask them to upgrade for unlimited saved bundles.`;
 }
 
 // --- F17 storefront quote-widget gating --------------------------------------

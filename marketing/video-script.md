@@ -90,6 +90,16 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Extended B-roll — buyer app & one-tap reorder (Feature 18)
+
+> **VO:** "Reorder from your phone in one tap — your buyers add your store to
+> their home screen and their usual order is one tap away."
+>
+> **On screen:** A **phone home screen** with the **Mannon app icon**; a tap opens
+> the portal straight to a **"One-tap reorder"** screen, and a saved shortcut
+> **"Monthly reorder"** turns into a quote in a single tap. _(Extended B-roll /
+> mobile social clip — not part of the ≤60s store reel.)_
+
 ## Extended B-roll — multi-currency & language (Feature 16)
 
 > **VO:** "Your buyers, their language and currency — an Arabic buyer sees the
