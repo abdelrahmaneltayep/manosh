@@ -15,6 +15,98 @@ thorough and utilitarian — unlike the ≤60s public reel
 
 ---
 
+## Recorded core video — status: ✅ submission-ready
+
+`mannonscreencast.mp4` (1920×1080 · 30fps · **3:16** · 12 MB · audio mean −25 dB /
+peak −5.2 dB — no loud noise). Recorded on the live app (`manosh.fly.dev`), embedded
+Polaris/App Bridge. It satisfies **all five of Shopify's required screencast points**:
+
+| Shopify point | Shown at |
+|---|---|
+| 1. Install / onboarding (provisions shop → dashboard) | ~0:40 |
+| 2. Merchant: new quote → products → **Net 30** → send (priced on a Shopify draft order) | ~0:55 |
+| 3. Customer: passwordless magic-link portal → **Accept** (+ explicit confirm step) | ~1:30 |
+| 4. Becomes a real Shopify **draft order** → one-tap **reorder** → **AI Order Pad** | ~2:15 |
+| 5. No loud background noise | audio verified |
+
+**Coverage note:** the video deep-demos the core loop (F1-core, F4 order pad, net
+terms, reorder). The other ~15 Growth-gated features are **not** on screen — that's
+acceptable for the Screencast field, because the **App testing information** block
+below tells reviewers exactly how to reach and test them.
+
+## The Screencast URL field — how to unblock it
+
+The field wants a **hosted, streaming URL** (you can't upload the file, and
+screenshots don't satisfy it):
+1. Upload `mannonscreencast.mp4` to **Loom** (easiest — instant share URL), **YouTube
+   (Unlisted)**, or **Vimeo**. Avoid a raw Google-Drive file link (reviewers want
+   streaming).
+2. Paste that URL into **Screencast URL** under *App testing information*.
+3. Paste the block below into the **testing instructions** next to it.
+
+### App testing information — paste-ready
+
+```
+Screencast URL: <hosted Loom/YouTube-unlisted/Vimeo link>
+
+Test store:  ______.myshopify.com
+Login:       ______ (staff account or collaborator request code)
+
+What the video shows (3:16): install → create a quote with Net 30 terms → the buyer
+accepts from a passwordless magic-link portal → it becomes a real Shopify draft
+order → one-tap reorder → the AI Magic Order Pad parsing a pasted list. The app
+never computes money — all totals/tax come from Shopify's draftOrderCalculate.
+
+Testing the full feature set: this store is on the GROWTH plan (dev-store charges
+are free) with all feature flags enabled, so every feature is reachable. Use this
+map to find each one in the admin nav / buyer portal:
+
+- AI Quote Assistant ....... Quotes → open a quote → AI counter panel (Growth)
+- Net terms + credit ....... Credit
+- Price lists .............. Price lists  (buyer sees "you save X%")
+- Quick / AI order pad ..... Buyer portal → Order pad
+- Company accounts ........ Buyers / Team (Growth)
+- Wholesale registration .. Wholesale  ·  public form at /apply/{shop}
+- Quote analytics ......... Analytics (Growth)
+- Follow-ups & expiry ..... Follow-ups
+- MOQ / order rules ....... Order rules
+- Accounting sync ......... Accounting (Growth)
+- Custom catalogs ......... Catalogs ("preview as customer")
+- Sales-rep portal ........ Reps (Growth)
+- Flexible payments ....... Payments (Growth)
+- Tax / VAT ............... Tax & VAT
+- ERP / inventory sync .... ERP sync (Growth)
+- Multi-currency/language . Languages  ·  switch the portal to Arabic (RTL)
+- Storefront quote widget . Requests  ·  theme app block on a product page
+- Buyer PWA / one-tap ..... Buyer portal → One-tap reorder ("Add to Home Screen")
+- Catalog sharing ......... Catalog sharing  ·  public page /catalog/{shop}/{slug}  ·  /discover (Growth)
+- White-label / agency .... Agency (Growth)
+
+To see the Starter-locked state, open Settings → Plan and note the upgrade CTAs.
+Compliance: 3 GDPR webhooks + app/uninstalled (HMAC-401), minimal scopes, live
+privacy policy at https://manosh.fly.dev/privacy.
+```
+
+## Optional — v2 that showcases the gated features (only if you want depth on camera)
+
+Keep the current 3:16 as the spine, then append ~3 min (target ≤ 8 min total)
+recording these marquee gated features, in this order:
+
+1. **F1 AI Quote Assistant** — in a quote, AI counter + margin read → confirm.
+2. **F3 Price lists** — buyer portal shows "you save X%".
+3. **F11 Custom catalogs** — "preview as customer"; a hidden SKU never appears.
+4. **F7 Quote analytics** — win rate / discount / time-to-close dashboard.
+5. **F13 Flexible payments** — deposit % + a copy-able pay-link (Shopify checkout).
+6. **F17 Storefront widget** — theme block → request → convert to a quote.
+7. **F16 Arabic RTL** — portal flips right-to-left, prices in SAR.
+8. **F19 Catalog sharing** — public catalog (prices hidden) → request access → approve → prices unlock.
+9. **F20 Agency / white-label** — 2-store rollup → switch → one store's portal in a client's brand; admin stays Mannon.
+
+Not required to pass review — the paste-ready instructions above already route
+reviewers to every feature.
+
+---
+
 ## 0. Reviewer test setup (read before watching / put in "Testing instructions")
 
 **Test store:** `______.myshopify.com` (fill in) · **App URL:** `https://manosh.fly.dev`
