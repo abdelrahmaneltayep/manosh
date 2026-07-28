@@ -82,6 +82,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const flexPayEnabled = process.env.MANNON_FF_FLEX_PAY === "true";
   const taxVatEnabled = process.env.MANNON_FF_TAX_VAT === "true";
   const erpEnabled = process.env.MANNON_FF_ERP_SYNC === "true";
+  const i18nEnabled = process.env.MANNON_FF_I18N === "true";
 
   const [quoteAllowance, seatAllowance, seats, templateOverrides, creditProfileCount, accountingConnCount, customCatalogCount, repCount, shopFlex, erpConnCount] =
     shopId
@@ -94,7 +95,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           prisma.accountingConnection.count({ where: { shopId } }),
           prisma.catalog.count({ where: { shopId, isDefault: false } }),
           prisma.salesRep.count({ where: { shopId } }),
-          prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true, defaultTaxRate: true } }),
+          prisma.shop.findUnique({ where: { id: shopId }, select: { defaultDepositPct: true, defaultTaxRate: true, supportedLocales: true, supportedCurrencies: true } }),
           prisma.erpConnection.count({ where: { shopId } }),
         ])
       : [null, null, [], {}, 0, 0, 0, 0, null, 0];
@@ -154,6 +155,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasTaxRules: shopFlex?.defaultTaxRate != null,
     erpEnabled,
     hasErpConnection: erpConnCount > 0,
+    i18nEnabled,
+    hasI18nSetup: ((shopFlex?.supportedLocales as string[] | null)?.length ?? 0) > 1 || ((shopFlex?.supportedCurrencies as string[] | null)?.length ?? 0) > 0,
     templates,
     plan: status.plan,
     onTrial: status.onTrial,
@@ -393,6 +396,20 @@ export default function Settings() {
           </Banner>
         )}
 
+        {/* Optional onboarding: add currencies & languages */}
+        {data.i18nEnabled && !data.hasI18nSetup && (
+          <Banner tone="info" title="Optional: add currencies & languages">
+            <p>
+              Sell across borders — let buyers see the portal in their language
+              (Arabic is full RTL) and prices in their currency, with FX locked per
+              quote.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url="/app/i18n">Add currencies &amp; languages</Button>
+            </Box>
+          </Banner>
+        )}
+
         {/* Recommended onboarding: set your tax rules */}
         {data.taxVatEnabled && !data.hasTaxRules && (
           <Banner tone="info" title="Recommended: set your tax rules">
@@ -607,6 +624,12 @@ export default function Settings() {
                     Real-time stock in, orders out (webhook / SFTP / NetSuite).
                   </Text>
                 )}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="span" variant="bodySm" fontWeight="semibold">
+                  Multi-currency &amp; language (Arabic/RTL)
+                </Text>
+                <Badge tone="info">1 extra currency + EN/AR on Starter · unlimited + contract rates on Growth</Badge>
               </InlineStack>
             </BlockStack>
 

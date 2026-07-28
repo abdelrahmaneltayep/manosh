@@ -108,6 +108,8 @@ export async function submitQuote(input: {
   poReference?: string | null;
   expiryDays?: number;
   placedByRepId?: string | null;
+  displayCurrency?: string | null;
+  displayRate?: string | null;
   now?: Date;
 }): Promise<QuoteWithLines> {
   const now = input.now ?? new Date();
@@ -130,6 +132,8 @@ export async function submitQuote(input: {
         expiresAt,
         poReference: input.poReference ?? null,
         placedByRepId: input.placedByRepId ?? null,
+        displayCurrency: input.displayCurrency ?? null,
+        displayRate: input.displayRate ?? null,
         lines: {
           create: input.lines.map((line) => ({
             variantId: line.variantId,

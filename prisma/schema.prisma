@@ -49,6 +49,10 @@ model Shop {
   defaultDepositPct     Float? // F13: default deposit policy (fraction, e.g. 0.30 = 30%); null = none
   defaultTaxRate        Float? // F14: single default tax rate (fraction, e.g. 0.15 = 15%); reference/display
   invoiceSeq            Int                    @default(0) // F14: compliant invoice number sequence (Growth)
+  defaultLocale         String                 @default("en") // F16: store default locale
+  supportedLocales      Json? // F16: enabled locales, e.g. ["en","ar"]
+  supportedCurrencies   Json? // F16: enabled currencies (besides the store default), e.g. ["SAR"]
+  i18nStrings           Json? // F16: custom UI string overrides, keyed by locale (Growth)
   weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
   timezone              String? // F8: IANA tz for quiet-hours-safe follow-up sends
   installedAt           DateTime               @default(now())
@@ -72,8 +76,57 @@ model Shop {
   erpConnection         ErpConnection?
   erpSyncLogs           ErpSyncLog[]
   stockOverrides        StockOverride[]
+  currencyRates         CurrencyRate[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F16 — an FX rate from `base` to `quote`. `source` = live Shopify Markets rate
+// or a merchant-set fixed rate (contract pricing). A quote locks its rate at
+// issue time (Quote.displayRate) so a counter-offer never drifts with FX.
+model CurrencyRate {
+  id        String     @id @default(cuid())
+  shopId    String
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  base      String // ISO 4217, e.g. "USD"
+  quote     String // ISO 4217, e.g. "SAR"
+  rate      Decimal    @db.Decimal(18, 8)
+  source    RateSource @default(MANUAL)
+  updatedAt DateTime   @updatedAt
+
+  @@unique([shopId, base, quote])
+  @@index([shopId])
+}
+
+// F16 — a buyer's (company or member) locale + currency preference. Resolution
+// order: member > company > store default.
+model LocalePreference {
+  id        String   @id @default(cuid())
+  companyId String?  @unique
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  memberId  String?  @unique
+  member    Buyer?   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  locale    String
+  currency  String
+  updatedAt DateTime @updatedAt
+}
+
+// F16 — an optional per-currency price override for an F3 price-list entry, so a
+// merchant can set exact contract prices per currency (no FX math). Growth.
+model PriceListCurrencyOverride {
+  id          String         @id @default(cuid())
+  entryId     String
+  entry       PriceListEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  currency    String
+  price       Decimal        @db.Decimal(18, 4)
+
+  @@unique([entryId, currency])
+  @@index([entryId])
+}
+
+enum RateSource {
+  SHOPIFY
+  MANUAL
 }
 
 // F15 — a store's link to its ERP/WMS (webhook, SFTP, NetSuite, or custom).
@@ -549,11 +602,12 @@ model PriceList {
 
 // A per-variant fixed price within a list.
 model PriceListEntry {
-  id          String    @id @default(cuid())
-  priceListId String
-  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
-  variantId   String // gid://shopify/ProductVariant/...
-  price       Decimal   @db.Decimal(18, 4)
+  id                String                      @id @default(cuid())
+  priceListId       String
+  priceList         PriceList                   @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  variantId         String // gid://shopify/ProductVariant/...
+  price             Decimal                     @db.Decimal(18, 4)
+  currencyOverrides PriceListCurrencyOverride[]
 
   @@unique([priceListId, variantId])
   @@index([priceListId])
@@ -644,6 +698,7 @@ model Company {
   catalogAssignments CatalogAssignment[]
   repAssignments    RepAssignment[]
   taxProfile        TaxProfile?
+  localePreference  LocalePreference?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -769,6 +824,7 @@ model Buyer {
   requestedApprovals       OrderApproval[] @relation("ApprovalRequester")
   decidedApprovals         OrderApproval[] @relation("ApprovalApprover")
   catalogAssignments       CatalogAssignment[]
+  localePreference         LocalePreference?
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt
 
@@ -830,6 +886,8 @@ model Quote {
   reminderState  Json? // F8: per-quote follow-up state ({ unsubscribed, nudgesSent, overrideCadence })
   placedByRepId  String? // F12: the sales rep who placed/negotiated this on behalf of the buyer
   placedByRep    SalesRep?           @relation("QuotePlacedByRep", fields: [placedByRepId], references: [id], onDelete: SetNull)
+  displayCurrency String? // F16: buyer-facing currency locked at issue time
+  displayRate    Decimal?            @db.Decimal(18, 8) // F16: FX rate (store base -> displayCurrency) locked at issue
   lines          QuoteLine[]
   aiSuggestions  QuoteAiSuggestion[]
   followups      QuoteFollowup[]
@@ -1074,6 +1132,7 @@ enum EventType {
   ERP_CONNECTED
   STOCK_SYNCED
   ORDER_EXPORTED
+  LOCALE_CHANGED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
