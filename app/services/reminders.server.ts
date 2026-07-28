@@ -1,6 +1,7 @@
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { daysOverdue } from "../lib/aging";
+import { formatInvoiceNumber, legacyInvoiceNumber } from "../lib/tax";
 import {
   isMailerConfigured,
   renderTemplate,
@@ -97,7 +98,7 @@ export async function runRemindersForShop(
       const template = resolveTemplate(KIND_TO_TEMPLATE[stage], shop.emailTemplates);
       const { subject, body } = renderTemplate(template, {
         buyerName: buyer.name ?? "there",
-        invoiceNumber: invoice.id.slice(-8).toUpperCase(),
+        invoiceNumber: invoice.sequenceNo != null ? formatInvoiceNumber(invoice.sequenceNo) : legacyInvoiceNumber(invoice.id),
         amount: `${invoice.currency} ${Number(invoice.amount).toFixed(2)}`,
         dueDate: invoice.dueDate.toISOString().slice(0, 10),
         invoiceUrl: `/portal/invoices/${invoice.id}`,

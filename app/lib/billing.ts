@@ -236,6 +236,26 @@ export function flexPayAllowed(plan: string | null | undefined): boolean {
   return plan === "GROWTH" || plan === GROWTH_PLAN;
 }
 
+// --- F14 tax / VAT gating ----------------------------------------------------
+// Basic tax (single default rate + a manual per-company exempt toggle) is on
+// BOTH plans. Growth adds the certificate workflow, tax-ID validation, per-region
+// rules, and compliant invoice numbering.
+
+/** Per-region tax rules are Growth-only. Pure. */
+export function taxRegionsAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** The certificate + verification workflow (and ID validation) is Growth-only. Pure. */
+export function taxCertWorkflowAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** Compliant sequential invoice numbering is Growth-only. Pure. */
+export function compliantInvoiceNumbering(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
 /** Pure allowance decision for inviting another sales rep. */
 export function evaluateRepSeatAllowance(used: number, cap: number): { allowed: boolean; used: number; cap: number } {
   return { allowed: used < cap, used, cap };

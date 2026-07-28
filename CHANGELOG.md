@@ -5,6 +5,31 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 14: Tax Exemption & VAT/GST Handling
+
+- **Right tax, correct invoices.** Buyers submit a tax ID and/or an exemption
+  certificate from their portal; the merchant reviews and verifies. A
+  **verified-exempt** buyer gets tax removed at checkout — Mannon sets the draft
+  order's `taxExempt` flag and **Shopify zeroes the tax** (guardrail #1: we never
+  compute tax). Verified-taxable buyers get Shopify's correct VAT lines plus a
+  **compliant sequential invoice number** (Growth).
+- **Default-taxed until verified.** The `resolveTaxTreatment` decision (pure,
+  unit-tested) never exempts an unverified or rejected profile — an upload never
+  auto-exempts. Region `exemptByDefault` is an explicit merchant policy.
+- **Certificates stored privately.** Uploaded certificates live in private storage
+  (DB bytes, never a public URL) and download **only** through an authenticated
+  admin route. Time-limited certs get expiry reminders
+  (`/internal/cron/tax-reminders`, idempotent).
+- **ID validation** (Growth): format checks for EU VIES-style + **KSA 15-digit**
+  VAT, India GSTIN, ABN (checksum), and EIN.
+- **Plan gating (partial).** Both plans get a single default rate + a manual
+  per-company exempt toggle; Growth adds **per-region rules**, the certificate +
+  verification workflow, ID validation, and compliant invoice numbering
+  (`taxRegionsAllowed` / `taxCertWorkflowAllowed` / `compliantInvoiceNumbering`).
+  Event `TAX_PROFILE_VERIFIED`. New templates: documents received / verified /
+  rejected / expiring. Dark-launched behind `MANNON_FF_TAX_VAT`. Migration
+  `f14_tax_vat`. Recommended onboarding nudge. See `docs/tax-vat.md`.
+
 ### Added — Feature 13: Flexible Payments — Deposits, Partial Pay & Pay-by-Link (Growth)
 
 - **Beyond net terms.** On an accepted order the merchant picks **deposit +

@@ -102,10 +102,25 @@ export async function acceptAndOrder(
     }
   }
 
+  // F14 — a verified-exempt buyer gets tax removed at checkout. We only set the
+  // flag; Shopify zeroes the tax (we never compute it). Best-effort: a lookup
+  // hiccup must never block the order, so it falls back to taxed.
+  let taxExempt = false;
+  if (process.env.MANNON_FF_TAX_VAT === "true") {
+    try {
+      const { isCompanyTaxExempt } = await import("./tax.server");
+      taxExempt = await isCompanyTaxExempt(quote.companyId);
+    } catch (error) {
+      const { captureException } = await import("../lib/sentry.server");
+      captureException(error);
+    }
+  }
+
   const input = buildDraftOrderInput({
     currencyCode: options.currencyCode,
     poReference: quote.poReference,
     paymentTermsTemplateId: options.paymentTermsTemplateId,
+    taxExempt,
     purchasingEntity: {
       companyId: quote.company.shopifyCompanyId,
       companyLocationId,

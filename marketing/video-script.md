@@ -80,6 +80,12 @@ over dialogue.
 > with the first nudge marked sent; cut to the buyer's email with **Accept /
 > Counter** buttons. _(Extended cut only — keep the core reel ≤ 60s.)_
 
+## Docs screenshot only — tax & VAT (Feature 14)
+
+> **Not in the reel.** A docs/help screenshot only: a company tax profile showing
+> **"VAT verified — exempt"** and a quote with the correct tax line (GCC 15%/5%,
+> EU VAT, US resale). No VO/beat — keep the store reel ≤ 60s.
+
 ## Extended B-roll — flexible payments (Feature 13)
 
 > **VO:** "Take a deposit up front and send a secure pay-link for the balance —

@@ -41,6 +41,19 @@ export async function createInvoiceForOrder(input: CreateInvoiceInput): Promise<
   }
 
   const amount = typeof input.amount === "number" ? input.amount.toFixed(4) : input.amount;
+
+  // F14 — allocate a compliant sequential invoice number (Growth + flag on).
+  // Best-effort: numbering must never block invoice creation.
+  let sequenceNo: number | null = null;
+  try {
+    const { allocateInvoiceNumber } = await import("./tax.server");
+    const shop = await prisma.shop.findUnique({ where: { id: input.shopId }, select: { plan: true } });
+    const allocated = await allocateInvoiceNumber(input.shopId, shop?.plan ?? null);
+    sequenceNo = allocated?.sequenceNo ?? null;
+  } catch {
+    /* fall back to the id-based number */
+  }
+
   const invoice = await prisma.invoice.create({
     data: {
       companyId: input.companyId,
@@ -49,6 +62,7 @@ export async function createInvoiceForOrder(input: CreateInvoiceInput): Promise<
       amount,
       currency: input.currency,
       status: "OPEN",
+      sequenceNo,
       issuedAt: now,
       dueDate: computeDueDate(now, input.termsDays),
     },

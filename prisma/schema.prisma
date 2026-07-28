@@ -47,6 +47,8 @@ model Shop {
   defaultTermsDays      Int                    @default(30) // F2: default net-terms days for new invoices
   emailTemplates        Json? // F2: editable invoice/reminder email templates (keyed by template id)
   defaultDepositPct     Float? // F13: default deposit policy (fraction, e.g. 0.30 = 30%); null = none
+  defaultTaxRate        Float? // F14: single default tax rate (fraction, e.g. 0.15 = 15%); reference/display
+  invoiceSeq            Int                    @default(0) // F14: compliant invoice number sequence (Growth)
   weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
   timezone              String? // F8: IANA tz for quiet-hours-safe follow-up sends
   installedAt           DateTime               @default(now())
@@ -66,8 +68,62 @@ model Shop {
   accountingMap         AccountingMap?
   catalogs              Catalog[]
   salesReps             SalesRep[]
+  taxRuleOverrides      TaxRuleOverride[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// F14 — a company's tax profile: their tax id, whether they're exempt, and the
+// verification state. Default-taxed until VERIFIED (guardrail): an unverified
+// upload never auto-exempts. Certificate bytes are stored privately (in the DB,
+// never a public URL) and downloadable only through an authenticated admin route.
+model TaxProfile {
+  id                   String        @id @default(cuid())
+  companyId            String        @unique
+  company              Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  taxId                String?
+  taxIdType            TaxIdType     @default(OTHER)
+  exempt               Boolean       @default(false)
+  status               TaxStatus     @default(UNVERIFIED)
+  verifiedAt           DateTime?
+  rejectedReason       String?
+  certificateName      String?
+  certificateType      String? // MIME type
+  certificateData      Bytes? // private storage — never exposed via a public URL
+  certificateExpiresAt DateTime? // time-limited certs → expiry reminders
+  certExpiryRemindedAt DateTime? // idempotency guard for expiry reminder emails
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+}
+
+// F14 — per-region tax rule override (Growth). Reference rate + a policy flag to
+// treat a whole region as exempt by default. Mannon never COMPUTES tax — Shopify
+// does; these drive the draft-order taxExempt flag + display, not a calculation.
+model TaxRuleOverride {
+  id              String   @id @default(cuid())
+  shopId          String
+  shop            Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  region          String // e.g. "SA", "AE", "EU", "US-CA"
+  rate            Decimal? @db.Decimal(6, 4) // reference rate (fraction); display only
+  exemptByDefault Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shopId, region])
+}
+
+enum TaxIdType {
+  VAT
+  GST
+  ABN
+  EIN
+  OTHER
+}
+
+enum TaxStatus {
+  UNVERIFIED
+  VERIFIED
+  REJECTED
 }
 
 // F12 — a merchant's sales rep. Authenticates via the same passwordless
@@ -507,6 +563,7 @@ model Company {
   savedOrderLists   SavedOrderList[]
   catalogAssignments CatalogAssignment[]
   repAssignments    RepAssignment[]
+  taxProfile        TaxProfile?
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -565,6 +622,7 @@ model Invoice {
   amount    Decimal           @db.Decimal(18, 4)
   currency  String
   status    InvoiceStatus     @default(OPEN)
+  sequenceNo Int? // F14: compliant sequential invoice number (Growth); null = legacy id-based
   issuedAt  DateTime          @default(now())
   dueDate   DateTime
   paidAt    DateTime?
@@ -932,6 +990,7 @@ enum EventType {
   PAYMENT_PLAN_CREATED
   INSTALLMENT_PAID
   PAYLINK_PAID
+  TAX_PROFILE_VERIFIED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED
