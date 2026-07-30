@@ -9,6 +9,37 @@ import prisma from "./db.server";
 import { BILLING_CONFIG } from "./services/billing.server";
 import { ensureShopInstalled } from "./services/shop.server";
 
+/**
+ * Boot-time config guard. The embedded admin needs these at runtime — without
+ * SHOPIFY_API_KEY/SECRET the App Bridge iframe can't initialize (the merchant /
+ * App-Store reviewer sees "Something went wrong. Please refresh"), even though
+ * /healthz still returns 200. We log the *names* of any missing/placeholder vars
+ * (never values) so `fly logs` reveals a misconfig instantly instead of it
+ * surfacing as an opaque error page. Non-fatal so healthz stays up and the fix
+ * is obvious. Runs once at module load in production.
+ */
+function warnMissingShopifyEnv(): void {
+  if (process.env.NODE_ENV !== "production") return;
+  const required = ["SHOPIFY_API_KEY", "SHOPIFY_API_SECRET", "SHOPIFY_APP_URL", "SCOPES", "SESSION_SECRET", "DATABASE_URL"];
+  const missing = required.filter((k) => !process.env[k]);
+  // Catch the classic paste-the-placeholder mistake, too.
+  const placeholder = Object.entries({
+    SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET,
+    SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY,
+  })
+    .filter(([, v]) => v && /^<.*>$|from Partners|changeme|placeholder/i.test(v))
+    .map(([k]) => k);
+  if (missing.length || placeholder.length) {
+    console.error(
+      "[mannon] CONFIG ERROR — embedded admin will fail with 'Something went wrong'. " +
+        (missing.length ? `Missing env: ${missing.join(", ")}. ` : "") +
+        (placeholder.length ? `Placeholder value still set for: ${placeholder.join(", ")}. ` : "") +
+        "Set them with `fly secrets set …` (SHOPIFY_API_KEY must equal the app client_id).",
+    );
+  }
+}
+warnMissingShopifyEnv();
+
 // Confirm the current stable ApiVersion via the Shopify Dev MCP at the start of
 // each build session before pinning — see CLAUDE.md tech stack notes.
 const shopify = shopifyApp({
