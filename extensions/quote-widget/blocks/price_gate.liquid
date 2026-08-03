@@ -1,0 +1,44 @@
+{% comment %}
+  F24.2 — Mannon "Price / Add-to-Cart gate" app block. Place it on the product
+  template. It asks Mannon (async) whether this visitor should see the price /
+  Add-to-Cart, and if not, hides the theme's price/ATC elements and shows a
+  "Request a Quote" call-to-action. It NEVER renders a price itself — the decision
+  is only a set of hide flags + a label, so a hidden price is never in the source.
+{% endcomment %}
+
+<div
+  class="mannon-pg"
+  data-mannon-pg
+  data-shop="{{ shop.permanent_domain }}"
+  data-app-url="{{ block.settings.app_url | default: 'https://manosh.fly.dev' }}"
+  data-logged-in="{% if customer %}1{% else %}0{% endif %}"
+  {% if customer %}data-tags="{{ customer.tags | join: ',' | escape }}"{% endif %}
+  {% if product %}
+    data-product-id="gid://shopify/Product/{{ product.id }}"
+    data-collection-ids="{% for c in product.collections %}gid://shopify/Collection/{{ c.id }}{% unless forloop.last %},{% endunless %}{% endfor %}"
+  {% endif %}
+  data-price-selector="{{ block.settings.price_selector | default: '.price, .product__price, [data-product-price]' | escape }}"
+  data-atc-selector="{{ block.settings.atc_selector | default: 'form[action*="/cart/add"] [type="submit"], .product-form__submit, [name="add"]' | escape }}"
+  data-quote-url="{{ block.settings.quote_url }}"
+  style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
+>
+  <button type="button" class="mannon-pg-cta" hidden data-mannon-pg-cta>Request a Quote</button>
+</div>
+
+<script src="{{ 'price-gate.js' | asset_url }}" defer></script>
+{{ 'price-gate.css' | asset_url | stylesheet_tag }}
+
+{% schema %}
+{
+  "name": "Price / ATC gate",
+  "target": "section",
+  "settings": [
+    { "type": "color", "id": "accent", "label": "CTA colour", "default": "#4F46E5" },
+    { "type": "url", "id": "quote_url", "label": "Quote page URL (where the CTA links)" },
+    { "type": "text", "id": "price_selector", "label": "Price CSS selector(s) to hide", "default": ".price, .product__price, [data-product-price]" },
+    { "type": "text", "id": "atc_selector", "label": "Add-to-Cart CSS selector(s) to hide", "default": "form[action*='/cart/add'] [type='submit'], .product-form__submit, [name='add']" },
+    { "type": "url", "id": "app_url", "label": "Mannon app URL (advanced)" }
+  ],
+  "presets": [{ "name": "Price / ATC gate" }]
+}
+{% endschema %}

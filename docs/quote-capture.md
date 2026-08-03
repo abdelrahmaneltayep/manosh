@@ -90,7 +90,45 @@ Already unlocked on Growth by the PR-8a single-form cap; `getPublicForm` picks t
 active form for a surface (most-recently-updated). Bind different forms to
 product / collection / cart / standalone-page surfaces.
 
+## PR-8c — Hide price / Add-to-Cart → "Request a Quote" (§5.2)
+
+Hide the price and/or Add-to-Cart button and swap in a Request-a-Quote CTA, scoped
+by audience or catalog. **Broad scopes (everyone / logged-out) are Starter;
+targeted scopes (customer tag / product / collection) are Growth**
+(`priceRuleScopeAllowed`) — enforced in the service *and* the UI (the Growth scopes
+are disabled + labeled in the scope picker).
+
+### THE INVARIANT — a hidden price never leaves the server (§5.2)
+
+The pure evaluator (`app/lib/price-visibility.ts`) returns a `VisibilityDecision`
+of **only** `{ hidePrice, hideAtc, ctaLabel }` — there is no price field, by type.
+`GET /api/price-visibility` returns exactly that decision, so a hidden price is
+never in our markup or JSON. A unit test asserts the decision keys contain no
+`price`/`amount`. The storefront block renders **no price of its own** — it only
+hides the theme's price/ATC elements and shows the CTA.
+
+### Data (`migration price-visibility`)
+
+`PriceVisibilityRule { id, shop, scope (ALL|LOGGED_OUT|CUSTOMER_TAG|PRODUCT|
+COLLECTION), scopeRef?, hidePrice, hideAtc, ctaLabel, active, priority }`, FK'd to
+`Shop` (cascade). Highest-priority match wins, ties broken by specificity
+(product > collection > tag > logged-out > all). Event `PRICE_RULE_UPDATED`.
+
+### Admin (`/app/price-rules`)
+
+List + create + delete. The scope picker disables the Growth-only scopes below
+Growth; targeted scopes require a reference (tag / product GID / collection GID).
+
+### Storefront (theme app block `price_gate`)
+
+An app block the merchant places on the product template. It reads the visitor
+context from Liquid (logged-in, customer tags, product + collection GIDs), calls
+`/api/price-visibility` (async), and — when told to hide — hides the theme's
+price/ATC elements (configurable CSS selectors) and reveals the CTA (which opens
+the on-page quote widget if present, else navigates to the configured quote page).
+Fails open (theme untouched) on any error. No LCP impact, no price ever emitted.
+
 ### Not yet (later slices)
 
-Price/ATC gating (PR-8c), Add-to-Quote drawer + cart→quote (PR-8d), post-submission
-redirect + multi-language (PR-8e).
+Add-to-Quote drawer + cart→quote (PR-8d), post-submission redirect + multi-language
+(PR-8e).

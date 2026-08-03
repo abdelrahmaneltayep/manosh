@@ -1,0 +1,11 @@
+/* F24.2 — Price / ATC gate CTA. Scoped to .mannon-pg* to avoid theme clashes. */
+.mannon-pg-cta {
+  background: var(--mannon-accent, #4F46E5);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

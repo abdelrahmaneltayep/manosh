@@ -5,6 +5,24 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 24 (PR-8c): hide price / Add-to-Cart → "Request a Quote"
+
+- **`PriceVisibilityRule` model** (migration `price-visibility`) — hide price and/or
+  Add-to-Cart and swap in a Request-a-Quote CTA, scoped by everyone / logged-out /
+  customer tag / product / collection (highest-priority match wins, ties broken by
+  specificity). Event `PRICE_RULE_UPDATED`.
+- **THE INVARIANT (§5.2): a hidden price never leaves the server.** The pure
+  evaluator returns a decision of only `{ hidePrice, hideAtc, ctaLabel }` (no price
+  by type); `GET /api/price-visibility` returns exactly that, and the storefront
+  block renders no price of its own — it only hides the theme's price/ATC elements
+  and shows the CTA. A test asserts the decision carries no `price`/`amount` key.
+- **Plan gate:** broad scopes (everyone / logged-out) are Starter; targeted scopes
+  (tag / product / collection) are Growth (`priceRuleScopeAllowed`) — enforced in
+  `savePriceRule` and shown disabled + labeled in the admin scope picker.
+- **Admin `/app/price-rules`** (list/create/delete) + **theme app block `price_gate`**
+  (async, reads visitor/product context from Liquid, hides configurable selectors,
+  fails open). Behind `MANNON_FF_QUOTE_CAPTURE`. Docs: `docs/quote-capture.md`.
+
 ### Added — Feature 24 (PR-8b): advanced form builder (conditional logic + success message)
 
 - **Conditional logic** (`showIf`) — a field can show only when an **earlier**

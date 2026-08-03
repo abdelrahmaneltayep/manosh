@@ -84,6 +84,7 @@ model Shop {
   currencyRates         CurrencyRate[]
   quoteRequests         QuoteRequest[]
   quoteForms            QuoteForm[]
+  priceVisibilityRules  PriceVisibilityRule[]
   publicCatalogs        PublicCatalog[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -140,6 +141,34 @@ enum QuoteFormSurface {
   COLLECTION
   CART
   PAGE
+}
+
+// F24.2 — storefront price / Add-to-Cart visibility rule. Hide price and/or the
+// ATC button and swap in a "Request a Quote" CTA, scoped by audience or catalog.
+// Evaluated in the theme app extension; the decision NEVER carries a price.
+model PriceVisibilityRule {
+  id        String               @id @default(cuid())
+  shopId    String
+  shop      Shop                 @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  scope     PriceVisibilityScope @default(ALL)
+  scopeRef  String? // tag value / product gid / collection gid for the scope
+  hidePrice Boolean              @default(true)
+  hideAtc   Boolean              @default(false)
+  ctaLabel  String               @default("Request a Quote")
+  active    Boolean              @default(true)
+  priority  Int                  @default(0)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([shopId, active, priority])
+}
+
+enum PriceVisibilityScope {
+  ALL
+  LOGGED_OUT
+  CUSTOMER_TAG
+  PRODUCT
+  COLLECTION
 }
 
 // F19 — a shareable public/semi-public wholesale catalog (Faire-style). Renders
@@ -1363,4 +1392,5 @@ enum EventType {
   PLAN_CANCELLED
   REVIEW_PROMPT_SHOWN
   QUOTE_FORM_UPDATED
+  PRICE_RULE_UPDATED
 }
