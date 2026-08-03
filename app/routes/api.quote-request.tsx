@@ -41,6 +41,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       elapsedMs: typeof body.elapsedMs === "number" ? body.elapsedMs : undefined,
       customFields: (body.customFields as Record<string, unknown>) ?? undefined,
       source: (body.source as "PDP" | "CART" | "WIDGET") ?? "PDP",
+      formId: typeof body.formId === "string" ? body.formId : null,
     },
     { rateKey: `${shop}:${ip}`, baseUrl },
   );

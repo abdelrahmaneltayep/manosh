@@ -5,6 +5,27 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 24 (PR-8a): Storefront Quote Capture — custom form builder
+
+- **`QuoteForm` model + builder.** A merchant builds an ordered set of storefront
+  quote fields (text/number/email/phone/dropdown/checkbox/file/date/product), per
+  surface (product/collection/cart/page). Migration `quote-capture`; `formId` added
+  to `QuoteRequest` (set at submission) and `Quote` (carried on conversion). Event
+  `QUOTE_FORM_UPDATED`; `QUOTE_REQUEST_CREATED` carries `formId`.
+- **Pure field schema** (`app/lib/quote-form.ts`): `normalizeFields` (drops unknown
+  types, dedupes keys, parses dropdown options), `moveField`, `missingRequired` —
+  unit-tested.
+- **Admin `/app/quote-forms`** (embedded Polaris): list + create, and a field
+  builder (add/reorder/type/required/placeholder/help/options, active toggle,
+  surface). Basic builder on every plan; advanced (conditional logic, multiple
+  forms) is Growth — enforced in the service (single-form cap below Growth) and
+  shown disabled + upgrade-labeled. `quoteFormFeatures` gate in `app/lib/billing.ts`.
+- **Storefront render.** The F17 theme app extension now fetches
+  `GET /api/quote-form?shop=&surface=` (async, CORS, cached) and renders the active
+  form's fields — falling back to its built-in fields when none is configured.
+  Submissions carry `formId` + answers through `/api/quote-request`. No LCP impact.
+- Dark-launched behind `MANNON_FF_QUOTE_CAPTURE`. Docs: `docs/quote-capture.md`.
+
 ### Added — Feature 20: White-Label / Agency Multi-Store Management
 
 - **Agency org dashboard.** New models `Organization`, `OrgStore` (per-store role

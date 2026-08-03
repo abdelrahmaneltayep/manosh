@@ -83,6 +83,7 @@ model Shop {
   stockOverrides        StockOverride[]
   currencyRates         CurrencyRate[]
   quoteRequests         QuoteRequest[]
+  quoteForms            QuoteForm[]
   publicCatalogs        PublicCatalog[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
@@ -104,10 +105,40 @@ model QuoteRequest {
   status           QuoteRequestStatus  @default(NEW)
   convertedQuoteId String?             @unique // set on conversion → Quote.id
   convertedQuote   Quote?              @relation("QuoteFromRequest", fields: [convertedQuoteId], references: [id], onDelete: SetNull)
+  formId           String? // F24.1: the custom QuoteForm this submission used
+  form             QuoteForm?          @relation("QuoteRequestForm", fields: [formId], references: [id], onDelete: SetNull)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
   @@index([shopId, status])
+}
+
+// F24.1 — a merchant-built storefront quote form (custom fields per surface).
+// The theme app extension renders the active form for its surface; the merchant
+// builds it in embedded Polaris. `fields` is the ordered field schema (see
+// app/lib/quote-form.ts). Basic builder is on every plan; advanced controls
+// (conditional logic, multiple forms) are Growth (F24 PR-8b).
+model QuoteForm {
+  id        String           @id @default(cuid())
+  shopId    String
+  shop      Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name      String
+  surface   QuoteFormSurface @default(PRODUCT)
+  fields    Json // [{ key, type, label, required, placeholder?, help?, options? }]
+  active    Boolean          @default(true)
+  requests  QuoteRequest[]   @relation("QuoteRequestForm")
+  quotes    Quote[]          @relation("QuoteForm")
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([shopId, active])
+}
+
+enum QuoteFormSurface {
+  PRODUCT
+  COLLECTION
+  CART
+  PAGE
 }
 
 // F19 — a shareable public/semi-public wholesale catalog (Faire-style). Renders
@@ -1023,6 +1054,8 @@ model Quote {
   displayCurrency String? // F16: buyer-facing currency locked at issue time
   displayRate    Decimal?            @db.Decimal(18, 8) // F16: FX rate (store base -> displayCurrency) locked at issue
   fromRequest    QuoteRequest?       @relation("QuoteFromRequest")
+  formId         String? // F24.1: the QuoteForm the originating request used (carried on conversion)
+  form           QuoteForm?          @relation("QuoteForm", fields: [formId], references: [id], onDelete: SetNull)
   lines          QuoteLine[]
   aiSuggestions  QuoteAiSuggestion[]
   followups      QuoteFollowup[]
@@ -1328,4 +1361,5 @@ enum EventType {
   PLAN_UPGRADED
   PLAN_CANCELLED
   REVIEW_PROMPT_SHOWN
+  QUOTE_FORM_UPDATED
 }

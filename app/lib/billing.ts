@@ -340,6 +340,25 @@ export function quoteWidgetFeatures(plan: string | null | undefined): QuoteWidge
   return { pdpForm: true, cartLevel: isGrowth, gatedMode: isGrowth, customFields: isGrowth, autoPrefill: isGrowth };
 }
 
+// --- F24.1 storefront quote form builder gating ------------------------------
+
+export interface QuoteFormFeatures {
+  /** The basic builder (fields, types, required, placeholder) is on every plan. */
+  basicBuilder: boolean;
+  /** Advanced: conditional logic (show B if A=X). Growth. */
+  conditionalLogic: boolean;
+  /** Advanced: more than one named form, bound to different surfaces. Growth. */
+  multipleForms: boolean;
+  /** Advanced: localized form/PDF/email surfaces (F24.5). Growth. */
+  multiLanguage: boolean;
+}
+
+/** Which quote-form-builder capabilities a plan unlocks. Basic is universal. Pure. */
+export function quoteFormFeatures(plan: string | null | undefined): QuoteFormFeatures {
+  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  return { basicBuilder: true, conditionalLogic: isGrowth, multipleForms: isGrowth, multiLanguage: isGrowth };
+}
+
 // --- F16 i18n / multi-currency gating ----------------------------------------
 
 /**

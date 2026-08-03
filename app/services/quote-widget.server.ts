@@ -7,6 +7,7 @@ import { getVisibleCatalog } from "./catalogs.server";
 import { submitBuyerQuote } from "./portal-quote.server";
 import { quoteWidgetFeatures, type QuoteWidgetFeatures } from "../lib/billing";
 import { validateQuoteRequest, type QuoteRequestInput, type CleanLine } from "../lib/quote-widget";
+import { formBelongsToShop } from "./quote-form.server";
 
 /**
  * F17 — storefront "Request a Quote" widget service. Public submissions are
@@ -90,7 +91,7 @@ export type CreateResult =
 
 export async function createQuoteRequest(
   shopDomain: string,
-  input: QuoteRequestInput & { source?: "PDP" | "CART" | "WIDGET" },
+  input: QuoteRequestInput & { source?: "PDP" | "CART" | "WIDGET"; formId?: string | null },
   ctx: { rateKey: string; baseUrl: string; now?: number },
 ): Promise<CreateResult> {
   const shop = await shopFor(shopDomain);
@@ -111,6 +112,12 @@ export async function createQuoteRequest(
     if (!known) return { ok: false, error: "Quotes are available to approved wholesale accounts. Please apply first." };
   }
 
+  // F24.1 — a submission from a merchant-built form carries its formId (validated
+  // to belong to this shop). Form answers are always stored (the merchant
+  // configured the form), independent of the legacy widget custom-fields gate.
+  const formId = input.formId && (await formBelongsToShop(shop.id, input.formId)) ? input.formId : null;
+  const customFields = formId ? clean.value.customFields : features.customFields ? clean.value.customFields : null;
+
   const request = await prisma.quoteRequest.create({
     data: {
       shopId: shop.id,
@@ -119,12 +126,13 @@ export async function createQuoteRequest(
       companyName: clean.value.companyName,
       note: clean.value.note,
       lines: clean.value.lines as object,
-      customFields: (features.customFields ? clean.value.customFields : null) as object,
+      customFields: customFields as object,
+      formId,
       status: "NEW",
     },
   });
 
-  await appendEvent({ shopId: shop.id, type: "QUOTE_REQUEST_CREATED", entityType: "QuoteRequest", entityId: request.id, payload: { source: input.source ?? "PDP", lines: clean.value.lines.length } });
+  await appendEvent({ shopId: shop.id, type: "QUOTE_REQUEST_CREATED", entityType: "QuoteRequest", entityId: request.id, payload: { source: input.source ?? "PDP", lines: clean.value.lines.length, ...(formId ? { formId } : {}) } });
 
   // Notify the merchant + auto-reply to the visitor (best-effort).
   try {
@@ -230,5 +238,9 @@ export async function convertToQuote(shopDomain: string, id: string): Promise<Co
   if (!result.ok) return { ok: false, error: result.error };
 
   await prisma.quoteRequest.update({ where: { id: request.id }, data: { status: "CONVERTED", convertedQuoteId: result.quote.id } });
+  // F24.1 — carry the originating form onto the created quote (quote.created carries formId).
+  if (request.formId) {
+    await prisma.quote.update({ where: { id: result.quote.id }, data: { formId: request.formId } });
+  }
   return { ok: true, quoteId: result.quote.id };
 }
