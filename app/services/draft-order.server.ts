@@ -233,3 +233,23 @@ export async function createDraftOrder(
   );
   return mapCreatedDraftOrder(payload);
 }
+
+const DRAFT_ORDER_INVOICE_SEND = `#graphql
+  mutation MannonDraftOrderInvoiceSend($id: ID!) {
+    draftOrderInvoiceSend(id: $id) {
+      draftOrder { id }
+      userErrors { field message }
+    }
+  }
+`;
+
+/**
+ * Email the buyer the draft order's invoice (F25.2). Shopify owns the email +
+ * the hosted invoice/checkout link; we only trigger the send. Throws
+ * DraftOrderError on a userError so callers can treat it as best-effort.
+ */
+export async function sendDraftOrderInvoice(admin: AdminGraphqlClient, draftOrderId: string): Promise<void> {
+  const response = await admin.graphql(DRAFT_ORDER_INVOICE_SEND, { variables: { id: draftOrderId } });
+  const body = (await response.json()) as { data?: { draftOrderInvoiceSend?: { userErrors?: UserError[] } } };
+  assertNoUserErrors(body.data?.draftOrderInvoiceSend?.userErrors, "draftOrderInvoiceSend");
+}

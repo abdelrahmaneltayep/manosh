@@ -5,6 +5,24 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 25 (PR-9a): one-click convert quote → draft order → invoice
+
+- **Merchant one-click convert** (`convertQuoteToOrder`) — from an accepted quote
+  (or a countered one the buyer agreed to offline), create a native Shopify draft
+  order at the buyer's **exact negotiated prices** and email the invoice. Reuses the
+  S8 draft-order builder (no second pricing brain); line prices come **verbatim**
+  from `Quote.lines` — never re-priced from the live catalog (test-asserted).
+- **Order of operations mirrors S8:** Shopify first (`createDraftOrder`), then a
+  best-effort invoice send (`sendDraftOrderInvoice` / `draftOrderInvoiceSend`;
+  skippable for F13 deposit / pay-by-link / F2 net terms), then flip the quote
+  `COUNTERED → ACCEPTED → ORDERED`, set `Quote.convertedOrderId` (migration
+  `quote_ops`) + `draftOrderId`, append `QUOTE_CONVERTED`. A Shopify failure never
+  strands the quote.
+- **Admin** (`/app/quotes/:id`): a **Convert to order & send invoice** action on an
+  accepted/countered quote, gated to a paid plan (Starter+); an "Order created"
+  banner after. Buyer must be linked to a company location (like S8). Docs:
+  `docs/quote-ops.md`.
+
 ### Added — Feature 24 (PR-8e): post-submission control + multi-language
 
 - **Post-submission control (§5.4, Starter+).** `QuoteForm` gains `successMode`

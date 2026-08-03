@@ -1084,6 +1084,7 @@ model Quote {
   expiresAt      DateTime
   poReference    String?
   draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
+  convertedOrderId String? // F25.2: gid set by the merchant one-click convert (mirrors Offer.convertedOrderId)
   totalsSnapshot Json? // exact draftOrderCalculate output
   reminderState  Json? // F8: per-quote follow-up state ({ unsubscribed, nudgesSent, overrideCadence })
   placedByRepId  String? // F12: the sales rep who placed/negotiated this on behalf of the buyer
@@ -1400,4 +1401,5 @@ enum EventType {
   REVIEW_PROMPT_SHOWN
   QUOTE_FORM_UPDATED
   PRICE_RULE_UPDATED
+  QUOTE_CONVERTED
 }

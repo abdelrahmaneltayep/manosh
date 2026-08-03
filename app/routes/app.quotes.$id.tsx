@@ -34,7 +34,10 @@ import {
   QuoteNotFoundError,
 } from "../services/quote.server";
 import { requireBilling } from "../services/billing.server";
-import { featureAccess, GROWTH_PLAN } from "../lib/billing";
+import { featureAccess, GROWTH_PLAN, STARTER_PLAN } from "../lib/billing";
+import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
+import { DraftOrderError } from "../services/draft-order.server";
+import { getCatalog } from "../services/catalog.server";
 import {
   generateSuggestionForLine,
   generateSuggestionsForQuote,
@@ -84,6 +87,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       expiresAt: quote.expiresAt,
       poReference: quote.poReference,
       draftOrderId: quote.draftOrderId,
+      convertedOrderId: quote.convertedOrderId,
       lines: quote.lines.map((line) => ({
         id: line.id,
         title: line.title,
@@ -96,10 +100,29 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request, params }: ActionFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { admin, session, billing } = await authenticate.admin(request);
   const quoteId = params.id!;
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+
+  // --- F25.2 convert quote → draft order → invoice (paid) -------------------
+  if (intent === "convert") {
+    const status = await requireBilling(billing, { isTest: IS_TEST });
+    if (!featureAccess(status, STARTER_PLAN).allowed) {
+      return { ok: false as const, kind: "quote" as const, error: "Converting to an order needs a paid plan.", upgrade: true as const };
+    }
+    try {
+      const catalog = await getCatalog(session.shop);
+      const currencyCode = catalog[0]?.currencyCode ?? "USD";
+      const res = await convertQuoteToOrder(quoteId, admin, { currencyCode });
+      return { ok: true as const, kind: "quote" as const, message: res.invoiceSent ? "Draft order created and invoice sent." : "Draft order created." };
+    } catch (error) {
+      if (error instanceof QuoteConvertError || error instanceof DraftOrderError) {
+        return { ok: false as const, kind: "quote" as const, error: error.message };
+      }
+      throw error;
+    }
+  }
 
   // --- AI Quote Assistant (Growth-only, feature-flagged) --------------------
   if (intent === "ai-suggest" || intent === "ai-suggest-all") {
@@ -437,6 +460,29 @@ export default function QuoteDetail() {
               </Text>
             )}
           </BlockStack>
+        )}
+
+        {(quote.status === "ACCEPTED" || quote.status === "COUNTERED") && !quote.draftOrderId && !quote.convertedOrderId && (
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h2" variant="headingMd">Turn this into an order</Text>
+              <Text as="p" tone="subdued" variant="bodyMd">
+                Creates a native draft order at the agreed prices on the buyer’s company location and emails them the invoice.
+                Shopify calculates tax and totals — we never re-price from the catalog.
+                {quote.status === "COUNTERED" && " Use this once the buyer has agreed to your counter."}
+              </Text>
+              <Form method="post">
+                <input type="hidden" name="intent" value="convert" />
+                <Button submit variant="primary" loading={submitting}>Convert to order &amp; send invoice</Button>
+              </Form>
+            </BlockStack>
+          </Card>
+        )}
+
+        {(quote.draftOrderId || quote.convertedOrderId) && (
+          <Banner tone="success" title="Order created">
+            The draft order is in Shopify (Orders → Drafts) with the invoice sent. Totals are Shopify’s.
+          </Banner>
         )}
 
         {!isTerminal && (
