@@ -5,6 +5,23 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — PR-6: Built-for-Shopify design hardening (§3.3)
+
+- **Contextual Save Bar on the Make-an-Offer widget form** (`/app/offers/widget`).
+  Editing any control now reveals the App Bridge **`SaveBar`** (Save / Discard);
+  dirty state is a pure diff of the form against the loaded config, so the bar only
+  shows for real unsaved changes — the sanctioned Shopify "unsaved changes"
+  pattern, replacing the inline Save button. The refactor also fixed a latent
+  double-submit bug (checkboxes carried both a Polaris `name` and a shadow hidden
+  input of the same name); form state is now the single source of truth.
+- **Fixed three broken empty states.** Offers, Catalog sharing, and Agency rendered
+  `EmptyState image=""` (a broken image); they now use the standard Shopify
+  empty-state illustration, matching the rest of the app.
+- **Design audit documented** in `docs/bfs-design.md` (§3.3): Polaris + App Bridge
+  shell with a complete `NavMenu`, contextual Save Bar on settings forms, designed
+  empty/error states (`Banner` feedback, never a raw error), a11y carried from S16
+  — each with a re-runnable audit command.
+
 ### Changed — PR-5: Built-for-Shopify performance hardening (§3.2)
 
 - **Batched variant-cost lookups — no per-line N+1.** New

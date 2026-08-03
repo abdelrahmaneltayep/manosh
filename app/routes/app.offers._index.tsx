@@ -64,7 +64,7 @@ export default function OffersQueue() {
         <Card padding="0">
           {offers.length === 0 ? (
             <Box padding="400">
-              <EmptyState heading="No offers yet" image="">
+              <EmptyState heading="No offers yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
                 <p>Once the Make-an-Offer widget is live on your storefront, buyer offers land here.</p>
               </EmptyState>
             </Box>
