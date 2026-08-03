@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import prisma from "../db.server";
-import { listForms, getForm, saveForm, getPublicForm, deleteForm, MultipleFormsError } from "./quote-form.server";
+import { listForms, getForm, saveForm, getPublicForm, deleteForm, getQuoteCaptureConfig, MultipleFormsError } from "./quote-form.server";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -83,5 +83,14 @@ describe.skipIf(!hasDb)("quote-form.server (DB)", () => {
     const full = await getForm("qf.myshopify.com", (r as { id: string }).id);
     expect(full?.fields[1].showIf).toBeUndefined(); // stripped
     expect(full?.successMessage).toBeNull(); // stripped
+  });
+
+  it("getQuoteCaptureConfig: on for paid + flag, off otherwise (F24.3)", async () => {
+    await starter();
+    vi.stubEnv("MANNON_FF_QUOTE_CAPTURE", "true");
+    expect(await getQuoteCaptureConfig("qf.myshopify.com")).toEqual({ enabled: true });
+    vi.stubEnv("MANNON_FF_QUOTE_CAPTURE", "false");
+    expect(await getQuoteCaptureConfig("qf.myshopify.com")).toEqual({ enabled: false });
+    vi.unstubAllEnvs();
   });
 });

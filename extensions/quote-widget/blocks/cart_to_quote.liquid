@@ -1,0 +1,33 @@
+{% comment %}
+  F24.3 — Mannon "Convert Cart to Quote" app block. Place it on the cart template.
+  One click turns the current cart into a multi-line quote request (the cart's
+  items drop into the quote drawer for the buyer's email + note). Loads async.
+{% endcomment %}
+
+<div
+  class="mannon-c2q"
+  data-mannon-capture
+  data-shop="{{ shop.permanent_domain }}"
+  data-app-url="{{ block.settings.app_url | default: 'https://manosh.fly.dev' }}"
+  style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
+>
+  <button type="button" class="mannon-c2q-btn" hidden data-mannon-c2q-btn>
+    {{ block.settings.label | default: 'Request a quote for this cart' }}
+  </button>
+</div>
+
+<script src="{{ 'quote-capture.js' | asset_url }}" defer></script>
+{{ 'quote-capture.css' | asset_url | stylesheet_tag }}
+
+{% schema %}
+{
+  "name": "Convert Cart to Quote",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button label", "default": "Request a quote for this cart" },
+    { "type": "color", "id": "accent", "label": "Accent colour", "default": "#4F46E5" },
+    { "type": "url", "id": "app_url", "label": "Mannon app URL (advanced)" }
+  ],
+  "presets": [{ "name": "Convert Cart to Quote" }]
+}
+{% endschema %}

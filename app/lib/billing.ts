@@ -359,6 +359,11 @@ export function quoteFormFeatures(plan: string | null | undefined): QuoteFormFea
   return { basicBuilder: true, conditionalLogic: isGrowth, multipleForms: isGrowth, multiLanguage: isGrowth };
 }
 
+/** F24.3 — Add-to-Quote drawer + cart→quote are a paid feature (Starter+). Pure. */
+export function quoteCaptureAllowed(plan: string | null | undefined): boolean {
+  return plan === "STARTER" || plan === STARTER_PLAN || plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
 // --- F16 i18n / multi-currency gating ----------------------------------------
 
 /**

@@ -1,0 +1,28 @@
+/* F24.3 — Add-to-Quote drawer + cart→quote. Scoped to .mannon-cap* to avoid theme clashes. */
+.mannon-atq-btn, .mannon-c2q-btn {
+  background: var(--mannon-accent, #4F46E5);
+  color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer;
+}
+.mannon-cap-launcher {
+  position: fixed; right: 18px; bottom: 18px; z-index: 2147482000;
+  background: var(--mannon-accent, #4F46E5); color: #fff; border: 0; border-radius: 999px;
+  padding: 12px 18px; font: inherit; font-weight: 700; cursor: pointer; box-shadow: 0 6px 20px rgba(26,26,46,.25);
+}
+.mannon-cap-drawer { position: fixed; inset: 0; background: rgba(26,26,46,.5); display: none; z-index: 2147483000; }
+.mannon-cap-drawer.open { display: block; }
+.mannon-cap-panel {
+  position: absolute; top: 0; right: 0; height: 100%; width: 100%; max-width: 380px;
+  background: #fff; color: #1A1A2E; padding: 22px 24px; overflow-y: auto; box-shadow: -8px 0 30px rgba(26,26,46,.2);
+}
+.mannon-cap-panel h2 { margin: 0 0 12px; font-size: 1.2rem; }
+.mannon-cap-x { position: absolute; top: 10px; right: 12px; background: none; border: 0; font-size: 1.4rem; cursor: pointer; color: #5b5670; }
+.mannon-cap-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #eee; }
+.mannon-cap-title { flex: 1; font-size: .9rem; }
+.mannon-cap-qty { width: 60px; border: 1px solid #d9d7e4; border-radius: 6px; padding: 6px; font: inherit; }
+.mannon-cap-rm { background: none; border: 0; font-size: 1.2rem; color: #b42318; cursor: pointer; }
+.mannon-cap-empty { color: #8a86a0; font-size: .9rem; }
+.mannon-cap-l { display: block; font-size: .85rem; color: #5b5670; margin: 12px 0; }
+.mannon-cap-l input, .mannon-cap-l textarea { display: block; width: 100%; margin-top: 4px; border: 1px solid #d9d7e4; border-radius: 8px; padding: 8px 10px; font: inherit; color: #1A1A2E; }
+.mannon-cap-hp { position: absolute !important; left: -9999px !important; width: 1px; height: 1px; opacity: 0; }
+.mannon-cap-btn { background: var(--mannon-accent, #4F46E5); color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; width: 100%; }
+.mannon-cap-msg, .mannon-cap-flash { font-size: .85rem; color: #3730a3; margin: 8px 0 0; }

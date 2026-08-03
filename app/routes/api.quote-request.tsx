@@ -42,6 +42,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       customFields: (body.customFields as Record<string, unknown>) ?? undefined,
       source: (body.source as "PDP" | "CART" | "WIDGET") ?? "PDP",
       formId: typeof body.formId === "string" ? body.formId : null,
+      channel: body.channel === "CAPTURE" ? "CAPTURE" : "WIDGET",
     },
     { rateKey: `${shop}:${ip}`, baseUrl },
   );

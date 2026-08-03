@@ -1,0 +1,38 @@
+{% comment %}
+  F24.3 — Mannon "Add to Quote" app block. Place it on a product template (or a
+  product card in a collection). Buyers collect items across pages into a quote
+  drawer, then submit ONE multi-line quote. Loads async — never blocks the page.
+{% endcomment %}
+
+<div
+  class="mannon-atq"
+  data-mannon-capture
+  data-shop="{{ shop.permanent_domain }}"
+  data-app-url="{{ block.settings.app_url | default: 'https://manosh.fly.dev' }}"
+  {% if product %}
+    data-variant-id="gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"
+    data-sku="{{ product.selected_or_first_available_variant.sku | escape }}"
+    data-title="{{ product.title | escape }}"
+  {% endif %}
+  style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
+>
+  <button type="button" class="mannon-atq-btn" hidden data-mannon-atq-add>
+    {{ block.settings.label | default: 'Add to Quote' }}
+  </button>
+</div>
+
+<script src="{{ 'quote-capture.js' | asset_url }}" defer></script>
+{{ 'quote-capture.css' | asset_url | stylesheet_tag }}
+
+{% schema %}
+{
+  "name": "Add to Quote",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button label", "default": "Add to Quote" },
+    { "type": "color", "id": "accent", "label": "Accent colour", "default": "#4F46E5" },
+    { "type": "url", "id": "app_url", "label": "Mannon app URL (advanced)" }
+  ],
+  "presets": [{ "name": "Add to Quote" }]
+}
+{% endschema %}

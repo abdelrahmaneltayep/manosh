@@ -5,9 +5,9 @@ import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
 import { submitRateOk } from "./wholesale.server";
 import { getVisibleCatalog } from "./catalogs.server";
 import { submitBuyerQuote } from "./portal-quote.server";
-import { quoteWidgetFeatures, type QuoteWidgetFeatures } from "../lib/billing";
+import { quoteWidgetFeatures, quoteCaptureAllowed, type QuoteWidgetFeatures } from "../lib/billing";
 import { validateQuoteRequest, type QuoteRequestInput, type CleanLine } from "../lib/quote-widget";
-import { formBelongsToShop } from "./quote-form.server";
+import { formBelongsToShop, QUOTE_CAPTURE_ENABLED } from "./quote-form.server";
 
 /**
  * F17 — storefront "Request a Quote" widget service. Public submissions are
@@ -91,11 +91,19 @@ export type CreateResult =
 
 export async function createQuoteRequest(
   shopDomain: string,
-  input: QuoteRequestInput & { source?: "PDP" | "CART" | "WIDGET"; formId?: string | null },
+  input: QuoteRequestInput & { source?: "PDP" | "CART" | "WIDGET"; formId?: string | null; channel?: "WIDGET" | "CAPTURE" },
   ctx: { rateKey: string; baseUrl: string; now?: number },
 ): Promise<CreateResult> {
   const shop = await shopFor(shopDomain);
-  if (!shop || !WIDGET_ENABLED() || !shop.quoteWidgetEnabled) return { ok: false, error: "Quote requests aren’t available." };
+  if (!shop) return { ok: false, error: "Quote requests aren’t available." };
+  // Two entry channels share this path (same QuoteRequest + anti-spam + emails):
+  //  · WIDGET (F17) — gated by the widget flag + the merchant's enable toggle.
+  //  · CAPTURE (F24.3 Add-to-Quote / cart→quote) — gated by the F24 flag + a paid plan.
+  const channelOk =
+    input.channel === "CAPTURE"
+      ? QUOTE_CAPTURE_ENABLED() && quoteCaptureAllowed(shop.plan)
+      : WIDGET_ENABLED() && shop.quoteWidgetEnabled;
+  if (!channelOk) return { ok: false, error: "Quote requests aren’t available." };
 
   // Anti-spam: rate limit by ip/shop, then validate (honeypot + too-fast inside).
   if (!submitRateOk(`qw:${ctx.rateKey}`, ctx.now ?? Date.now())) return { ok: true, silent: true };

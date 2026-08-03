@@ -128,7 +128,36 @@ price/ATC elements (configurable CSS selectors) and reveals the CTA (which opens
 the on-page quote widget if present, else navigates to the configured quote page).
 Fails open (theme untouched) on any error. No LCP impact, no price ever emitted.
 
-### Not yet (later slices)
+## PR-8d — Add-to-Quote drawer + Convert-Cart-to-Quote (§5.3)
 
-Add-to-Quote drawer + cart→quote (PR-8d), post-submission redirect + multi-language
-(PR-8e).
+Buyers collect multiple products into a **quote drawer** (across product/collection
+pages) and submit **one multi-line quote**; on the cart page, one click turns the
+cart into a quote. **Starter+** (`quoteCaptureAllowed`).
+
+### Backend — one path, two channels (no second widget)
+
+Both surfaces reuse the F17 `QuoteRequest` path. `createQuoteRequest` now takes a
+`channel`:
+- `WIDGET` (F17) — gated by the widget flag + the merchant's enable toggle.
+- `CAPTURE` (F24.3) — gated by `MANNON_FF_QUOTE_CAPTURE` + a paid plan.
+
+Same anti-spam (rate limit + honeypot + too-fast), same validation, same emails.
+`GET /api/quote-capture-config?shop=` returns `{ enabled }` (flag + paid plan) for
+the blocks. Submissions post to the existing `/api/quote-request` with
+`channel: "CAPTURE"` and a `lines[]` array (multi-line already supported).
+
+### Storefront (theme app blocks, async)
+
+- **`add_to_quote`** — an "Add to Quote" button (product context from Liquid).
+  Clicking adds the product to a drawer persisted in `localStorage` (keyed per
+  shop), shown via a floating **"Quote (n)"** launcher. The drawer lists items with
+  quantity steppers + remove, an email + note, a honeypot, and submits one
+  multi-line request. Duplicate variants merge.
+- **`cart_to_quote`** — a cart-page button; reads `/cart.js`, drops the cart's
+  items into the same drawer for the buyer's email, and submits (source `CART`).
+
+Both fail closed (no button, no impact) if the feature is off or the read fails.
+
+### Not yet (later slice)
+
+Post-submission redirect (message-or-redirect) + multi-language (PR-8e).

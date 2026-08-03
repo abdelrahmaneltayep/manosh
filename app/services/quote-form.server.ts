@@ -1,7 +1,7 @@
 import type { QuoteFormSurface as PrismaSurface } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
-import { quoteFormFeatures } from "../lib/billing";
+import { quoteFormFeatures, quoteCaptureAllowed } from "../lib/billing";
 import { normalizeFields, stripAdvanced, type QuoteFormField, type QuoteFormSurface } from "../lib/quote-form";
 
 /**
@@ -139,4 +139,15 @@ export async function getPublicForm(
 export async function formBelongsToShop(shopId: string, formId: string): Promise<boolean> {
   const row = await prisma.quoteForm.findFirst({ where: { id: formId, shopId }, select: { id: true } });
   return !!row;
+}
+
+/**
+ * F24.3 — public on/off for the storefront Add-to-Quote drawer + cart→quote.
+ * Enabled when the feature flag is on and the shop is on a paid plan (Starter+).
+ * No secrets — just a boolean the theme app block reads.
+ */
+export async function getQuoteCaptureConfig(shopDomain: string): Promise<{ enabled: boolean }> {
+  if (!QUOTE_CAPTURE_ENABLED()) return { enabled: false };
+  const plan = await planFor(shopDomain);
+  return { enabled: quoteCaptureAllowed(plan) };
 }

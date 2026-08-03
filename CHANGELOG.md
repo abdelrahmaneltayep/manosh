@@ -5,6 +5,23 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 24 (PR-8d): Add-to-Quote drawer + Convert-Cart-to-Quote
+
+- **Add-to-Quote drawer** — a storefront theme block (`add_to_quote`) lets buyers
+  collect products across product/collection pages into a `localStorage` drawer
+  (floating "Quote (n)" launcher, quantity steppers, remove) and submit **one
+  multi-line quote**.
+- **Convert Cart to Quote** — a cart-page block (`cart_to_quote`) reads `/cart.js`
+  and drops the cart into the same drawer for the buyer's email, submitting one
+  multi-line request (source `CART`).
+- **One path, two channels (no second widget).** `createQuoteRequest` now takes a
+  `channel`: `WIDGET` (F17, widget flag + merchant toggle) or `CAPTURE` (F24.3,
+  `MANNON_FF_QUOTE_CAPTURE` + a paid plan, `quoteCaptureAllowed`). Same anti-spam,
+  validation, and emails. New `GET /api/quote-capture-config` returns the on/off for
+  the blocks; submissions reuse `/api/quote-request` with `channel: "CAPTURE"`.
+- Gate `quoteCaptureAllowed` (Starter+) is pure + tested; `getQuoteCaptureConfig`
+  DB-tested. Both blocks fail closed. Docs: `docs/quote-capture.md`.
+
 ### Added — Feature 24 (PR-8c): hide price / Add-to-Cart → "Request a Quote"
 
 - **`PriceVisibilityRule` model** (migration `price-visibility`) — hide price and/or

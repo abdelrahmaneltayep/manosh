@@ -9,7 +9,7 @@ import {
   visibleFields,
   stripAdvanced,
 } from "./quote-form";
-import { quoteFormFeatures as gate } from "./billing";
+import { quoteFormFeatures as gate, quoteCaptureAllowed } from "./billing";
 
 describe("quote-form field normalisation", () => {
   it("drops unknown types and coerces flags + strings", () => {
@@ -117,5 +117,15 @@ describe("quoteFormFeatures gating (basic universal, advanced Growth)", () => {
     expect(gate(null)).toMatchObject({ basicBuilder: true, multipleForms: false });
     expect(gate("GROWTH")).toMatchObject({ basicBuilder: true, conditionalLogic: true, multipleForms: true, multiLanguage: true });
     expect(gate("Growth")).toMatchObject({ multipleForms: true }); // display-name form too
+  });
+});
+
+describe("quoteCaptureAllowed (Add-to-Quote / cart→quote — Starter+)", () => {
+  it("is true for any paid plan, false otherwise", () => {
+    expect(quoteCaptureAllowed("STARTER")).toBe(true);
+    expect(quoteCaptureAllowed("GROWTH")).toBe(true);
+    expect(quoteCaptureAllowed("Starter")).toBe(true);
+    expect(quoteCaptureAllowed("TRIAL")).toBe(false);
+    expect(quoteCaptureAllowed(null)).toBe(false);
   });
 });
