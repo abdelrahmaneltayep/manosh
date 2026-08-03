@@ -1,7 +1,7 @@
 import type { OfferSource, OfferStatus, OfferRuleScope } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
-import { getVariantCost } from "./variant-cost.server";
+import { getVariantCosts } from "./variant-cost.server";
 import { getShopCapabilities } from "./billing.server";
 import { submitRateOk } from "./wholesale.server";
 import {
@@ -116,11 +116,13 @@ export async function createOffer(shopDomain: string, input: CreateOfferInput): 
   if (input.lineItems.length === 0) return { error: "No items on the offer." };
 
   const listTotal = input.lineItems.reduce((s, l) => s + l.listPrice * l.quantity, 0);
+  // One batched cost read for all lines (§3.2 — no per-line N+1).
+  const costMap = await getVariantCosts(shopDomain, input.lineItems.map((l) => l.variantId));
   let costTotal = 0;
   let costKnown = true;
   for (const l of input.lineItems) {
-    const c = await getVariantCost(shopDomain, l.variantId);
-    if (c.costPrice == null) costKnown = false;
+    const c = costMap.get(l.variantId);
+    if (!c || c.costPrice == null) costKnown = false;
     else costTotal += c.costPrice * l.quantity;
   }
 
@@ -176,11 +178,13 @@ export async function offerSuggestion(shopDomain: string, offerId: string): Prom
   const offer = await prisma.offer.findFirst({ where: { id: offerId, shopId } });
   if (!offer) return null;
   const lines = (offer.lineItems as unknown as OfferLineInput[]) ?? [];
+  // One batched cost read for all lines (§3.2 — no per-line N+1).
+  const costMap = await getVariantCosts(shopDomain, lines.map((l) => l.variantId));
   let costTotal = 0;
   let costKnown = true;
   for (const l of lines) {
-    const c = await getVariantCost(shopDomain, l.variantId);
-    if (c.costPrice == null) costKnown = false;
+    const c = costMap.get(l.variantId);
+    if (!c || c.costPrice == null) costKnown = false;
     else costTotal += c.costPrice * l.quantity;
   }
   if (!costKnown) return { action: "manual", marginAtOffer: 0, reason: "Variant cost unknown." };

@@ -5,6 +5,24 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Changed — PR-5: Built-for-Shopify performance hardening (§3.2)
+
+- **Batched variant-cost lookups — no per-line N+1.** New
+  `getVariantCosts(shop, ids[])` does **one** indexed `findMany` for the whole set
+  plus a **single** Shopify `nodes()` call for the cache misses. The F21 offer
+  engine (`createOffer`, `offerSuggestion`) now batches instead of calling
+  `getVariantCost` once per line — an N-line offer drops from up to N Shopify
+  round-trips to one, keeping the interaction under p95 < 500ms. `getVariantCost`
+  is now a thin wrapper over the batch (behavior unchanged); a live-read failure
+  still serves stale cache and never throws. Tests cover fresh-cache-no-fetch,
+  one-call-per-miss batching, and the never-throw fallback.
+- **Performance audit documented** in `docs/bfs-performance.md`: theme app
+  extensions load async + framework-free (assets ≤ ~5 KB) and cache their config
+  (`Cache-Control: public, max-age=60` on `/api/offer-config` +
+  `/api/quote-widget-config`); admin hot paths are indexed reads with no N+1;
+  App Bridge navigation + designed empty/error states keep layout shift low. Each
+  bar has a re-runnable audit command.
+
 ### Added — PR-4: F21 Make an Offer — storefront + automation + conversion
 
 - **Storefront theme app extension** (`extensions/make-an-offer/`) — a **Make an
