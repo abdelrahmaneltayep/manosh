@@ -101,4 +101,12 @@ describe.skipIf(!hasDb)("GDPR redaction", () => {
     // Uninstall does NOT erase shop data (that's shop/redact's job).
     expect(await prisma.shop.count()).toBe(2);
   });
+
+  it("cleanupUninstall deactivates the theme-app-extension config (BFS §3.1)", async () => {
+    const { shop } = await seedShop("c.myshopify.com", "c@x.com");
+    await prisma.shop.update({ where: { id: shop.id }, data: { quoteWidgetEnabled: true } });
+    await cleanupUninstall("c.myshopify.com");
+    const after = await prisma.shop.findUnique({ where: { id: shop.id }, select: { quoteWidgetEnabled: true } });
+    expect(after?.quoteWidgetEnabled).toBe(false); // nothing renders on the storefront after uninstall
+  });
 });

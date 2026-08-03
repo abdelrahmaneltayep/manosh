@@ -10,6 +10,8 @@ import { authenticate } from "../shopify.server";
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  // Session-token auth (BFS §3.1): every embedded route authenticates here (this
+  // shell) and again in its own loader/action. No cookie-only admin routes.
   await authenticate.admin(request);
 
   return { apiKey: process.env.SHOPIFY_API_KEY || "" };
@@ -21,6 +23,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function App() {
   const { apiKey } = useLoaderData<typeof loader>();
 
+  // App Bridge (BFS §3.1): AppProvider loads App Bridge from the UNVERSIONED CDN
+  // (`https://cdn.shopify.com/shopifycloud/app-bridge.js`, per
+  // @shopify/shopify-app-remix APP_BRIDGE_URL) — latest, not bundled, not pinned.
+  // This is the Shopify-sanctioned embedded setup; we don't hand-roll the script
+  // tag (which would double-load and risk the live embedded frame).
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
       <NavMenu>
