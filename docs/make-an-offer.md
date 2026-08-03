@@ -1,4 +1,4 @@
-# F21 — Make an Offer / Name Your Price (PR-3 core)
+# F21 — Make an Offer / Name Your Price (PR-3 core + PR-4 storefront/automation)
 
 Let buyers name their price; the merchant counters, accepts, or declines — with a
 **margin-safe rule engine**. Growth = manual + rules; Scale = automation + PWYW.
@@ -7,8 +7,40 @@ capability map (`makeAnOffer` tier, `offerRuleCap`).
 
 **PR-3 scope (§2.1–2.4):** models + migration, the rule engine, the manual admin
 flow (queue, detail + thread + counter/accept/decline), rules editor, widget
-config. **PR-4** adds the storefront theme-app-extension surfaces, the Scale
-auto-execution + PWYW, and offer→net-terms/deposit conversion.
+config. **PR-4 (§2.2 scale path + §2.3):** the storefront theme-app-extension,
+Scale auto-execution + PWYW, and offer → native draft order conversion.
+
+## Storefront (theme app extension `extensions/make-an-offer/`)
+
+Mirrors F17's Request-a-Quote block. The merchant adds the **Make an Offer** app
+block from the theme editor (no theme-code editing). It loads **async** (never
+blocks the storefront), reads `GET /api/offer-config?shop=` to decide whether and
+how to render (off below Growth; banner/exit-popup surfaces are Scale-only), and
+posts to `POST /api/offer`. Anti-spam mirrors F17: a hidden honeypot
+(`company_url_confirm`) + a render→submit timer + a per-ip/shop rate limit — spam
+gets a **generic OK** so bots learn nothing. On Scale the buyer sees an instant
+answer (accepted / countered / declined); on Growth it's "we'll reply by email".
+
+## Automation + PWYW (`resolveAutoOutcome`, Scale only)
+
+On Growth every offer stays **pending** for the merchant. On Scale the engine's
+decision runs automatically — auto-decline / auto-accept / auto-counter — and a
+**manual** decision becomes **Pay-What-You-Want**: auto-accept iff the offered
+margin clears the shop's PWYW floor (`Shop.minMarginPct`, the F1 floor), else it
+falls to the merchant. The margin floor is never breached: accept only fires when
+margin is verified safe, and a **cost we don't know forces manual** (never commit
+blind).
+
+## Conversion (`convertOffer`, §2.3) — offer → native draft order
+
+An accepted offer converts to a **Shopify draft order** on the buyer's B2B company
+location (net-terms / deposit path), exactly like quote → order (S8): the agreed
+total is split across lines as agreed **per-unit prices** (`agreedUnitPriceCents`,
+a uniform "% off"), and **Shopify calculates tax + the real total** — we never
+compute money (guardrail #1). Order of operations mirrors S8: **Shopify first,
+then flip the offer to `CONVERTED`** (+ `convertedOrderId`, `OFFER_CONVERTED`
+event), so a Shopify failure never strands the offer. A buyer not linked to a
+company location can't convert (same rule as quotes).
 
 ## The rule engine (`app/lib/offers.ts`) — pure, tested
 

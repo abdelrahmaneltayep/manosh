@@ -8,7 +8,8 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getShopCapabilities } from "../services/billing.server";
-import { MAKE_AN_OFFER_ENABLED, getOffer, offerSuggestion, counterOffer, acceptOffer, declineOffer } from "../services/offers.server";
+import { MAKE_AN_OFFER_ENABLED, getOffer, offerSuggestion, counterOffer, acceptOffer, declineOffer, convertOffer } from "../services/offers.server";
+import { getCatalog } from "../services/catalog.server";
 import { formatDate } from "../lib/format";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
@@ -25,17 +26,19 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       listPriceTotal: Number(offer.listPriceTotal), offeredTotal: Number(offer.offeredTotal),
       currentCounterTotal: offer.currentCounterTotal == null ? null : Number(offer.currentCounterTotal),
       marginAtOffer: offer.marginAtOffer == null ? null : Number(offer.marginAtOffer),
+      convertedOrderId: offer.convertedOrderId,
       createdAt: offer.createdAt,
       messages: offer.messages.map((m) => ({ id: m.id, actor: m.actor, amountTotal: m.amountTotal == null ? null : Number(m.amountTotal), note: m.note, createdAt: m.createdAt })),
     },
     suggestion,
+    isScale: caps.makeAnOffer === "auto",
   };
 };
 
 type ActionResult = { ok: boolean; message?: string; error?: string };
 
 export const action = async ({ request, params }: ActionFunctionArgs): Promise<ActionResult> => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   if (!MAKE_AN_OFFER_ENABLED()) throw new Response("Not found", { status: 404 });
   const caps = await getShopCapabilities(session.shop);
   if (caps.makeAnOffer === "teaser") return { ok: false, error: "Upgrade to Growth to handle offers." };
@@ -54,6 +57,13 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
     const res = await declineOffer(session.shop, id, String(form.get("note") ?? "") || undefined);
     return res.ok ? { ok: true, message: "Offer declined." } : { ok: false, error: res.error };
   }
+  if (intent === "convert") {
+    if (caps.makeAnOffer !== "auto") return { ok: false, error: "Upgrade to Scale to turn offers into orders automatically." };
+    const catalog = await getCatalog(session.shop);
+    const currencyCode = catalog[0]?.currencyCode ?? "USD";
+    const res = await convertOffer(session.shop, id, admin, { currencyCode });
+    return "error" in res ? { ok: false, error: res.error } : { ok: true, message: "Draft order created." };
+  }
   return { ok: false, error: "Unknown action." };
 };
 
@@ -63,7 +73,7 @@ const SUGGESTION_LABEL: Record<string, string> = {
 };
 
 export default function OfferDetail() {
-  const { offer, suggestion } = useLoaderData<typeof loader>();
+  const { offer, suggestion, isScale } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
@@ -71,6 +81,7 @@ export default function OfferDetail() {
     suggestion?.action === "counter" && suggestion.counterCents ? (suggestion.counterCents / 100).toFixed(2) : offer.offeredTotal.toFixed(2),
   );
   const open = offer.status === "PENDING" || offer.status === "COUNTERED";
+  const canConvert = isScale && offer.status === "ACCEPTED" && !offer.convertedOrderId;
 
   return (
     <Page backAction={{ url: "/app/offers" }}>
@@ -140,8 +151,27 @@ export default function OfferDetail() {
                   <Form method="post"><input type="hidden" name="intent" value="decline" /><Button submit tone="critical" disabled={busy}>Decline</Button></Form>
                 </InlineStack>
                 <Text as="p" tone="subdued" variant="bodySm">
-                  Accepting converts to a draft order / net-terms / deposit on Scale (coming next). Totals are always Shopify's.
+                  Once accepted, Scale can convert it to a native draft order (net-terms / deposit). Totals are always Shopify's.
                 </Text>
+              </>
+            ) : offer.convertedOrderId ? (
+              <>
+                <Divider />
+                <Banner tone="success">Converted to a draft order. Totals are Shopify’s — finish it in Orders → Drafts.</Banner>
+              </>
+            ) : canConvert ? (
+              <>
+                <Divider />
+                <BlockStack gap="200">
+                  <Text as="h3" variant="headingSm">Turn this into an order</Text>
+                  <Text as="p" tone="subdued" variant="bodySm">
+                    Creates a native draft order at the agreed price on the buyer’s company location. Shopify calculates tax and the total — we never compute money.
+                  </Text>
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="convert" />
+                    <Button submit variant="primary" disabled={busy}>Convert to draft order</Button>
+                  </Form>
+                </BlockStack>
               </>
             ) : (
               <Text as="p" tone="subdued" variant="bodyMd">This offer is closed ({offer.status.toLowerCase()}).</Text>

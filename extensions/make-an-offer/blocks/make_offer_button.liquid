@@ -1,0 +1,42 @@
+{% comment %}
+  F21 (PR-4) — Mannon "Make an Offer" app block. Drop it on a product or cart
+  section from the theme editor. It loads async (never blocks the storefront),
+  fetches the merchant's offer config from Mannon, and posts offers to the public
+  API. Product context is read from Liquid; no hidden-catalog data is exposed.
+{% endcomment %}
+
+<div
+  class="mannon-mao"
+  data-mannon-mao
+  data-shop="{{ shop.permanent_domain }}"
+  data-app-url="{{ block.settings.app_url | default: 'https://manosh.fly.dev' }}"
+  data-source="{% if template contains 'cart' %}CART{% else %}PRODUCT{% endif %}"
+  {% if product %}
+    data-product-title="{{ product.title | escape }}"
+    data-variant-id="gid://shopify/ProductVariant/{{ product.selected_or_first_available_variant.id }}"
+    data-sku="{{ product.selected_or_first_available_variant.sku | escape }}"
+    data-list-price="{{ product.selected_or_first_available_variant.price | money_without_currency | strip_html }}"
+  {% endif %}
+  {% if customer %}data-customer-email="{{ customer.email | escape }}"{% endif %}
+  style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
+>
+  <button type="button" class="mannon-mao-btn" hidden data-mannon-mao-open>
+    {{ block.settings.label | default: 'Make an offer' }}
+  </button>
+</div>
+
+<script src="{{ 'make-an-offer.js' | asset_url }}" defer></script>
+{{ 'make-an-offer.css' | asset_url | stylesheet_tag }}
+
+{% schema %}
+{
+  "name": "Make an Offer",
+  "target": "section",
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button label", "default": "Make an offer" },
+    { "type": "color", "id": "accent", "label": "Accent colour", "default": "#4F46E5" },
+    { "type": "url", "id": "app_url", "label": "Mannon app URL (advanced)" }
+  ],
+  "presets": [{ "name": "Make an Offer" }]
+}
+{% endschema %}

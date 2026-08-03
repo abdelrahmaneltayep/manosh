@@ -5,6 +5,9 @@ import {
   ruleMatches,
   pickRule,
   evaluateOffer,
+  resolveAutoOutcome,
+  agreedUnitPriceCents,
+  type OfferDecision,
   type OfferRuleLite,
 } from "./offers";
 
@@ -82,5 +85,37 @@ describe("THE INVARIANT — margin floor is never breached", () => {
   it("goes manual when even list price can't clear the floor (cost ≥ list)", () => {
     const d = evaluateOffer({ listCents: 1000, offeredCents: 900, costCents: 1000 }, rule({ autoDeclineBelowPctOfList: 0.1 }));
     expect(d.action).toBe("manual");
+  });
+});
+
+describe("resolveAutoOutcome — scale automation + PWYW", () => {
+  const dec = (action: OfferDecision["action"], marginAtOffer = 0.4): OfferDecision => ({ action, marginAtOffer, reason: "" });
+  it("Growth never auto-executes (always pending)", () => {
+    expect(resolveAutoOutcome(dec("accept"), false, 0.15)).toBe("pending");
+    expect(resolveAutoOutcome(dec("decline"), false, 0.15)).toBe("pending");
+  });
+  it("Scale runs the decision automatically", () => {
+    expect(resolveAutoOutcome(dec("decline"), true, 0.15)).toBe("declined");
+    expect(resolveAutoOutcome(dec("accept"), true, 0.15)).toBe("accepted");
+    expect(resolveAutoOutcome(dec("counter"), true, 0.15)).toBe("countered");
+  });
+  it("PWYW: a manual decision auto-accepts only when margin clears the shop floor", () => {
+    expect(resolveAutoOutcome(dec("manual", 0.30), true, 0.15)).toBe("accepted"); // 30% ≥ 15%
+    expect(resolveAutoOutcome(dec("manual", 0.10), true, 0.15)).toBe("pending"); // 10% < 15% → human
+  });
+});
+
+describe("agreedUnitPriceCents — offer → draft order split", () => {
+  it("applies the negotiated ratio uniformly to each unit list price", () => {
+    // list total 1000¢, agreed 800¢ → 20% off. A 500¢ unit becomes 400¢.
+    expect(agreedUnitPriceCents(500, 1000, 800)).toBe(400);
+    expect(agreedUnitPriceCents(200, 1000, 800)).toBe(160);
+  });
+  it("full-price offer leaves unit prices unchanged", () => {
+    expect(agreedUnitPriceCents(1234, 5000, 5000)).toBe(1234);
+  });
+  it("rounds to whole cents and never goes negative", () => {
+    expect(agreedUnitPriceCents(333, 1000, 850)).toBe(283); // 333 * 0.85 = 283.05 → 283
+    expect(agreedUnitPriceCents(100, 0, 0)).toBe(100); // no list total → keep unit price
   });
 });

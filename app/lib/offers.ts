@@ -135,3 +135,54 @@ export function evaluateOffer(econ: OfferEconomics, rule: OfferRuleLite | null):
   // 4. Otherwise a human decides.
   return { action: "manual", marginAtOffer, reason: "Between decline and accept thresholds — manual review." };
 }
+
+// --- scale automation + PWYW (§2.2 scale path, executed in PR-4) --------------
+
+export type AutoOutcome = "pending" | "declined" | "accepted" | "countered";
+
+/**
+ * What actually happens to an offer, given the engine's decision. On Growth
+ * (isScale=false) nothing auto-executes — every offer waits for the merchant
+ * (pending). On Scale, the decision runs automatically; a "manual" decision
+ * becomes **Pay-What-You-Want**: auto-accept iff the offered margin clears the
+ * shop's PWYW floor (`shopFloorPct`, e.g. the F1 minMargin), else pending. The
+ * margin floor is still never breached — accept only happens when margin is safe.
+ * Pure.
+ */
+export function resolveAutoOutcome(
+  decision: OfferDecision,
+  isScale: boolean,
+  shopFloorPct: number,
+): AutoOutcome {
+  if (!isScale) return "pending";
+  switch (decision.action) {
+    case "decline":
+      return "declined";
+    case "accept":
+      return "accepted";
+    case "counter":
+      return "countered";
+    case "manual":
+      return decision.marginAtOffer >= shopFloorPct ? "accepted" : "pending";
+  }
+}
+
+// --- offer → draft order price split (PR-4 conversion) ------------------------
+
+/**
+ * The agreed per-unit price (cents) for one line, when a whole-offer total is
+ * accepted. We apply the negotiated ratio (`agreedTotal / listTotal`) uniformly
+ * to the line's unit list price — a single, explainable "% off" — then round to
+ * cents. This is an *agreed price*, not a computed order total: Shopify still
+ * calculates tax and the real order total on top (guardrail #1). Sub-cent drift
+ * from rounding per-unit is reconciled by Shopify. Pure.
+ */
+export function agreedUnitPriceCents(
+  listUnitCents: number,
+  listTotalCents: number,
+  agreedTotalCents: number,
+): number {
+  if (listTotalCents <= 0) return Math.max(0, Math.round(listUnitCents));
+  const ratio = agreedTotalCents / listTotalCents;
+  return Math.max(0, Math.round(listUnitCents * ratio));
+}

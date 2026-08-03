@@ -5,6 +5,27 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — PR-4: F21 Make an Offer — storefront + automation + conversion
+
+- **Storefront theme app extension** (`extensions/make-an-offer/`) — a **Make an
+  Offer** app block (async, non-blocking) mirroring F17. Reads
+  `GET /api/offer-config` to decide whether/how to render (off below Growth;
+  banner + exit-popup surfaces Scale-only) and posts to `POST /api/offer`.
+  Anti-spam mirrors F17: honeypot (`company_url_confirm`) + render→submit timer +
+  per-ip/shop rate limit → a **generic OK** so bots learn nothing.
+- **Scale auto-execution + PWYW** (`resolveAutoOutcome`, pure) — on Scale the
+  engine's decision runs automatically (auto-decline/accept/counter); a *manual*
+  decision becomes **Pay-What-You-Want** (auto-accept only when the offered margin
+  clears the shop's `minMarginPct`). Growth stays fully manual (pending). The
+  margin floor is never breached, and an unknown cost forces manual.
+- **Offer → native draft order conversion** (`convertOffer`, §2.3) — an accepted
+  offer becomes a Shopify draft order on the buyer's B2B company location. The
+  agreed total is split into agreed **per-unit prices** (`agreedUnitPriceCents`,
+  uniform "% off"); **Shopify calculates tax + the total** (guardrail #1). Shopify
+  first, then `CONVERTED` + `convertedOrderId` + `OFFER_CONVERTED` — a Shopify
+  failure never strands the offer. Admin gains a **Convert to draft order** button
+  on accepted offers (Scale). Tests cover auto-execute, PWYW, and conversion.
+
 ### Added — PR-3: F21 Make an Offer / Name Your Price (core)
 
 - **Margin-safe rule engine** (`app/lib/offers.ts`, pure) — reuses the F1 margin
