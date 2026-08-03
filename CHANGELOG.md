@@ -5,6 +5,24 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — PR-3: F21 Make an Offer / Name Your Price (core)
+
+- **Margin-safe rule engine** (`app/lib/offers.ts`, pure) — reuses the F1 margin
+  idea against the variant-cost baseline (no second pricing brain). Decision order
+  auto-decline → auto-accept → auto-counter → manual, with **the margin floor always
+  winning**: never auto-accept/counter below `marginFloorPct`, clamp counters up to
+  the floor, and force manual when cost is unknown. Thoroughly unit-tested.
+- **Models + migration `make_an_offer`:** `Offer`, `OfferMessage` (negotiation
+  thread), `OfferRule`, `OfferWidgetConfig` (all FK'd to `Shop`, cascade on redact).
+  Events `OFFER_CREATED|COUNTERED|ACCEPTED|DECLINED|CONVERTED`, `OFFER_RULE_UPDATED`.
+- **Admin `/app/offers`:** queue (IndexTable), offer detail with the engine's
+  suggestion + negotiation thread + counter/accept/decline, a rules editor
+  (cap-aware), and widget config. Gated via the PR-1 capability map
+  (`makeAnOffer`): teaser (free/starter) shows an upgrade CTA; growth = manual +
+  `offerRuleCap` (3) rules; scale = automation + PWYW (PR-4). Behind
+  `MANNON_FF_MAKE_AN_OFFER`. Storefront surfaces + scale automation + conversion are
+  PR-4. Docs: `docs/make-an-offer.md`.
+
 ### Added — PR-1: Pricing v3 (4-plan ladder + grandfathering)
 
 - **New ladder, priced under the field.** Free $0 · Starter **$9** · Growth **$29**
