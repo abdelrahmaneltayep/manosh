@@ -6,7 +6,7 @@ import {
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
-import { BILLING_CONFIG } from "./services/billing.server";
+import { ACTIVE_BILLING_CONFIG } from "./services/billing.server";
 import { ensureShopInstalled } from "./services/shop.server";
 
 /**
@@ -51,7 +51,7 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
-  billing: BILLING_CONFIG,
+  billing: ACTIVE_BILLING_CONFIG,
   hooks: {
     // Provision the Shop row on install (and record APP_INSTALLED — the top of
     // the acquisition funnel). Idempotent, so re-auth/scope changes no-op.

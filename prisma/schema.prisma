@@ -40,6 +40,8 @@ model Shop {
   shopifyDomain         String                 @unique // e.g. acme.myshopify.com
   plan                  Plan                   @default(TRIAL)
   trialEndsAt           DateTime?
+  legacyPlan            Boolean                @default(false) // Pricing v3: grandfathered onto pre-v3 pricing
+  legacyPriceCents      Int? // the price we must keep honoring for a grandfathered shop (never silently raised)
   autoApproveTolerance  Float                  @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
   quoteExpiryDays       Int                    @default(14) // default quote lifetime
   magicLinkExpiryDays   Int                    @default(7) // how long a buyer magic link stays valid
@@ -1268,8 +1270,10 @@ model Event {
 
 enum Plan {
   TRIAL
-  STARTER // $29
-  GROWTH // $79
+  FREE // $0 (Pricing v3)
+  STARTER // legacy $29 · v3 $9
+  GROWTH // legacy $79 · v3 $29
+  SCALE // v3 $69
   CANCELLED
 }
 

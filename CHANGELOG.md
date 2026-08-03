@@ -5,6 +5,28 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — PR-1: Pricing v3 (4-plan ladder + grandfathering)
+
+- **New ladder, priced under the field.** Free $0 · Starter **$9** · Growth **$29**
+  · Scale **$69** (annual = 2 months free), vs the mainstream quote-app field
+  ($17–$97). Additive + **flag-gated behind `MANNON_FF_PLAN_V3`** — off by default,
+  so the live app keeps the legacy Starter $29 / Growth $79 behaviour unchanged
+  (nothing 500s mid-migration).
+- **Grandfathering — no one's price is ever silently raised.** Distinct lowercase
+  Shopify plan handles (`free/starter/growth/scale`) never collide with the legacy
+  `Starter`/`Growth` subscriptions, so existing subs stay chargeable at their price.
+  A legacy Starter ($29) maps **up** to Growth capabilities; legacy Growth ($79) up
+  to Scale — persisted via `Shop.legacyPlan` + `Shop.legacyPriceCents`
+  (`resolveGrandfather`, `resolveV3PlanFromName`, migration `pricing_v3`).
+- **Capability map (§1.3)** in `app/lib/billing-v3.ts` (`PLAN_CAPABILITIES`,
+  `getPlanCapabilities`) with the index-ranked ladder (`PLANS`, `meetsPlan`); server
+  gate `requirePlanV3(request, minPlan)` (redirects to the in-app upgrade screen) and
+  `getShopCapabilities(shop)`. Enum adds `FREE` + `SCALE`.
+- **Trust message:** "No per-order fees, ever" on the in-app plan screen and the
+  pricing page — Mannon stays a flat monthly fee, never a per-order commission.
+  Fully unit-tested (ladder, pricing, capability map, grandfathering). Docs:
+  `docs/pricing-v3.md`.
+
 ### Added — Feature 20: White-Label / Agency Multi-Store Management
 
 - **Agency org dashboard.** New models `Organization`, `OrgStore` (per-store role
