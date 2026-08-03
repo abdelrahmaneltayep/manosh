@@ -158,6 +158,43 @@ the blocks. Submissions post to the existing `/api/quote-request` with
 
 Both fail closed (no button, no impact) if the feature is off or the read fails.
 
-### Not yet (later slice)
+## PR-8e — Post-submission control + multi-language (§5.4, §5.5)
 
-Post-submission redirect (message-or-redirect) + multi-language (PR-8e).
+Generalises PR-8b's success message and localizes the buyer surfaces. Migration
+`quote_capture_i18n` replaces `successMessage` with **`successMode`
+(MESSAGE|REDIRECT) + `successValue`** and adds **`translations`** (JSON).
+
+### Post-submission control (§5.4, Starter+)
+
+After submit, show a configurable thank-you **message** or **redirect** to a
+merchant URL — `successMode` + `successValue` on `QuoteForm`, available on any paid
+plan (`quoteCaptureAllowed`, enforced in `saveForm` + the admin "After submit"
+card). The widget shows the message, or navigates to the URL on success.
+
+### Multi-language (§5.5, Growth)
+
+`translations` holds per-locale overrides — `{ "<locale>": { fields: { key:
+{ label?, placeholder?, help? } }, successValue? } }`. Pure helpers
+(`normalizeTranslations`, `resolveLocale`, `localizeForm`) apply the storefront
+locale with base-language fallback (`fr-CA` → `fr` → default). `getPublicForm`
+takes a `locale`; the widget passes `<html lang>` (or `Shopify.locale`) to
+`/api/quote-form`. The admin exposes a Growth-only Translations editor (per-locale
+field labels + thank-you message). Stripped server-side below Growth.
+
+- **Form** — localized via `getPublicForm(locale)` + the widget. ✓
+- **Quote PDF / buyer emails** — localize off the same `translations` store when
+  the PDF lands in **PR-9b (§6.1)**, so the second-locale surfaces share one source.
+
+## §5.6 acceptance — status
+
+- ✅ Form builder + one conditional rule; renders on the chosen surface; the request
+  carries `formId` (PR-8a/8b).
+- ✅ Price + ATC hidden for the targeted scope; Request-a-Quote shown; **hidden price
+  never in page source** — the decision carries no price (PR-8c).
+- ✅ Add-to-Quote across pages → one multi-line quote; cart→quote (PR-8d).
+- ✅ Post-submission redirect/message honored; **form localized** in a second locale
+  (PR-8e). PDF/email localization ride the same `translations` store as those
+  surfaces land (PDF = PR-9b).
+- ✅ Events `QUOTE_FORM_UPDATED`, `PRICE_RULE_UPDATED`; `quote.created` carries
+  `formId`. Migrations `quote-capture`, `quote_capture_advanced`,
+  `price-visibility`, `quote_capture_i18n`.

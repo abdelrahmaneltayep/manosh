@@ -7,9 +7,9 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
-import { quoteFormFeatures } from "../lib/billing";
-import { FIELD_TYPES, SURFACES, emptyField, moveField, type QuoteFormField, type QuoteFieldType } from "../lib/quote-form";
-import { QUOTE_CAPTURE_ENABLED, getForm, saveForm } from "../services/quote-form.server";
+import { quoteFormFeatures, quoteCaptureAllowed } from "../lib/billing";
+import { FIELD_TYPES, SURFACES, emptyField, moveField, type QuoteFormField, type QuoteFieldType, type Translations, type LocaleTranslation } from "../lib/quote-form";
+import { QUOTE_CAPTURE_ENABLED, getForm, saveForm, type SuccessMode } from "../services/quote-form.server";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -19,7 +19,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const form = await getForm(session.shop, params.id!);
   if (!form) throw new Response("Form not found", { status: 404 });
-  return { form, features: quoteFormFeatures(status.plan) };
+  return { form, features: quoteFormFeatures(status.plan), paid: quoteCaptureAllowed(status.plan) };
 };
 
 type ActionResult = { ok: boolean; message?: string; error?: string };
@@ -29,10 +29,12 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
   if (!QUOTE_CAPTURE_ENABLED()) throw new Response("Not found", { status: 404 });
   const form = await request.formData();
   let fields: unknown = [];
+  let translations: unknown = {};
   try {
     fields = JSON.parse(String(form.get("fields") ?? "[]"));
+    translations = JSON.parse(String(form.get("translations") ?? "{}"));
   } catch {
-    return { ok: false, error: "Couldn’t read the fields — please try again." };
+    return { ok: false, error: "Couldn’t read the form — please try again." };
   }
   const res = await saveForm(session.shop, {
     id: params.id!,
@@ -40,13 +42,15 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
     surface: (String(form.get("surface") ?? "PRODUCT") as "PRODUCT" | "COLLECTION" | "CART" | "PAGE"),
     fields,
     active: form.get("active") === "on",
-    successMessage: String(form.get("successMessage") ?? ""),
+    successMode: (String(form.get("successMode") ?? "MESSAGE") as SuccessMode),
+    successValue: String(form.get("successValue") ?? ""),
+    translations,
   });
   return "error" in res ? { ok: false, error: res.error } : { ok: true, message: "Form saved." };
 };
 
 export default function QuoteFormBuilder() {
-  const { form, features } = useLoaderData<typeof loader>();
+  const { form, features, paid } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
@@ -56,8 +60,11 @@ export default function QuoteFormBuilder() {
   const [active, setActive] = useState(form.active);
   const [fields, setFields] = useState<QuoteFormField[]>(form.fields);
   const [newType, setNewType] = useState<QuoteFieldType>("text");
-  const [successMessage, setSuccessMessage] = useState(form.successMessage ?? "");
-  const advanced = features.conditionalLogic; // Growth
+  const [successMode, setSuccessMode] = useState<SuccessMode>(form.successMode);
+  const [successValue, setSuccessValue] = useState(form.successValue ?? "");
+  const [translations, setTranslations] = useState<Translations>(form.translations ?? {});
+  const [newLocale, setNewLocale] = useState("");
+  const advanced = features.conditionalLogic; // Growth (conditional logic + translations)
 
   const update = (i: number, patch: Partial<QuoteFormField>) =>
     setFields(fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
@@ -67,13 +74,38 @@ export default function QuoteFormBuilder() {
   const removeField = (i: number) => setFields(fields.filter((_, idx) => idx !== i));
   const move = (i: number, dir: -1 | 1) => setFields(moveField(fields, i, i + dir));
 
+  // Translations (Growth): per-locale field-label + message overrides.
+  const addLocale = () => {
+    const loc = newLocale.trim().toLowerCase();
+    if (!loc || translations[loc]) return;
+    setTranslations({ ...translations, [loc]: {} });
+    setNewLocale("");
+  };
+  const removeLocale = (loc: string) => {
+    const next = { ...translations };
+    delete next[loc];
+    setTranslations(next);
+  };
+  const setLocaleField = (loc: string, key: string, label: string) => {
+    const entry: LocaleTranslation = { ...(translations[loc] ?? {}) };
+    const flds = { ...(entry.fields ?? {}) };
+    if (label.trim()) flds[key] = { ...(flds[key] ?? {}), label: label };
+    else delete flds[key];
+    entry.fields = flds;
+    setTranslations({ ...translations, [loc]: entry });
+  };
+  const setLocaleSuccess = (loc: string, value: string) =>
+    setTranslations({ ...translations, [loc]: { ...(translations[loc] ?? {}), successValue: value || undefined } });
+
   return (
     <Page backAction={{ url: "/app/quote-forms" }}>
       <TitleBar title={`Edit — ${form.name}`} />
       <Form method="post">
         <input type="hidden" name="fields" value={JSON.stringify(fields)} />
         <input type="hidden" name="active" value={active ? "on" : "off"} />
-        <input type="hidden" name="successMessage" value={successMessage} />
+        <input type="hidden" name="successMode" value={successMode} />
+        <input type="hidden" name="successValue" value={successValue} />
+        <input type="hidden" name="translations" value={JSON.stringify(translations)} />
         <BlockStack gap="400">
           {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
           {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
@@ -147,27 +179,65 @@ export default function QuoteFormBuilder() {
           </Card>
 
           <Card>
-            <BlockStack gap="200">
+            <BlockStack gap="300">
               <InlineStack gap="200" blockAlign="center">
                 <Text as="h2" variant="headingMd">After submit</Text>
+                {!paid && <Badge tone="info">Starter</Badge>}
+              </InlineStack>
+              {paid ? (
+                <>
+                  <Select
+                    label="What happens next"
+                    options={[{ label: "Show a thank-you message", value: "MESSAGE" }, { label: "Redirect to a URL", value: "REDIRECT" }]}
+                    value={successMode}
+                    onChange={(v) => setSuccessMode(v as SuccessMode)}
+                  />
+                  {successMode === "MESSAGE" ? (
+                    <TextField label="Thank-you message" value={successValue} onChange={setSuccessValue} autoComplete="off" multiline={2}
+                      placeholder="Thanks — we got your request and will reply with pricing." helpText="Shown to the buyer after they submit." />
+                  ) : (
+                    <TextField label="Redirect URL" value={successValue} onChange={setSuccessValue} autoComplete="off" type="url"
+                      placeholder="https://your-store.com/thank-you" helpText="The buyer is sent here after a successful submit." />
+                  )}
+                </>
+              ) : (
+                <Tooltip content="A custom thank-you message or redirect is available on any paid plan.">
+                  <Box><TextField label="Thank-you message" value="" disabled autoComplete="off" helpText="Post-submission control is on Starter and up." /></Box>
+                </Tooltip>
+              )}
+            </BlockStack>
+          </Card>
+
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Translations</Text>
                 {!advanced && <Badge tone="info">Growth</Badge>}
               </InlineStack>
               {advanced ? (
-                <TextField
-                  label="Thank-you message"
-                  value={successMessage}
-                  onChange={setSuccessMessage}
-                  autoComplete="off"
-                  multiline={2}
-                  placeholder="Thanks — we got your request and will reply with pricing."
-                  helpText="Shown to the buyer after they submit this form."
-                />
+                <>
+                  <Text as="p" tone="subdued" variant="bodySm">Override field labels + the thank-you message per storefront locale. The buyer sees their locale, falling back to the default.</Text>
+                  {Object.keys(translations).map((loc) => (
+                    <Box key={loc} padding="300" borderColor="border" borderWidth="025" borderRadius="200">
+                      <BlockStack gap="200">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <Text as="h3" variant="headingSm">{loc}</Text>
+                          <Button size="micro" tone="critical" variant="tertiary" onClick={() => removeLocale(loc)}>Remove</Button>
+                        </InlineStack>
+                        {fields.map((f) => (
+                          <TextField key={f.key} label={`Label — ${f.label}`} value={translations[loc]?.fields?.[f.key]?.label ?? ""} onChange={(v) => setLocaleField(loc, f.key, v)} autoComplete="off" placeholder={f.label} />
+                        ))}
+                        <TextField label="Thank-you message" value={translations[loc]?.successValue ?? ""} onChange={(v) => setLocaleSuccess(loc, v)} autoComplete="off" multiline={2} placeholder={successValue} />
+                      </BlockStack>
+                    </Box>
+                  ))}
+                  <InlineStack gap="200" blockAlign="end">
+                    <Box minWidth="12rem"><TextField label="Add a locale (e.g. fr, de, ar)" value={newLocale} onChange={setNewLocale} autoComplete="off" /></Box>
+                    <Button onClick={addLocale}>Add locale</Button>
+                  </InlineStack>
+                </>
               ) : (
-                <Tooltip content="Upgrade to Growth for conditional fields and a custom thank-you message.">
-                  <Box>
-                    <TextField label="Thank-you message" value="" disabled autoComplete="off" helpText="Conditional fields + a custom thank-you message are on Growth." />
-                  </Box>
-                </Tooltip>
+                <Text as="p" tone="subdued" variant="bodyMd">Localize the form + thank-you message per storefront locale on Growth.</Text>
               )}
             </BlockStack>
           </Card>

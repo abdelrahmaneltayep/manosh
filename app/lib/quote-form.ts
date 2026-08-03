@@ -154,6 +154,81 @@ export function stripAdvanced(fields: QuoteFormField[]): QuoteFormField[] {
   });
 }
 
+// --- F24.5 localization (per-locale overrides) -------------------------------
+
+export interface FieldTranslation {
+  label?: string;
+  placeholder?: string;
+  help?: string;
+}
+export interface LocaleTranslation {
+  /** Overrides keyed by field key. */
+  fields?: Record<string, FieldTranslation>;
+  /** Localized thank-you message (only meaningful when successMode = MESSAGE). */
+  successValue?: string;
+}
+export type Translations = Record<string, LocaleTranslation>;
+
+/** Validate/clean a raw translations blob (drops non-string overrides). Pure. */
+export function normalizeTranslations(raw: unknown): Translations {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const out: Translations = {};
+  for (const [locale, val] of Object.entries(raw as Record<string, unknown>)) {
+    const loc = locale.trim().toLowerCase();
+    if (!loc || !val || typeof val !== "object") continue;
+    const v = val as Record<string, unknown>;
+    const entry: LocaleTranslation = {};
+    if (v.fields && typeof v.fields === "object" && !Array.isArray(v.fields)) {
+      const fields: Record<string, FieldTranslation> = {};
+      for (const [key, t] of Object.entries(v.fields as Record<string, unknown>)) {
+        if (!t || typeof t !== "object") continue;
+        const tt = t as Record<string, unknown>;
+        const ft: FieldTranslation = {};
+        if (typeof tt.label === "string" && tt.label.trim()) ft.label = tt.label.trim();
+        if (typeof tt.placeholder === "string" && tt.placeholder.trim()) ft.placeholder = tt.placeholder.trim();
+        if (typeof tt.help === "string" && tt.help.trim()) ft.help = tt.help.trim();
+        if (Object.keys(ft).length) fields[key] = ft;
+      }
+      if (Object.keys(fields).length) entry.fields = fields;
+    }
+    if (typeof v.successValue === "string" && v.successValue.trim()) entry.successValue = v.successValue.trim();
+    if (Object.keys(entry).length) out[loc] = entry;
+  }
+  return out;
+}
+
+/** Best locale match for a request locale ("fr-CA" → "fr-ca" then "fr"). Pure. */
+export function resolveLocale(translations: Translations, requested: string | null | undefined): string | null {
+  if (!requested) return null;
+  const want = requested.trim().toLowerCase();
+  if (translations[want]) return want;
+  const base = want.split("-")[0];
+  if (base && translations[base]) return base;
+  return null;
+}
+
+/**
+ * Apply a locale's overrides to the fields + success message, falling back to the
+ * defaults for anything not translated. Returns the default form unchanged when
+ * the locale isn't found. Pure.
+ */
+export function localizeForm(
+  fields: QuoteFormField[],
+  successValue: string | null,
+  translations: Translations,
+  requested: string | null | undefined,
+): { fields: QuoteFormField[]; successValue: string | null } {
+  const loc = resolveLocale(translations, requested);
+  if (!loc) return { fields, successValue };
+  const t = translations[loc];
+  const localizedFields = fields.map((f) => {
+    const o = t.fields?.[f.key];
+    if (!o) return f;
+    return { ...f, ...(o.label ? { label: o.label } : {}), ...(o.placeholder ? { placeholder: o.placeholder } : {}), ...(o.help ? { help: o.help } : {}) };
+  });
+  return { fields: localizedFields, successValue: t.successValue ?? successValue };
+}
+
 /** Move the field at `from` to `to` (clamped), returning a new array. Pure. */
 export function moveField(fields: QuoteFormField[], from: number, to: number): QuoteFormField[] {
   const next = fields.slice();

@@ -23,8 +23,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
   const surfaceParam = (url.searchParams.get("surface") ?? "PRODUCT").toUpperCase() as QuoteFormSurface;
+  const locale = url.searchParams.get("locale");
   if (!shop || !QUOTE_CAPTURE_ENABLED()) return Response.json({ form: null }, { headers: CORS });
   const surface = SURFACES.has(surfaceParam) ? surfaceParam : "PRODUCT";
-  const form = await getPublicForm(shop, surface);
+  const form = await getPublicForm(shop, surface, locale);
   return Response.json({ form }, { headers: CORS });
 };

@@ -5,6 +5,25 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 24 (PR-8e): post-submission control + multi-language
+
+- **Post-submission control (§5.4, Starter+).** `QuoteForm` gains `successMode`
+  (MESSAGE | REDIRECT) + `successValue` (migration `quote_capture_i18n`, replacing
+  PR-8b's `successMessage`). After submit the widget shows a custom thank-you
+  message or redirects to a merchant URL. Available on any paid plan
+  (`quoteCaptureAllowed`), enforced in `saveForm` + the admin "After submit" card.
+- **Multi-language buyer surfaces (§5.5, Growth).** New `translations` JSON on
+  `QuoteForm` (`{ locale: { fields: { key: { label?, placeholder?, help? } },
+  successValue? } }`). Pure `normalizeTranslations` / `resolveLocale` (base-language
+  fallback `fr-CA` → `fr`) / `localizeForm`; `getPublicForm(locale)` localizes the
+  form + message; the widget passes the storefront locale (`<html lang>`). A
+  Growth-only admin Translations editor manages per-locale overrides; stripped
+  below Growth. The quote PDF + buyer emails localize off the same store as they
+  land (PDF = PR-9b).
+- **Completes F24 §5.6 acceptance:** form builder + conditional logic, price/ATC
+  gating with no leaked price, Add-to-Quote + cart→quote, post-submission control,
+  localized form. Tests cover localization + the post-submit/translations gates.
+
 ### Added — Feature 24 (PR-8d): Add-to-Quote drawer + Convert-Cart-to-Quote
 
 - **Add-to-Quote drawer** — a storefront theme block (`add_to_quote`) lets buyers

@@ -13,8 +13,11 @@
   var renderedAt = Date.now();
   var customForm = null; // F24.1: the merchant-built form for this surface (if any)
 
+  // Storefront locale (theme sets <html lang>) drives F24.5 form localization.
+  var locale = (document.documentElement.getAttribute("lang") || (window.Shopify && window.Shopify.locale) || "").trim();
+
   // Pull the custom form config alongside the widget config (both async, non-blocking).
-  fetch(appUrl + "/api/quote-form?shop=" + encodeURIComponent(shop) + "&surface=" + surface)
+  fetch(appUrl + "/api/quote-form?shop=" + encodeURIComponent(shop) + "&surface=" + surface + "&locale=" + encodeURIComponent(locale))
     .then(function (r) { return r.json(); })
     .then(function (d) { if (d && d.form) customForm = d.form; })
     .catch(function () { /* no custom form → fall back to built-in fields */ });
@@ -128,7 +131,10 @@
       formEl.addEventListener("input", function () { applyConditions(formEl); });
       formEl.addEventListener("change", function () { applyConditions(formEl); });
     }
-    var successText = usingForm && customForm.successMessage ? customForm.successMessage : "Thanks — we got your request and will reply with pricing.";
+    // F24.4 post-submission control: a custom message, or a redirect on success.
+    var successMode = usingForm ? (customForm.successMode || "MESSAGE") : "MESSAGE";
+    var redirectUrl = usingForm && successMode === "REDIRECT" ? customForm.successValue : null;
+    var successText = usingForm && successMode === "MESSAGE" && customForm.successValue ? customForm.successValue : "Thanks — we got your request and will reply with pricing.";
 
     formEl.addEventListener("submit", function (e) {
       e.preventDefault();
@@ -168,8 +174,10 @@
       })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-          if (res && res.ok) { msg.textContent = successText; f.reset(); }
-          else { msg.textContent = (res && res.error) || "Something went wrong. Please try again."; }
+          if (res && res.ok) {
+            if (redirectUrl) { window.location.href = redirectUrl; return; }
+            msg.textContent = successText; f.reset();
+          } else { msg.textContent = (res && res.error) || "Something went wrong. Please try again."; }
         })
         .catch(function () { msg.textContent = "Something went wrong. Please try again."; });
     });

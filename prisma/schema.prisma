@@ -127,7 +127,9 @@ model QuoteForm {
   surface   QuoteFormSurface @default(PRODUCT)
   fields    Json // [{ key, type, label, required, placeholder?, help?, options?, showIf? }]
   active    Boolean          @default(true)
-  successMessage String? // F24 PR-8b: per-form thank-you message (Growth)
+  successMode  QuoteFormSuccessMode @default(MESSAGE) // F24.4 post-submission control
+  successValue String? // the thank-you message (MESSAGE) or redirect URL (REDIRECT)
+  translations Json? // F24.5 per-locale overrides: { "<locale>": { fields: {key:{label?,placeholder?,help?}}, successValue? } }
   requests  QuoteRequest[]   @relation("QuoteRequestForm")
   quotes    Quote[]          @relation("QuoteForm")
   createdAt DateTime         @default(now())
@@ -141,6 +143,11 @@ enum QuoteFormSurface {
   COLLECTION
   CART
   PAGE
+}
+
+enum QuoteFormSuccessMode {
+  MESSAGE
+  REDIRECT
 }
 
 // F24.2 — storefront price / Add-to-Cart visibility rule. Hide price and/or the

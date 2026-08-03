@@ -8,6 +8,9 @@ import {
   isFieldVisible,
   visibleFields,
   stripAdvanced,
+  normalizeTranslations,
+  resolveLocale,
+  localizeForm,
 } from "./quote-form";
 import { quoteFormFeatures as gate, quoteCaptureAllowed } from "./billing";
 
@@ -117,6 +120,42 @@ describe("quoteFormFeatures gating (basic universal, advanced Growth)", () => {
     expect(gate(null)).toMatchObject({ basicBuilder: true, multipleForms: false });
     expect(gate("GROWTH")).toMatchObject({ basicBuilder: true, conditionalLogic: true, multipleForms: true, multiLanguage: true });
     expect(gate("Growth")).toMatchObject({ multipleForms: true }); // display-name form too
+  });
+});
+
+describe("localization (§5.5)", () => {
+  const fields = normalizeFields([
+    { type: "text", label: "Company" },
+    { type: "text", label: "Note" },
+  ]);
+  const translations = normalizeTranslations({
+    "fr": { fields: { company: { label: "Société", placeholder: "  " } }, successValue: "Merci" },
+    "de-DE": { fields: { company: { label: "Firma" } } },
+    "junk": { fields: "no" },
+  });
+
+  it("normalizeTranslations keeps only string overrides, lowercases locales", () => {
+    expect(translations.fr.fields?.company).toEqual({ label: "Société" }); // blank placeholder dropped
+    expect(translations.fr.successValue).toBe("Merci");
+    expect(translations["de-de"].fields?.company?.label).toBe("Firma");
+    expect(translations.junk).toBeUndefined();
+  });
+
+  it("resolveLocale matches exact then base (fr-CA → fr)", () => {
+    expect(resolveLocale(translations, "fr-CA")).toBe("fr");
+    expect(resolveLocale(translations, "de-DE")).toBe("de-de");
+    expect(resolveLocale(translations, "es")).toBeNull();
+    expect(resolveLocale(translations, null)).toBeNull();
+  });
+
+  it("localizeForm overrides matched fields + message, falls back otherwise", () => {
+    const fr = localizeForm(fields, "Thanks", translations, "fr");
+    expect(fr.fields[0].label).toBe("Société");
+    expect(fr.fields[1].label).toBe("Note"); // untranslated → default
+    expect(fr.successValue).toBe("Merci");
+    const es = localizeForm(fields, "Thanks", translations, "es"); // no locale → defaults
+    expect(es.fields[0].label).toBe("Company");
+    expect(es.successValue).toBe("Thanks");
   });
 });
 

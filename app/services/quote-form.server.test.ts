@@ -66,23 +66,38 @@ describe.skipIf(!hasDb)("quote-form.server (DB)", () => {
     { type: "text", label: "Bulk qty", required: true, showIf: { field: "reason", equals: "Bulk" } },
   ];
 
-  it("Growth persists conditional logic + a success message; getPublicForm returns them", async () => {
+  it("Growth persists conditional logic + translations; getPublicForm localizes", async () => {
     await growth();
-    const r = await saveForm("qf.myshopify.com", { name: "adv", surface: "PRODUCT", fields: advancedFields, successMessage: "  We'll be in touch  " });
+    const r = await saveForm("qf.myshopify.com", {
+      name: "adv", surface: "PRODUCT", fields: advancedFields,
+      successMode: "MESSAGE", successValue: "  We'll be in touch  ",
+      translations: { fr: { fields: { reason: { label: "Raison" } }, successValue: "À bientôt" } },
+    });
     const full = await getForm("qf.myshopify.com", (r as { id: string }).id);
     expect(full?.fields[1].showIf).toEqual({ field: "reason", equals: "Bulk" });
-    expect(full?.successMessage).toBe("We'll be in touch");
-    const pub = await getPublicForm("qf.myshopify.com", "PRODUCT");
-    expect(pub?.fields[1].showIf).toEqual({ field: "reason", equals: "Bulk" });
-    expect(pub?.successMessage).toBe("We'll be in touch");
+    expect(full?.successValue).toBe("We'll be in touch");
+    // Default locale.
+    const en = await getPublicForm("qf.myshopify.com", "PRODUCT");
+    expect(en?.fields[0].label).toBe("Reason");
+    expect(en?.successValue).toBe("We'll be in touch");
+    // French (base-match on "fr-CA").
+    const fr = await getPublicForm("qf.myshopify.com", "PRODUCT", "fr-CA");
+    expect(fr?.fields[0].label).toBe("Raison");
+    expect(fr?.successValue).toBe("À bientôt");
   });
 
-  it("below Growth, conditional logic + success message are stripped server-side", async () => {
+  it("post-submission control allowed on Starter; translations stripped below Growth", async () => {
     await starter();
-    const r = await saveForm("qf.myshopify.com", { name: "adv", surface: "PRODUCT", fields: advancedFields, successMessage: "custom" });
+    const r = await saveForm("qf.myshopify.com", {
+      name: "adv", surface: "PRODUCT", fields: advancedFields,
+      successMode: "REDIRECT", successValue: "https://shop.example/thanks",
+      translations: { fr: { successValue: "x" } },
+    });
     const full = await getForm("qf.myshopify.com", (r as { id: string }).id);
-    expect(full?.fields[1].showIf).toBeUndefined(); // stripped
-    expect(full?.successMessage).toBeNull(); // stripped
+    expect(full?.fields[1].showIf).toBeUndefined(); // conditional logic stripped (Growth)
+    expect(full?.successMode).toBe("REDIRECT"); // post-submit control is Starter+
+    expect(full?.successValue).toBe("https://shop.example/thanks");
+    expect(full?.translations).toEqual({}); // translations stripped (Growth)
   });
 
   it("getQuoteCaptureConfig: on for paid + flag, off otherwise (F24.3)", async () => {

@@ -1,8 +1,16 @@
-import type { QuoteFormSurface as PrismaSurface } from "@prisma/client";
+import type { QuoteFormSurface as PrismaSurface, QuoteFormSuccessMode } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { quoteFormFeatures, quoteCaptureAllowed } from "../lib/billing";
-import { normalizeFields, stripAdvanced, type QuoteFormField, type QuoteFormSurface } from "../lib/quote-form";
+import {
+  normalizeFields,
+  stripAdvanced,
+  normalizeTranslations,
+  localizeForm,
+  type QuoteFormField,
+  type QuoteFormSurface,
+  type Translations,
+} from "../lib/quote-form";
 
 /**
  * F24.1 — storefront quote form builder service. The merchant builds forms in
@@ -32,18 +40,25 @@ async function planFor(shopDomain: string): Promise<string | null> {
   return shop?.plan ?? null;
 }
 
+export type SuccessMode = "MESSAGE" | "REDIRECT";
+
 export interface QuoteFormRow {
   id: string;
   name: string;
   surface: QuoteFormSurface;
   fields: QuoteFormField[];
   active: boolean;
-  successMessage: string | null;
+  successMode: SuccessMode;
+  successValue: string | null;
+  translations: Translations;
   updatedAt: Date;
 }
 
-function toRow(r: { id: string; name: string; surface: PrismaSurface; fields: unknown; active: boolean; successMessage: string | null; updatedAt: Date }): QuoteFormRow {
-  return { id: r.id, name: r.name, surface: r.surface as QuoteFormSurface, fields: normalizeFields(r.fields), active: r.active, successMessage: r.successMessage, updatedAt: r.updatedAt };
+function toRow(r: { id: string; name: string; surface: PrismaSurface; fields: unknown; active: boolean; successMode: QuoteFormSuccessMode; successValue: string | null; translations: unknown; updatedAt: Date }): QuoteFormRow {
+  return {
+    id: r.id, name: r.name, surface: r.surface as QuoteFormSurface, fields: normalizeFields(r.fields), active: r.active,
+    successMode: r.successMode as SuccessMode, successValue: r.successValue, translations: normalizeTranslations(r.translations), updatedAt: r.updatedAt,
+  };
 }
 
 export async function listForms(shopDomain: string): Promise<QuoteFormRow[]> {
@@ -66,8 +81,11 @@ export interface SaveFormInput {
   surface: QuoteFormSurface;
   fields: unknown; // normalised here
   active?: boolean;
-  /** Per-form thank-you message (Growth). Stripped below Growth. */
-  successMessage?: string | null;
+  /** Post-submission control (Starter+): show a message or redirect to a URL. */
+  successMode?: SuccessMode;
+  successValue?: string | null;
+  /** Per-locale overrides (Growth). Stripped below Growth. */
+  translations?: unknown;
 }
 
 /**
@@ -81,19 +99,26 @@ export async function saveForm(shopDomain: string, input: SaveFormInput): Promis
   if (!shopId) return { error: "Unknown shop." };
   const plan = await planFor(shopDomain);
   const features = quoteFormFeatures(plan);
+  const advanced = features.conditionalLogic; // Growth
+  const paid = quoteCaptureAllowed(plan); // Starter+
 
-  // Advanced config (conditional logic + per-form success message) is Growth.
-  // Strip it server-side below Growth so a lower plan can't sneak it via the API.
+  // Conditional logic (showIf) + translations are Growth; post-submission control
+  // is Starter+. Strip each server-side below its gate so a lower plan can't sneak
+  // it in via the API.
   const normalized = normalizeFields(input.fields);
-  const fields = features.conditionalLogic ? normalized : stripAdvanced(normalized);
-  const successMessage = features.conditionalLogic ? (input.successMessage?.trim() || null) : null;
+  const fields = advanced ? normalized : stripAdvanced(normalized);
+  const successMode: QuoteFormSuccessMode = paid && input.successMode === "REDIRECT" ? "REDIRECT" : "MESSAGE";
+  const successValue = paid ? (input.successValue?.trim() || null) : null;
+  const translations = advanced ? (normalizeTranslations(input.translations) as object) : ({} as object);
   const name = input.name.trim() || "Quote form";
   const active = input.active ?? true;
+
+  const writable = { name, surface: input.surface, fields: fields as object, active, successMode, successValue, translations };
 
   if (input.id) {
     const existing = await prisma.quoteForm.findFirst({ where: { id: input.id, shopId }, select: { id: true } });
     if (!existing) return { error: "Form not found." };
-    await prisma.quoteForm.update({ where: { id: input.id }, data: { name, surface: input.surface, fields: fields as object, active, successMessage } });
+    await prisma.quoteForm.update({ where: { id: input.id }, data: writable });
     await appendEvent({ shopId, type: "QUOTE_FORM_UPDATED", entityType: "QuoteForm", entityId: input.id, payload: { fields: fields.length } });
     return { id: input.id };
   }
@@ -103,7 +128,7 @@ export async function saveForm(shopDomain: string, input: SaveFormInput): Promis
     const count = await prisma.quoteForm.count({ where: { shopId } });
     if (count >= 1) throw new MultipleFormsError();
   }
-  const created = await prisma.quoteForm.create({ data: { shopId, name, surface: input.surface, fields: fields as object, active, successMessage }, select: { id: true } });
+  const created = await prisma.quoteForm.create({ data: { shopId, ...writable }, select: { id: true } });
   await appendEvent({ shopId, type: "QUOTE_FORM_UPDATED", entityType: "QuoteForm", entityId: created.id, payload: { created: true, fields: fields.length } });
   return { id: created.id };
 }
@@ -123,16 +148,19 @@ export async function deleteForm(shopDomain: string, id: string): Promise<void> 
 export async function getPublicForm(
   shopDomain: string,
   surface: QuoteFormSurface,
-): Promise<{ formId: string; name: string; fields: QuoteFormField[]; successMessage: string | null } | null> {
+  locale?: string | null,
+): Promise<{ formId: string; name: string; fields: QuoteFormField[]; successMode: SuccessMode; successValue: string | null } | null> {
   const shopId = await shopIdFor(shopDomain);
   if (!shopId) return null;
   const row = await prisma.quoteForm.findFirst({
     where: { shopId, active: true, surface },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, fields: true, successMessage: true },
+    select: { id: true, name: true, fields: true, successMode: true, successValue: true, translations: true },
   });
   if (!row) return null;
-  return { formId: row.id, name: row.name, fields: normalizeFields(row.fields), successMessage: row.successMessage };
+  // F24.5 — localize field labels/placeholders/help + the message to the storefront locale.
+  const { fields, successValue } = localizeForm(normalizeFields(row.fields), row.successValue, normalizeTranslations(row.translations), locale);
+  return { formId: row.id, name: row.name, fields, successMode: row.successMode as SuccessMode, successValue };
 }
 
 /** Validate that a formId belongs to the shop (used when storing a submission). */
