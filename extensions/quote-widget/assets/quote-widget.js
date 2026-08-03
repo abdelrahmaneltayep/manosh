@@ -34,16 +34,22 @@
   function esc(s) { return String(s == null ? "" : s); }
   function attr(s) { return esc(s).replace(/"/g, "&quot;"); }
 
-  // Render one custom-form field as a labelled control by type. Value key is cf_<key>.
+  // Render one custom-form field as a labelled control by type. Value key is
+  // cf_<key>. Conditional fields (showIf) carry data attrs + start hidden.
   function renderField(f) {
     var name = "cf_" + esc(f.key);
     var req = f.required ? " required" : "";
     var ph = f.placeholder ? ' placeholder="' + attr(f.placeholder) + '"' : "";
     var help = f.help ? '<span class="mannon-qw-help">' + esc(f.help) + "</span>" : "";
+    // data-* let applyConditions() toggle visibility; conditional fields hide first.
+    var cond = f.showIf && f.showIf.field
+      ? ' data-mfif="' + attr(f.showIf.field) + '" data-mfeq="' + attr(f.showIf.equals) + '" style="display:none"'
+      : "";
+    var lbl = 'data-mfk="' + attr(f.key) + '"' + cond;
     var control;
     switch (f.type) {
       case "checkbox":
-        return '<label class="mannon-qw-l mannon-qw-cb"><input type="checkbox" name="' + name + '"' + req + "> " + esc(f.label) + help + "</label>";
+        return '<label class="mannon-qw-l mannon-qw-cb" ' + lbl + '><input type="checkbox" name="' + name + '"' + req + "> " + esc(f.label) + help + "</label>";
       case "dropdown":
         var opts = (f.options || []).map(function (o) { return '<option value="' + attr(o) + '">' + esc(o) + "</option>"; }).join("");
         control = '<select name="' + name + '"' + req + "><option value=\"\">Choose…</option>" + opts + "</select>";
@@ -56,7 +62,28 @@
       case "product": control = '<input type="text" name="' + name + '"' + req + ph + ">"; break;
       default: control = '<input type="text" name="' + name + '"' + req + ph + ">";
     }
-    return '<label class="mannon-qw-l">' + esc(f.label) + control + help + "</label>";
+    return '<label class="mannon-qw-l" ' + lbl + ">" + esc(f.label) + control + help + "</label>";
+  }
+
+  // The current value of field key `k` inside form `f` (checkbox → "true"/"false").
+  function answerOf(f, k) {
+    var el = f.querySelector('[name="cf_' + k + '"]');
+    if (!el) return "";
+    if (el.type === "checkbox") return el.checked ? "true" : "false";
+    return el.value || "";
+  }
+
+  // Show/hide conditional fields based on current answers. A hidden field's
+  // control is disabled so it never submits or blocks (required) while hidden.
+  function applyConditions(f) {
+    var labels = f.querySelectorAll("[data-mfif]");
+    for (var i = 0; i < labels.length; i++) {
+      var lbl = labels[i];
+      var visible = answerOf(f, lbl.getAttribute("data-mfif")) === lbl.getAttribute("data-mfeq");
+      lbl.style.display = visible ? "" : "none";
+      var ctrl = lbl.querySelector("input,select,textarea");
+      if (ctrl) ctrl.disabled = !visible;
+    }
   }
 
   function openModal(cfg) {
@@ -94,14 +121,23 @@
     overlay.querySelector(".mannon-qw-x").addEventListener("click", close);
     overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
 
-    overlay.querySelector("form").addEventListener("submit", function (e) {
+    var formEl = overlay.querySelector("form");
+    // F24 PR-8b: evaluate conditional fields now and on every answer change.
+    if (usingForm) {
+      applyConditions(formEl);
+      formEl.addEventListener("input", function () { applyConditions(formEl); });
+      formEl.addEventListener("change", function () { applyConditions(formEl); });
+    }
+    var successText = usingForm && customForm.successMessage ? customForm.successMessage : "Thanks — we got your request and will reply with pricing.";
+
+    formEl.addEventListener("submit", function (e) {
       e.preventDefault();
       var f = e.target;
       var custom = {};
       var fieldDefs = usingForm ? customForm.fields : (cfg.customFields || []);
       fieldDefs.forEach(function (cf) {
         var el = f.querySelector('[name="cf_' + cf.key + '"]');
-        if (!el) return;
+        if (!el || el.disabled) return; // a hidden (conditional) field never submits
         if (el.type === "checkbox") custom[cf.key] = el.checked;
         else if (el.type === "file") { if (el.files && el.files[0]) custom[cf.key] = el.files[0].name; }
         else if (el.value) custom[cf.key] = el.value;
@@ -132,7 +168,7 @@
       })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-          if (res && res.ok) { msg.textContent = "Thanks — we got your request and will reply with pricing."; f.reset(); }
+          if (res && res.ok) { msg.textContent = successText; f.reset(); }
           else { msg.textContent = (res && res.error) || "Something went wrong. Please try again."; }
         })
         .catch(function () { msg.textContent = "Something went wrong. Please try again."; });

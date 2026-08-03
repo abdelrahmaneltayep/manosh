@@ -124,8 +124,9 @@ model QuoteForm {
   shop      Shop             @relation(fields: [shopId], references: [id], onDelete: Cascade)
   name      String
   surface   QuoteFormSurface @default(PRODUCT)
-  fields    Json // [{ key, type, label, required, placeholder?, help?, options? }]
+  fields    Json // [{ key, type, label, required, placeholder?, help?, options?, showIf? }]
   active    Boolean          @default(true)
+  successMessage String? // F24 PR-8b: per-form thank-you message (Growth)
   requests  QuoteRequest[]   @relation("QuoteRequestForm")
   quotes    Quote[]          @relation("QuoteForm")
   createdAt DateTime         @default(now())

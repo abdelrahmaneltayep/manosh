@@ -2,7 +2,7 @@ import type { QuoteFormSurface as PrismaSurface } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { quoteFormFeatures } from "../lib/billing";
-import { normalizeFields, type QuoteFormField, type QuoteFormSurface } from "../lib/quote-form";
+import { normalizeFields, stripAdvanced, type QuoteFormField, type QuoteFormSurface } from "../lib/quote-form";
 
 /**
  * F24.1 — storefront quote form builder service. The merchant builds forms in
@@ -38,11 +38,12 @@ export interface QuoteFormRow {
   surface: QuoteFormSurface;
   fields: QuoteFormField[];
   active: boolean;
+  successMessage: string | null;
   updatedAt: Date;
 }
 
-function toRow(r: { id: string; name: string; surface: PrismaSurface; fields: unknown; active: boolean; updatedAt: Date }): QuoteFormRow {
-  return { id: r.id, name: r.name, surface: r.surface as QuoteFormSurface, fields: normalizeFields(r.fields), active: r.active, updatedAt: r.updatedAt };
+function toRow(r: { id: string; name: string; surface: PrismaSurface; fields: unknown; active: boolean; successMessage: string | null; updatedAt: Date }): QuoteFormRow {
+  return { id: r.id, name: r.name, surface: r.surface as QuoteFormSurface, fields: normalizeFields(r.fields), active: r.active, successMessage: r.successMessage, updatedAt: r.updatedAt };
 }
 
 export async function listForms(shopDomain: string): Promise<QuoteFormRow[]> {
@@ -65,6 +66,8 @@ export interface SaveFormInput {
   surface: QuoteFormSurface;
   fields: unknown; // normalised here
   active?: boolean;
+  /** Per-form thank-you message (Growth). Stripped below Growth. */
+  successMessage?: string | null;
 }
 
 /**
@@ -79,14 +82,18 @@ export async function saveForm(shopDomain: string, input: SaveFormInput): Promis
   const plan = await planFor(shopDomain);
   const features = quoteFormFeatures(plan);
 
-  const fields = normalizeFields(input.fields);
+  // Advanced config (conditional logic + per-form success message) is Growth.
+  // Strip it server-side below Growth so a lower plan can't sneak it via the API.
+  const normalized = normalizeFields(input.fields);
+  const fields = features.conditionalLogic ? normalized : stripAdvanced(normalized);
+  const successMessage = features.conditionalLogic ? (input.successMessage?.trim() || null) : null;
   const name = input.name.trim() || "Quote form";
   const active = input.active ?? true;
 
   if (input.id) {
     const existing = await prisma.quoteForm.findFirst({ where: { id: input.id, shopId }, select: { id: true } });
     if (!existing) return { error: "Form not found." };
-    await prisma.quoteForm.update({ where: { id: input.id }, data: { name, surface: input.surface, fields: fields as object, active } });
+    await prisma.quoteForm.update({ where: { id: input.id }, data: { name, surface: input.surface, fields: fields as object, active, successMessage } });
     await appendEvent({ shopId, type: "QUOTE_FORM_UPDATED", entityType: "QuoteForm", entityId: input.id, payload: { fields: fields.length } });
     return { id: input.id };
   }
@@ -96,7 +103,7 @@ export async function saveForm(shopDomain: string, input: SaveFormInput): Promis
     const count = await prisma.quoteForm.count({ where: { shopId } });
     if (count >= 1) throw new MultipleFormsError();
   }
-  const created = await prisma.quoteForm.create({ data: { shopId, name, surface: input.surface, fields: fields as object, active }, select: { id: true } });
+  const created = await prisma.quoteForm.create({ data: { shopId, name, surface: input.surface, fields: fields as object, active, successMessage }, select: { id: true } });
   await appendEvent({ shopId, type: "QUOTE_FORM_UPDATED", entityType: "QuoteForm", entityId: created.id, payload: { created: true, fields: fields.length } });
   return { id: created.id };
 }
@@ -116,16 +123,16 @@ export async function deleteForm(shopDomain: string, id: string): Promise<void> 
 export async function getPublicForm(
   shopDomain: string,
   surface: QuoteFormSurface,
-): Promise<{ formId: string; name: string; fields: QuoteFormField[] } | null> {
+): Promise<{ formId: string; name: string; fields: QuoteFormField[]; successMessage: string | null } | null> {
   const shopId = await shopIdFor(shopDomain);
   if (!shopId) return null;
   const row = await prisma.quoteForm.findFirst({
     where: { shopId, active: true, surface },
     orderBy: { updatedAt: "desc" },
-    select: { id: true, name: true, fields: true },
+    select: { id: true, name: true, fields: true, successMessage: true },
   });
   if (!row) return null;
-  return { formId: row.id, name: row.name, fields: normalizeFields(row.fields) };
+  return { formId: row.id, name: row.name, fields: normalizeFields(row.fields), successMessage: row.successMessage };
 }
 
 /** Validate that a formId belongs to the shop (used when storing a submission). */

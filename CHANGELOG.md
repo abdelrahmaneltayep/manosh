@@ -5,6 +5,23 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 24 (PR-8b): advanced form builder (conditional logic + success message)
+
+- **Conditional logic** (`showIf`) — a field can show only when an **earlier**
+  field's answer equals a value. Lives in the `fields` JSON (no new column);
+  `normalizeFields` validates the reference (drops self/unknown/cycle refs),
+  `isFieldVisible`/`visibleFields` evaluate it, and `missingRequired` skips hidden
+  required fields. The storefront widget renders conditional fields hidden +
+  disabled and re-evaluates on every answer change (so they never submit or block).
+- **Per-form success message** (`QuoteForm.successMessage`, migration
+  `quote_capture_advanced`) — a custom thank-you shown after submit; the widget uses
+  it in place of the default text.
+- **Growth-gated** (`quoteFormFeatures.conditionalLogic`): the admin shows the
+  per-field "Show only if" controls + the success-message field on Growth, disabled +
+  upgrade-labeled below; `saveForm` strips `showIf` and nulls `successMessage` below
+  Growth server-side. Multiple named forms per surface (Growth, from PR-8a) bind via
+  `getPublicForm`. Tests cover conditional rendering, the required-skip, and the gate.
+
 ### Added — Feature 24 (PR-8a): Storefront Quote Capture — custom form builder
 
 - **`QuoteForm` model + builder.** A merchant builds an ordered set of storefront

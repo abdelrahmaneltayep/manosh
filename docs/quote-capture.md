@@ -56,8 +56,41 @@ storefront form → `POST /api/quote-request` (carries `formId` + answers) →
 `QuoteRequest` (with `formId`) → merchant one-click convert → `Quote` (with
 `formId`). So **`quote.created` carries `formId`** end to end.
 
+## PR-8b — Advanced builder (§5.1, Growth)
+
+Conditional logic, per-form success message, and multiple named forms per surface.
+All **Growth** (`quoteFormFeatures.conditionalLogic` / `.multipleForms`), enforced
+in the service *and* shown disabled + upgrade-labeled in the UI.
+
+### Conditional logic (`showIf`, in the `fields` JSON — no new column)
+
+Each field may carry `showIf: { field, equals }` — show it only when an **earlier**
+field's answer equals a value. `normalizeFields` validates the reference (earlier
+key only; self/unknown/cycle refs are dropped), and `isFieldVisible` / `visibleFields`
+evaluate it. `missingRequired` **skips hidden required fields** (a field you can't
+see can't block submit). All pure + tested (`quote-form.test.ts`).
+
+- **Admin:** a per-field "Show only if" (earlier field) + "equals" control appears
+  on Growth. The **After submit** card holds the thank-you message (Growth), disabled
+  + labeled below Growth.
+- **Storefront:** conditional fields render hidden and their control is **disabled**
+  so they never submit or block; the widget re-evaluates visibility on every answer
+  change. The form's `successMessage` replaces the default thank-you text.
+- **Server gate:** `saveForm` runs `stripAdvanced` and nulls `successMessage` below
+  Growth, so a lower plan can't sneak advanced config in via the API.
+
+### Per-form success message (`QuoteForm.successMessage`)
+
+Migration `quote_capture_advanced` adds the nullable column. (The general
+message-or-redirect control is §5.4 / PR-8e.)
+
+### Multiple named forms per surface
+
+Already unlocked on Growth by the PR-8a single-form cap; `getPublicForm` picks the
+active form for a surface (most-recently-updated). Bind different forms to
+product / collection / cart / standalone-page surfaces.
+
 ### Not yet (later slices)
 
-Conditional logic + multiple named forms (PR-8b), price/ATC gating (PR-8c),
-Add-to-Quote drawer + cart→quote (PR-8d), post-submission control + multi-language
-(PR-8e).
+Price/ATC gating (PR-8c), Add-to-Quote drawer + cart→quote (PR-8d), post-submission
+redirect + multi-language (PR-8e).

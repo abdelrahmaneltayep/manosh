@@ -60,4 +60,28 @@ describe.skipIf(!hasDb)("quote-form.server (DB)", () => {
     await deleteForm("qf.myshopify.com", (r as { id: string }).id);
     expect(await listForms("qf.myshopify.com")).toHaveLength(0);
   });
+
+  const advancedFields = [
+    { type: "dropdown", label: "Reason", options: "Bulk,Sample" },
+    { type: "text", label: "Bulk qty", required: true, showIf: { field: "reason", equals: "Bulk" } },
+  ];
+
+  it("Growth persists conditional logic + a success message; getPublicForm returns them", async () => {
+    await growth();
+    const r = await saveForm("qf.myshopify.com", { name: "adv", surface: "PRODUCT", fields: advancedFields, successMessage: "  We'll be in touch  " });
+    const full = await getForm("qf.myshopify.com", (r as { id: string }).id);
+    expect(full?.fields[1].showIf).toEqual({ field: "reason", equals: "Bulk" });
+    expect(full?.successMessage).toBe("We'll be in touch");
+    const pub = await getPublicForm("qf.myshopify.com", "PRODUCT");
+    expect(pub?.fields[1].showIf).toEqual({ field: "reason", equals: "Bulk" });
+    expect(pub?.successMessage).toBe("We'll be in touch");
+  });
+
+  it("below Growth, conditional logic + success message are stripped server-side", async () => {
+    await starter();
+    const r = await saveForm("qf.myshopify.com", { name: "adv", surface: "PRODUCT", fields: advancedFields, successMessage: "custom" });
+    const full = await getForm("qf.myshopify.com", (r as { id: string }).id);
+    expect(full?.fields[1].showIf).toBeUndefined(); // stripped
+    expect(full?.successMessage).toBeNull(); // stripped
+  });
 });

@@ -5,6 +5,9 @@ import {
   emptyField,
   keyFromLabel,
   missingRequired,
+  isFieldVisible,
+  visibleFields,
+  stripAdvanced,
 } from "./quote-form";
 import { quoteFormFeatures as gate } from "./billing";
 
@@ -65,6 +68,46 @@ describe("keyFromLabel + missingRequired", () => {
     ]);
     expect(missingRequired(fields, { name: "Jo", agree: "on" })).toEqual([]);
     expect(missingRequired(fields, { name: "  ", agree: false })).toEqual(["Name", "Agree"]);
+  });
+});
+
+describe("conditional logic (showIf)", () => {
+  const built = () =>
+    normalizeFields([
+      { type: "dropdown", label: "Reason", options: "Bulk,Sample" },
+      { type: "text", label: "Bulk qty", showIf: { field: "reason", equals: "Bulk" } },
+      { type: "text", label: "Self ref", showIf: { field: "self_ref", equals: "x" } }, // self → dropped
+      { type: "text", label: "Bad ref", showIf: { field: "nope", equals: "y" } }, // unknown → dropped
+    ]);
+
+  it("keeps only showIf that references an earlier field (drops self/unknown)", () => {
+    const f = built();
+    expect(f[1].showIf).toEqual({ field: "reason", equals: "Bulk" });
+    expect(f[2].showIf).toBeUndefined();
+    expect(f[3].showIf).toBeUndefined();
+  });
+
+  it("isFieldVisible / visibleFields evaluate the rule", () => {
+    const f = built();
+    expect(isFieldVisible(f[1], { reason: "Bulk" })).toBe(true);
+    expect(isFieldVisible(f[1], { reason: "Sample" })).toBe(false);
+    expect(isFieldVisible(f[1], {})).toBe(false); // unanswered → hidden
+    expect(visibleFields(f, { reason: "Sample" }).map((x) => x.key)).toEqual(["reason", "self_ref", "bad_ref"]);
+    expect(visibleFields(f, { reason: "Bulk" }).map((x) => x.key)).toContain("bulk_qty");
+  });
+
+  it("missingRequired skips a hidden required field", () => {
+    const f = normalizeFields([
+      { type: "dropdown", label: "Reason", options: "Bulk,Sample" },
+      { type: "text", label: "Bulk qty", required: true, showIf: { field: "reason", equals: "Bulk" } },
+    ]);
+    expect(missingRequired(f, { reason: "Sample" })).toEqual([]); // hidden → not demanded
+    expect(missingRequired(f, { reason: "Bulk" })).toEqual(["Bulk qty"]); // shown + empty → demanded
+  });
+
+  it("stripAdvanced removes showIf (Growth-gate enforcement)", () => {
+    const stripped = stripAdvanced(built());
+    expect(stripped.every((f) => f.showIf === undefined)).toBe(true);
   });
 });
 

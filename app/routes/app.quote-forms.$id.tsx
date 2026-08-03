@@ -40,6 +40,7 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
     surface: (String(form.get("surface") ?? "PRODUCT") as "PRODUCT" | "COLLECTION" | "CART" | "PAGE"),
     fields,
     active: form.get("active") === "on",
+    successMessage: String(form.get("successMessage") ?? ""),
   });
   return "error" in res ? { ok: false, error: res.error } : { ok: true, message: "Form saved." };
 };
@@ -55,9 +56,13 @@ export default function QuoteFormBuilder() {
   const [active, setActive] = useState(form.active);
   const [fields, setFields] = useState<QuoteFormField[]>(form.fields);
   const [newType, setNewType] = useState<QuoteFieldType>("text");
+  const [successMessage, setSuccessMessage] = useState(form.successMessage ?? "");
+  const advanced = features.conditionalLogic; // Growth
 
   const update = (i: number, patch: Partial<QuoteFormField>) =>
     setFields(fields.map((f, idx) => (idx === i ? { ...f, ...patch } : f)));
+  const setShowIf = (i: number, ref: string, equals: string) =>
+    setFields(fields.map((f, idx) => (idx === i ? { ...f, showIf: ref ? { field: ref, equals } : undefined } : f)));
   const addField = () => setFields([...fields, emptyField(newType)]);
   const removeField = (i: number) => setFields(fields.filter((_, idx) => idx !== i));
   const move = (i: number, dir: -1 | 1) => setFields(moveField(fields, i, i + dir));
@@ -68,6 +73,7 @@ export default function QuoteFormBuilder() {
       <Form method="post">
         <input type="hidden" name="fields" value={JSON.stringify(fields)} />
         <input type="hidden" name="active" value={active ? "on" : "off"} />
+        <input type="hidden" name="successMessage" value={successMessage} />
         <BlockStack gap="400">
           {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
           {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
@@ -107,6 +113,21 @@ export default function QuoteFormBuilder() {
                         <Box minWidth="16rem"><TextField label="Options (comma-separated)" value={(f.options ?? []).join(", ")} onChange={(v) => update(i, { options: v.split(",").map((o) => o.trim()).filter(Boolean) })} autoComplete="off" /></Box>
                       )}
                     </InlineStack>
+                    {advanced && i > 0 && (
+                      <InlineStack gap="300" blockAlign="end" wrap>
+                        <Box minWidth="14rem">
+                          <Select
+                            label="Show only if"
+                            options={[{ label: "Always show", value: "" }, ...fields.slice(0, i).map((pf) => ({ label: pf.label, value: pf.key }))]}
+                            value={f.showIf?.field ?? ""}
+                            onChange={(v) => setShowIf(i, v, f.showIf?.equals ?? "")}
+                          />
+                        </Box>
+                        {f.showIf?.field && (
+                          <Box minWidth="12rem"><TextField label="equals" value={f.showIf.equals} onChange={(v) => setShowIf(i, f.showIf!.field, v)} autoComplete="off" /></Box>
+                        )}
+                      </InlineStack>
+                    )}
                     <InlineStack gap="200">
                       <Button size="micro" disabled={i === 0} onClick={() => move(i, -1)} accessibilityLabel="Move up">↑</Button>
                       <Button size="micro" disabled={i === fields.length - 1} onClick={() => move(i, 1)} accessibilityLabel="Move down">↓</Button>
@@ -128,15 +149,23 @@ export default function QuoteFormBuilder() {
           <Card>
             <BlockStack gap="200">
               <InlineStack gap="200" blockAlign="center">
-                <Text as="h2" variant="headingMd">Conditional logic</Text>
-                {!features.conditionalLogic && <Badge tone="info">Growth</Badge>}
+                <Text as="h2" variant="headingMd">After submit</Text>
+                {!advanced && <Badge tone="info">Growth</Badge>}
               </InlineStack>
-              {features.conditionalLogic ? (
-                <Text as="p" tone="subdued" variant="bodyMd">Show a field only when another answer matches — configure this in the next release.</Text>
+              {advanced ? (
+                <TextField
+                  label="Thank-you message"
+                  value={successMessage}
+                  onChange={setSuccessMessage}
+                  autoComplete="off"
+                  multiline={2}
+                  placeholder="Thanks — we got your request and will reply with pricing."
+                  helpText="Shown to the buyer after they submit this form."
+                />
               ) : (
-                <Tooltip content="Upgrade to Growth to show/hide fields based on earlier answers.">
+                <Tooltip content="Upgrade to Growth for conditional fields and a custom thank-you message.">
                   <Box>
-                    <Checkbox label="Show a field only when another answer matches" checked={false} disabled onChange={() => {}} />
+                    <TextField label="Thank-you message" value="" disabled autoComplete="off" helpText="Conditional fields + a custom thank-you message are on Growth." />
                   </Box>
                 </Tooltip>
               )}

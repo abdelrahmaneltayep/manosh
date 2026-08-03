@@ -14,6 +14,13 @@ export type QuoteFieldType =
   | "date"
   | "product";
 
+/** Conditional-logic rule (F24 PR-8b, Growth): show this field only when the
+ *  answer to `field` (an earlier field's key) equals `equals`. */
+export interface ShowIfRule {
+  field: string;
+  equals: string;
+}
+
 export interface QuoteFormField {
   /** Stable machine key (unique within a form), used as the answer key. */
   key: string;
@@ -24,6 +31,8 @@ export interface QuoteFormField {
   help?: string;
   /** Choices for `dropdown` (ignored for other types). */
   options?: string[];
+  /** Growth: show this field only when another field's answer matches. */
+  showIf?: ShowIfRule;
 }
 
 export type QuoteFormSurface = "PRODUCT" | "COLLECTION" | "CART" | "PAGE";
@@ -104,9 +113,45 @@ export function normalizeFields(raw: unknown): QuoteFormField[] {
           : [];
       if (opts.length) field.options = opts;
     }
+    // Conditional logic (Growth): reference an EARLIER field's key only (no
+    // cycles, no self-reference). Invalid references are dropped, not errored.
+    const rawShowIf = r.showIf as { field?: unknown; equals?: unknown } | undefined;
+    if (rawShowIf && typeof rawShowIf.field === "string") {
+      const ref = keyFromLabel(rawShowIf.field);
+      if (ref && ref !== unique && seen.has(ref)) {
+        field.showIf = { field: ref, equals: rawShowIf.equals == null ? "" : String(rawShowIf.equals) };
+      }
+    }
     out.push(field);
   }
   return out;
+}
+
+/**
+ * Is a field currently visible given the buyer's answers? A field with no
+ * `showIf` is always visible; otherwise the referenced field's answer must equal
+ * the rule value (checkbox truthiness is normalised to "true"/"false"). Pure.
+ */
+export function isFieldVisible(field: QuoteFormField, answers: Record<string, unknown>): boolean {
+  if (!field.showIf) return true;
+  const raw = answers[field.showIf.field];
+  const value = raw === true || raw === "true" || raw === "on" ? "true" : raw === false ? "false" : raw == null ? "" : String(raw);
+  return value === field.showIf.equals;
+}
+
+/** The subset of fields currently visible for these answers. Pure. */
+export function visibleFields(fields: QuoteFormField[], answers: Record<string, unknown>): QuoteFormField[] {
+  return fields.filter((f) => isFieldVisible(f, answers));
+}
+
+/** Strip advanced config (conditional logic) from every field. Used to enforce
+ *  the Growth gate server-side so a lower plan can't sneak `showIf` in. Pure. */
+export function stripAdvanced(fields: QuoteFormField[]): QuoteFormField[] {
+  return fields.map((f) => {
+    if (!f.showIf) return f;
+    const { showIf: _omit, ...rest } = f;
+    return rest;
+  });
 }
 
 /** Move the field at `from` to `to` (clamped), returning a new array. Pure. */
@@ -129,6 +174,8 @@ export function missingRequired(fields: QuoteFormField[], answers: Record<string
   const missing: string[] = [];
   for (const f of fields) {
     if (!f.required) continue;
+    // A required field hidden by its condition can't be filled — don't demand it.
+    if (!isFieldVisible(f, answers)) continue;
     const v = answers[f.key];
     const present = f.type === "checkbox" ? v === true || v === "true" || v === "on" : v != null && String(v).trim() !== "";
     if (!present) missing.push(f.label);
