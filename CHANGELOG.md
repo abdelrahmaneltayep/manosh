@@ -5,6 +5,21 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — PR-7: quick wins (§4)
+
+- **F21 offers now move the AARRR funnel.** Added `OFFER_CREATED` / `OFFER_COUNTERED`
+  (activation) and `OFFER_ACCEPTED` / `OFFER_CONVERTED` (revenue) to the funnel map
+  (`app/lib/analytics.ts`), so PostHog reflects Make-an-Offer activity. The events
+  were already in the append-only `Event` stream; only the map needed them
+  (`appendEvent → captureFunnelEvent` emits the rest). `OFFER_DECLINED` /
+  `OFFER_RULE_UPDATED` stay out of the funnel (Event-table only), like `QUOTE_EXPIRED`.
+- **Pricing v3 trust line — one source of truth.** Settings now renders
+  `NO_PER_ORDER_FEES_COPY` (was defined-but-unused while Settings hardcoded the same
+  sentence), so the "no per-order fees" promise lives in exactly one place.
+- **Demo Make-an-Offer seed data.** `prisma/seed.ts` seeds (idempotently) a widget
+  config, one margin-safe `OfferRule`, and a pending buyer `Offer` for the demo
+  shop, so a fresh install shows the Offers admin with something to act on.
+
 ### Changed — PR-6: Built-for-Shopify design hardening (§3.3)
 
 - **Contextual Save Bar on the Make-an-Offer widget form** (`/app/offers/widget`).

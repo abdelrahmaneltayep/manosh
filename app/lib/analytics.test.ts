@@ -14,6 +14,8 @@ describe("funnelEventFor (AARRR mapping)", () => {
       "QUOTE_COUNTERED",
       "REORDER_CREATED",
       "AI_PARSE_ACCEPTED",
+      "OFFER_CREATED",
+      "OFFER_COUNTERED",
     ];
     for (const type of activation) {
       expect(funnelEventFor(type)?.stage).toBe("activation");
@@ -27,10 +29,17 @@ describe("funnelEventFor (AARRR mapping)", () => {
       "DRAFT_ORDER_CREATED",
       "PLAN_UPGRADED",
       "PLAN_CANCELLED",
+      "OFFER_ACCEPTED",
+      "OFFER_CONVERTED",
     ];
     for (const type of revenue) {
       expect(funnelEventFor(type)?.stage).toBe("revenue");
     }
+  });
+
+  it("keeps offer decline/rule-update out of the funnel (Event table only)", () => {
+    expect(funnelEventFor("OFFER_DECLINED")).toBeNull();
+    expect(funnelEventFor("OFFER_RULE_UPDATED")).toBeNull();
   });
 
   it("maps the review prompt to referral", () => {

@@ -35,6 +35,7 @@ import {
 import prisma from "../db.server";
 import { requireBilling, reconcileShopPlan } from "../services/billing.server";
 import { cancelPlan } from "../services/billing-actions.server";
+import { NO_PER_ORDER_FEES_COPY } from "../lib/billing-v3";
 import { canCreateQuote } from "../services/plan-limits.server";
 import {
   listSeats,
@@ -556,10 +557,11 @@ export default function Settings() {
               <Badge tone={data.plan ? "success" : "attention"}>{planLabel}</Badge>
             </InlineStack>
             {/* Pricing v3 trust line — Mannon is a flat monthly fee, never a
-                per-order commission (unlike the Make-an-Offer rivals). */}
+                per-order commission (unlike the Make-an-Offer rivals). Single
+                source of truth: NO_PER_ORDER_FEES_COPY (app/lib/billing-v3.ts). */}
             <Banner tone="success">
               <Text as="span" variant="bodyMd" fontWeight="semibold">
-                No per-order fees, ever — one flat monthly price.
+                {NO_PER_ORDER_FEES_COPY}
               </Text>
             </Banner>
             <Text as="p" tone="subdued" variant="bodyMd">
