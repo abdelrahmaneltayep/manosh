@@ -1,0 +1,11 @@
+{
+  "name": "customer-account-quotes",
+  "private": true,
+  "license": "UNLICENSED",
+  "description": "Mannon — Your quotes: Customer Account UI extension (F25.5)",
+  "dependencies": {
+    "@shopify/ui-extensions": "2025.1.x",
+    "@shopify/ui-extensions-react": "2025.1.x",
+    "react": "^18.2.0"
+  }
+}
