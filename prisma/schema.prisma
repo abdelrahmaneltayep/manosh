@@ -40,6 +40,8 @@ model Shop {
   shopifyDomain         String                 @unique // e.g. acme.myshopify.com
   plan                  Plan                   @default(TRIAL)
   trialEndsAt           DateTime?
+  legacyPlan            Boolean                @default(false) // Pricing v3: grandfathered onto pre-v3 pricing
+  legacyPriceCents      Int? // the price we must keep honoring for a grandfathered shop (never silently raised)
   autoApproveTolerance  Float                  @default(0) // reorder auto-convert tolerance, fraction (0.05 = 5%)
   quoteExpiryDays       Int                    @default(14) // default quote lifetime
   magicLinkExpiryDays   Int                    @default(7) // how long a buyer magic link stays valid
@@ -86,6 +88,9 @@ model Shop {
   quoteForms            QuoteForm[]
   priceVisibilityRules  PriceVisibilityRule[]
   publicCatalogs        PublicCatalog[]
+  offers                Offer[]
+  offerRules            OfferRule[]
+  offerWidgetConfig     OfferWidgetConfig?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
 }
@@ -1324,6 +1329,115 @@ model Branding {
   createdAt    DateTime @default(now())
 }
 
+// F21 — Make an Offer / Name Your Price. A buyer's price offer on a product /
+// cart / order. The rule engine (app/lib/offers.ts) reuses the F1 margin-aware
+// counter logic (no second pricing brain) and NEVER breaches the margin floor.
+// Growth = manual + rules; Scale = automation + PWYW. Behind MANNON_FF_MAKE_AN_OFFER.
+model Offer {
+  id                  String       @id @default(cuid())
+  shopId              String
+  shop                Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  buyerEmail          String
+  companyId           String? // F5 company, when the buyer is known
+  source              OfferSource  @default(PRODUCT)
+  status              OfferStatus  @default(PENDING)
+  lineItems           Json // [{ variantId, title?, sku?, quantity, listPrice }]
+  listPriceTotal      Decimal      @db.Decimal(12, 2)
+  offeredTotal        Decimal      @db.Decimal(12, 2)
+  currentCounterTotal Decimal?     @db.Decimal(12, 2)
+  marginAtOffer       Decimal?     @db.Decimal(6, 4) // fraction, e.g. 0.32 = 32%
+  ruleId              String? // the OfferRule that matched at creation
+  handledBy           OfferHandledBy? // auto (scale) | manual
+  expiresAt           DateTime?
+  convertedOrderId    String? // gid://shopify/... when converted (PR-4 scale path)
+  messages            OfferMessage[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([shopId, status])
+  @@index([shopId, createdAt])
+}
+
+// A turn in an offer's negotiation thread (buyer ↔ merchant ↔ system).
+model OfferMessage {
+  id          String     @id @default(cuid())
+  offerId     String
+  offer       Offer      @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  actor       OfferActor
+  amountTotal Decimal?   @db.Decimal(12, 2)
+  note        String?
+  createdAt   DateTime   @default(now())
+
+  @@index([offerId])
+}
+
+// A merchant rule that automates offer handling. Highest-priority match wins;
+// the margin floor always overrides (never auto-accept below it).
+model OfferRule {
+  id                        String        @id @default(cuid())
+  shopId                    String
+  shop                      Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  name                      String
+  scope                     OfferRuleScope @default(ALL)
+  scopeRef                  String? // collection/product/customer-group id for the scope
+  minAcceptPctOfList        Decimal       @db.Decimal(5, 4) // auto-accept at/above this % of list
+  autoDeclineBelowPctOfList Decimal       @db.Decimal(5, 4) // auto-decline below this % of list
+  autoCounterToPctOfList    Decimal?      @db.Decimal(5, 4) // counter to this % of list (scale)
+  marginFloorPct            Decimal       @db.Decimal(5, 4) // never auto-accept/counter below this margin
+  priority                  Int           @default(0)
+  active                    Boolean       @default(true)
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
+
+  @@index([shopId, active, priority])
+}
+
+// Per-shop Make-an-Offer surface config (theme app extension — wired in PR-4).
+model OfferWidgetConfig {
+  id                String  @id @default(cuid())
+  shopId            String  @unique
+  shop              Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  surfaces          Json    @default("{\"button\":true,\"banner\":false,\"inlineForm\":true,\"exitPopup\":false}")
+  buttonLabel       String  @default("Make an offer")
+  hideAtcUntilOffer Boolean @default(false)
+  styleTokens       Json    @default("{}")
+  updatedAt         DateTime @updatedAt
+  createdAt         DateTime @default(now())
+}
+
+enum OfferSource {
+  PRODUCT
+  CART
+  ORDER
+}
+
+enum OfferStatus {
+  PENDING
+  COUNTERED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  CONVERTED
+}
+
+enum OfferActor {
+  BUYER
+  MERCHANT
+  SYSTEM
+}
+
+enum OfferHandledBy {
+  AUTO
+  MANUAL
+}
+
+enum OfferRuleScope {
+  ALL
+  COLLECTION
+  PRODUCT
+  CUSTOMER_GROUP
+}
+
 // APPEND-ONLY. Written only via app/services/events.server.ts insert helper.
 model Event {
   id         String    @id @default(cuid())
@@ -1340,8 +1454,10 @@ model Event {
 
 enum Plan {
   TRIAL
-  STARTER // $29
-  GROWTH // $79
+  FREE // $0 (Pricing v3)
+  STARTER // legacy $29 · v3 $9
+  GROWTH // legacy $79 · v3 $29
+  SCALE // v3 $69
   CANCELLED
 }
 
@@ -1406,6 +1522,12 @@ enum EventType {
   ORG_CREATED
   STORE_LINKED
   BRANDING_UPDATED
+  OFFER_CREATED
+  OFFER_COUNTERED
+  OFFER_ACCEPTED
+  OFFER_DECLINED
+  OFFER_CONVERTED
+  OFFER_RULE_UPDATED
   TRIAL_STARTED
   PLAN_UPGRADED
   PLAN_CANCELLED

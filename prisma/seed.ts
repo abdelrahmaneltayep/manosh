@@ -70,6 +70,52 @@ export async function seed() {
     },
   });
 
+  // F21 — demo Make-an-Offer data so the Offers admin renders on a fresh install:
+  // a widget config, one margin-safe rule, and a pending buyer offer to act on.
+  // Idempotent: widget config is keyed by the unique shopId; the rule + offer are
+  // created only if none exist yet for the shop.
+  await prisma.offerWidgetConfig.upsert({
+    where: { shopId: shop.id },
+    update: {},
+    create: { shopId: shop.id, buttonLabel: "Make an offer" },
+  });
+
+  const existingRule = await prisma.offerRule.findFirst({ where: { shopId: shop.id } });
+  if (!existingRule) {
+    await prisma.offerRule.create({
+      data: {
+        shopId: shop.id,
+        name: "House rule",
+        scope: "ALL",
+        minAcceptPctOfList: "0.9000", // accept at ≥ 90% of list
+        autoDeclineBelowPctOfList: "0.6000", // decline below 60%
+        autoCounterToPctOfList: "0.8500", // counter to 85%
+        marginFloorPct: "0.3000", // never below 30% margin
+      },
+    });
+  }
+
+  const existingOffer = await prisma.offer.findFirst({ where: { shopId: shop.id } });
+  if (!existingOffer) {
+    await prisma.offer.create({
+      data: {
+        shopId: shop.id,
+        buyerEmail: buyer.email,
+        companyId: company.id,
+        source: "PRODUCT",
+        status: "PENDING",
+        lineItems: [
+          { variantId: "gid://shopify/ProductVariant/1", title: "Stoneware Mug — 12oz", sku: "MUG-12", quantity: 48, listPrice: 9.5 },
+        ],
+        listPriceTotal: "456.00",
+        offeredTotal: "372.00", // ~82% of list — lands in the counter band
+        messages: {
+          create: { actor: "BUYER", amountTotal: "372.00", note: "Buyer's offer" },
+        },
+      },
+    });
+  }
+
   // Append the demo install event only once (Event is append-only).
   const existingInstall = await prisma.event.findFirst({
     where: { shopId: shop.id, type: "APP_INSTALLED" },

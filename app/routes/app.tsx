@@ -38,6 +38,7 @@ export default function App() {
         <Link to="/app/quote-requests">Requests</Link>
         <Link to="/app/quote-forms">Quote forms</Link>
         <Link to="/app/price-rules">Price rules</Link>
+        <Link to="/app/offers">Offers</Link>
         <Link to="/app/followups">Follow-ups</Link>
         <Link to="/app/analytics">Analytics</Link>
         <Link to="/app/buyers">Buyers</Link>

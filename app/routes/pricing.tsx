@@ -127,7 +127,10 @@ export default function Pricing() {
         </p>
       </section>
 
-      <p style={{ color: "#5b5670", marginTop: "1.5rem", fontSize: "0.9rem" }}>
+      <p style={{ marginTop: "1.5rem", fontSize: "1rem", fontWeight: 700, color: "#1a1a2e" }}>
+        No per-order fees, ever — one flat monthly price. We never take a cut of your sales.
+      </p>
+      <p style={{ color: "#5b5670", marginTop: "0.5rem", fontSize: "0.9rem" }}>
         Billed through Shopify. Totals and tax are always calculated by Shopify —
         Mannon never computes them. Deposits, installments, and pay-by-link all run
         through Shopify checkout — Mannon never stores or sees card data.

@@ -188,7 +188,7 @@ export default function Agency() {
               <BlockStack gap="300">
                 <Text as="h2" variant="headingMd">Connected stores</Text>
                 {!data.rollup || data.rollup.stores.length === 0 ? (
-                  <EmptyState heading="No stores yet" image="">
+                  <EmptyState heading="No stores yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
                     <p>Link a client store below to see it here.</p>
                   </EmptyState>
                 ) : (

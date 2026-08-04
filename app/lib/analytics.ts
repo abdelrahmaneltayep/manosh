@@ -39,9 +39,15 @@ const FUNNEL: Partial<Record<EventType, FunnelEvent>> = {
   QUOTE_COUNTERED: { name: "quote_countered", stage: "activation" },
   REORDER_CREATED: { name: "reorder_created", stage: "activation" },
   AI_PARSE_ACCEPTED: { name: "ai_order_accepted", stage: "activation" },
+  // F21 Make an Offer: a buyer naming a price (and the merchant countering) is a
+  // first-value moment; accepting/converting to a draft order is revenue.
+  OFFER_CREATED: { name: "offer_created", stage: "activation" },
+  OFFER_COUNTERED: { name: "offer_countered", stage: "activation" },
   QUOTE_ACCEPTED: { name: "quote_accepted", stage: "revenue" },
   QUOTE_ORDERED: { name: "quote_ordered", stage: "revenue" },
   DRAFT_ORDER_CREATED: { name: "draft_order_created", stage: "revenue" },
+  OFFER_ACCEPTED: { name: "offer_accepted", stage: "revenue" },
+  OFFER_CONVERTED: { name: "offer_converted", stage: "revenue" },
   PLAN_UPGRADED: { name: "plan_upgraded", stage: "revenue" },
   PLAN_CANCELLED: { name: "plan_cancelled", stage: "revenue" },
   REVIEW_PROMPT_SHOWN: { name: "review_prompt_shown", stage: "referral" },

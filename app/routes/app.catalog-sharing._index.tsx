@@ -191,7 +191,7 @@ export default function CatalogSharing() {
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">Your public catalogs</Text>
             {data.publicCatalogs.length === 0 ? (
-              <EmptyState heading="No public catalogs yet" image="">
+              <EmptyState heading="No public catalogs yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
                 <p>Publish a catalog above to get a shareable wholesale page.</p>
               </EmptyState>
             ) : (

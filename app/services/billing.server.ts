@@ -12,6 +12,12 @@ import {
   type PlanName,
   type BillingStatus,
 } from "../lib/billing";
+import {
+  PLAN_PRICING_V3,
+  resolveGrandfather,
+  getPlanCapabilities,
+  type PlanCapabilities,
+} from "../lib/billing-v3";
 
 /**
  * Billing (S3 skeleton → S17 complete). The plan constants + pure gating live
@@ -74,6 +80,65 @@ export const BILLING_CONFIG = {
   },
 };
 
+// --- Pricing v3 (PR-1) -------------------------------------------------------
+// Additive + flag-gated. When MANNON_FF_PLAN_V3 is off, only the legacy config
+// above is exposed and everything behaves as before. When on, the v3 ladder is
+// ADDED (distinct lowercase names) — legacy "Starter"/"Growth" entries stay so
+// grandfathered subscriptions remain chargeable and are never re-priced.
+
+export const PLAN_V3_ENABLED = (): boolean => process.env.MANNON_FF_PLAN_V3 === "true";
+
+const ANNUAL: BillingInterval.Annual = BillingInterval.Annual;
+const USD = "USD" as const;
+
+/** Paid v3 plans as Shopify billing entries: a monthly + an annual line per tier.
+ *  Free is the absence of a paid subscription, so it has no billing entry. */
+const BILLING_CONFIG_V3 = {
+  starter: { trialDays: PLAN_PRICING_V3.starter.trialDays, lineItems: [{ amount: PLAN_PRICING_V3.starter.monthlyCents / 100, currencyCode: USD, interval: EVERY_30_DAYS }] },
+  "starter-annual": { trialDays: PLAN_PRICING_V3.starter.trialDays, lineItems: [{ amount: (PLAN_PRICING_V3.starter.annualCents ?? 0) / 100, currencyCode: USD, interval: ANNUAL }] },
+  growth: { trialDays: PLAN_PRICING_V3.growth.trialDays, lineItems: [{ amount: PLAN_PRICING_V3.growth.monthlyCents / 100, currencyCode: USD, interval: EVERY_30_DAYS }] },
+  "growth-annual": { trialDays: PLAN_PRICING_V3.growth.trialDays, lineItems: [{ amount: (PLAN_PRICING_V3.growth.annualCents ?? 0) / 100, currencyCode: USD, interval: ANNUAL }] },
+  scale: { trialDays: PLAN_PRICING_V3.scale.trialDays, lineItems: [{ amount: PLAN_PRICING_V3.scale.monthlyCents / 100, currencyCode: USD, interval: EVERY_30_DAYS }] },
+  "scale-annual": { trialDays: PLAN_PRICING_V3.scale.trialDays, lineItems: [{ amount: (PLAN_PRICING_V3.scale.annualCents ?? 0) / 100, currencyCode: USD, interval: ANNUAL }] },
+};
+
+/** The billing config passed to shopifyApp — legacy always, plus v3 when flagged. */
+export const ACTIVE_BILLING_CONFIG = PLAN_V3_ENABLED()
+  ? { ...BILLING_CONFIG, ...BILLING_CONFIG_V3 }
+  : BILLING_CONFIG;
+
+/**
+ * Map a raw Shopify subscription name to the Prisma plan + grandfathering. v3
+ * subscribers use the lowercase handles; legacy subscribers keep "Starter"/
+ * "Growth" (capital) and are grandfathered up in capabilities at their old price.
+ * Pure.
+ */
+export function resolveV3PlanFromName(
+  name: string | null,
+): { plan: Plan; legacyPlan: boolean; legacyPriceCents: number | null } {
+  switch (name) {
+    case "scale":
+    case "scale-annual":
+      return { plan: "SCALE", legacyPlan: false, legacyPriceCents: null };
+    case "growth":
+    case "growth-annual":
+      return { plan: "GROWTH", legacyPlan: false, legacyPriceCents: null };
+    case "starter":
+    case "starter-annual":
+      return { plan: "STARTER", legacyPlan: false, legacyPriceCents: null };
+    case GROWTH_PLAN: { // legacy "Growth" $79 → SCALE capabilities, price honored
+      const g = resolveGrandfather("GROWTH");
+      return { plan: "GROWTH", legacyPlan: g.legacyPlan, legacyPriceCents: g.legacyPriceCents };
+    }
+    case STARTER_PLAN: { // legacy "Starter" $29 → GROWTH capabilities, price honored
+      const s = resolveGrandfather("STARTER");
+      return { plan: "STARTER", legacyPlan: s.legacyPlan, legacyPriceCents: s.legacyPriceCents };
+    }
+    default:
+      return { plan: "TRIAL", legacyPlan: false, legacyPriceCents: null };
+  }
+}
+
 interface SubscriptionLike {
   id?: string;
   name: string;
@@ -110,6 +175,13 @@ export interface BillingLike {
   }) => Promise<{ hasActivePayment: boolean; appSubscriptions: SubscriptionLike[] }>;
 }
 
+// Plan names to ask Shopify about — legacy always, plus the v3 handles when the
+// flag is on (so a v3 subscription is recognized as an active payment).
+const V3_PLAN_NAMES = ["starter", "starter-annual", "growth", "growth-annual", "scale", "scale-annual"];
+function checkPlanNames(): string[] {
+  return PLAN_V3_ENABLED() ? [STARTER_PLAN, GROWTH_PLAN, ...V3_PLAN_NAMES] : [STARTER_PLAN, GROWTH_PLAN];
+}
+
 /**
  * Report the merchant's current plan (reads only — never redirects). Use
  * `requirePlan` when you need to enforce a plan and bounce to the billing page.
@@ -124,7 +196,10 @@ export async function requireBilling(
 ): Promise<BillingStatus> {
   const isTest = options.isTest ?? process.env.NODE_ENV !== "production";
   const { hasActivePayment, appSubscriptions } = await billing.check({
-    plans: [STARTER_PLAN, GROWTH_PLAN],
+    // v3 handles are added at runtime when the flag is on; they exist in the
+    // active billing config then, so Shopify accepts them. Cast to satisfy the
+    // legacy-typed BillingLike without widening it for every caller.
+    plans: checkPlanNames() as PlanName[],
     isTest,
   });
   return resolveActivePlan(hasActivePayment, appSubscriptions);
@@ -161,14 +236,18 @@ export function planEnumFor(status: BillingStatus): Extract<Plan, "TRIAL" | "STA
 const PLAN_ENUM_RANK: Record<Plan, number> = {
   TRIAL: 0,
   CANCELLED: 0,
+  FREE: 0,
   STARTER: 1,
   GROWTH: 2,
+  SCALE: 3,
 };
+
+const PAID_PLANS: Plan[] = ["STARTER", "GROWTH", "SCALE"];
 
 /** Which funnel event (if any) a plan transition should record. Pure. */
 export function planChangeEvent(from: Plan, to: Plan): EventType | null {
   if (to === "CANCELLED") {
-    return from === "STARTER" || from === "GROWTH" ? "PLAN_CANCELLED" : null;
+    return PAID_PLANS.includes(from) ? "PLAN_CANCELLED" : null;
   }
   if (PLAN_ENUM_RANK[to] > PLAN_ENUM_RANK[from]) {
     // First move out of the default TRIAL into a paid plan = the trial starting;
@@ -190,9 +269,15 @@ export async function reconcileShopPlan(
 ): Promise<Plan> {
   const shop = await prisma.shop.findUnique({
     where: { shopifyDomain: shopDomain },
-    select: { id: true, plan: true },
+    select: { id: true, plan: true, legacyPlan: true, legacyPriceCents: true },
   });
   if (!shop) return planEnumFor(status);
+
+  // Pricing v3: resolve from the raw subscription name (v3 handles + legacy
+  // names), persisting grandfathering so nobody's price is ever silently raised.
+  if (PLAN_V3_ENABLED()) {
+    return reconcileShopPlanV3(shop, status);
+  }
 
   let next: Plan;
   if (status.plan) {
@@ -218,4 +303,61 @@ export async function reconcileShopPlan(
     });
   }
   return next;
+}
+
+/**
+ * Pricing-v3 reconcile. Resolves the Prisma plan + grandfathering from the raw
+ * active subscription name and persists `legacyPlan`/`legacyPriceCents` so a
+ * grandfathered shop's price is never silently raised. Idempotent.
+ */
+async function reconcileShopPlanV3(
+  shop: { id: string; plan: Plan; legacyPlan: boolean; legacyPriceCents: number | null },
+  status: BillingStatus,
+): Promise<Plan> {
+  let next: Plan;
+  let legacyPlan = shop.legacyPlan;
+  let legacyPriceCents = shop.legacyPriceCents;
+
+  if (status.activeSubscriptionName) {
+    const resolved = resolveV3PlanFromName(status.activeSubscriptionName);
+    next = resolved.plan;
+    legacyPlan = resolved.legacyPlan;
+    legacyPriceCents = resolved.legacyPriceCents;
+  } else if (PAID_PLANS.includes(shop.plan)) {
+    next = "CANCELLED"; // had a paid plan, Shopify now reports none
+    legacyPlan = false;
+    legacyPriceCents = null;
+  } else {
+    next = shop.plan; // TRIAL / FREE / CANCELLED — nothing new
+  }
+
+  const unchanged = next === shop.plan && legacyPlan === shop.legacyPlan && legacyPriceCents === shop.legacyPriceCents;
+  if (unchanged) return shop.plan;
+
+  await prisma.shop.update({ where: { id: shop.id }, data: { plan: next, legacyPlan, legacyPriceCents } });
+
+  const eventType = planChangeEvent(shop.plan, next);
+  if (eventType) {
+    await appendEvent({
+      shopId: shop.id,
+      type: eventType,
+      entityType: "Shop",
+      entityId: shop.id,
+      payload: { from: shop.plan, to: next, legacy: legacyPlan },
+    });
+  }
+  return next;
+}
+
+/**
+ * The v3 capability object for a shop (§1.3), honoring grandfathering. Reads the
+ * persisted plan + legacy flag. Used by route gates and the plan UI. Falls back
+ * to Free capabilities for an unknown shop.
+ */
+export async function getShopCapabilities(shopDomain: string): Promise<PlanCapabilities> {
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: shopDomain },
+    select: { plan: true, legacyPlan: true },
+  });
+  return getPlanCapabilities(shop?.plan ?? null, shop?.legacyPlan ?? false);
 }

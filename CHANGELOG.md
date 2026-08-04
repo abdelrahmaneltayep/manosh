@@ -195,6 +195,116 @@ All notable changes to Mannon are recorded here. Format loosely follows
   `customers/data_request`, `customers/redact`, `shop/redact`) remain HMAC-verified
   (bad/missing signature → 401), covered by `webhooks.test.ts`.
 - **No Asset API:** confirmed the storefront is theme-app-extension only.
+### Added — PR-7: quick wins (§4)
+
+- **F21 offers now move the AARRR funnel.** Added `OFFER_CREATED` / `OFFER_COUNTERED`
+  (activation) and `OFFER_ACCEPTED` / `OFFER_CONVERTED` (revenue) to the funnel map
+  (`app/lib/analytics.ts`), so PostHog reflects Make-an-Offer activity. The events
+  were already in the append-only `Event` stream; only the map needed them
+  (`appendEvent → captureFunnelEvent` emits the rest). `OFFER_DECLINED` /
+  `OFFER_RULE_UPDATED` stay out of the funnel (Event-table only), like `QUOTE_EXPIRED`.
+- **Pricing v3 trust line — one source of truth.** Settings now renders
+  `NO_PER_ORDER_FEES_COPY` (was defined-but-unused while Settings hardcoded the same
+  sentence), so the "no per-order fees" promise lives in exactly one place.
+- **Demo Make-an-Offer seed data.** `prisma/seed.ts` seeds (idempotently) a widget
+  config, one margin-safe `OfferRule`, and a pending buyer `Offer` for the demo
+  shop, so a fresh install shows the Offers admin with something to act on.
+
+### Changed — PR-6: Built-for-Shopify design hardening (§3.3)
+
+- **Contextual Save Bar on the Make-an-Offer widget form** (`/app/offers/widget`).
+  Editing any control now reveals the App Bridge **`SaveBar`** (Save / Discard);
+  dirty state is a pure diff of the form against the loaded config, so the bar only
+  shows for real unsaved changes — the sanctioned Shopify "unsaved changes"
+  pattern, replacing the inline Save button. The refactor also fixed a latent
+  double-submit bug (checkboxes carried both a Polaris `name` and a shadow hidden
+  input of the same name); form state is now the single source of truth.
+- **Fixed three broken empty states.** Offers, Catalog sharing, and Agency rendered
+  `EmptyState image=""` (a broken image); they now use the standard Shopify
+  empty-state illustration, matching the rest of the app.
+- **Design audit documented** in `docs/bfs-design.md` (§3.3): Polaris + App Bridge
+  shell with a complete `NavMenu`, contextual Save Bar on settings forms, designed
+  empty/error states (`Banner` feedback, never a raw error), a11y carried from S16
+  — each with a re-runnable audit command.
+
+### Changed — PR-5: Built-for-Shopify performance hardening (§3.2)
+
+- **Batched variant-cost lookups — no per-line N+1.** New
+  `getVariantCosts(shop, ids[])` does **one** indexed `findMany` for the whole set
+  plus a **single** Shopify `nodes()` call for the cache misses. The F21 offer
+  engine (`createOffer`, `offerSuggestion`) now batches instead of calling
+  `getVariantCost` once per line — an N-line offer drops from up to N Shopify
+  round-trips to one, keeping the interaction under p95 < 500ms. `getVariantCost`
+  is now a thin wrapper over the batch (behavior unchanged); a live-read failure
+  still serves stale cache and never throws. Tests cover fresh-cache-no-fetch,
+  one-call-per-miss batching, and the never-throw fallback.
+- **Performance audit documented** in `docs/bfs-performance.md`: theme app
+  extensions load async + framework-free (assets ≤ ~5 KB) and cache their config
+  (`Cache-Control: public, max-age=60` on `/api/offer-config` +
+  `/api/quote-widget-config`); admin hot paths are indexed reads with no N+1;
+  App Bridge navigation + designed empty/error states keep layout shift low. Each
+  bar has a re-runnable audit command.
+
+### Added — PR-4: F21 Make an Offer — storefront + automation + conversion
+
+- **Storefront theme app extension** (`extensions/make-an-offer/`) — a **Make an
+  Offer** app block (async, non-blocking) mirroring F17. Reads
+  `GET /api/offer-config` to decide whether/how to render (off below Growth;
+  banner + exit-popup surfaces Scale-only) and posts to `POST /api/offer`.
+  Anti-spam mirrors F17: honeypot (`company_url_confirm`) + render→submit timer +
+  per-ip/shop rate limit → a **generic OK** so bots learn nothing.
+- **Scale auto-execution + PWYW** (`resolveAutoOutcome`, pure) — on Scale the
+  engine's decision runs automatically (auto-decline/accept/counter); a *manual*
+  decision becomes **Pay-What-You-Want** (auto-accept only when the offered margin
+  clears the shop's `minMarginPct`). Growth stays fully manual (pending). The
+  margin floor is never breached, and an unknown cost forces manual.
+- **Offer → native draft order conversion** (`convertOffer`, §2.3) — an accepted
+  offer becomes a Shopify draft order on the buyer's B2B company location. The
+  agreed total is split into agreed **per-unit prices** (`agreedUnitPriceCents`,
+  uniform "% off"); **Shopify calculates tax + the total** (guardrail #1). Shopify
+  first, then `CONVERTED` + `convertedOrderId` + `OFFER_CONVERTED` — a Shopify
+  failure never strands the offer. Admin gains a **Convert to draft order** button
+  on accepted offers (Scale). Tests cover auto-execute, PWYW, and conversion.
+
+### Added — PR-3: F21 Make an Offer / Name Your Price (core)
+
+- **Margin-safe rule engine** (`app/lib/offers.ts`, pure) — reuses the F1 margin
+  idea against the variant-cost baseline (no second pricing brain). Decision order
+  auto-decline → auto-accept → auto-counter → manual, with **the margin floor always
+  winning**: never auto-accept/counter below `marginFloorPct`, clamp counters up to
+  the floor, and force manual when cost is unknown. Thoroughly unit-tested.
+- **Models + migration `make_an_offer`:** `Offer`, `OfferMessage` (negotiation
+  thread), `OfferRule`, `OfferWidgetConfig` (all FK'd to `Shop`, cascade on redact).
+  Events `OFFER_CREATED|COUNTERED|ACCEPTED|DECLINED|CONVERTED`, `OFFER_RULE_UPDATED`.
+- **Admin `/app/offers`:** queue (IndexTable), offer detail with the engine's
+  suggestion + negotiation thread + counter/accept/decline, a rules editor
+  (cap-aware), and widget config. Gated via the PR-1 capability map
+  (`makeAnOffer`): teaser (free/starter) shows an upgrade CTA; growth = manual +
+  `offerRuleCap` (3) rules; scale = automation + PWYW (PR-4). Behind
+  `MANNON_FF_MAKE_AN_OFFER`. Storefront surfaces + scale automation + conversion are
+  PR-4. Docs: `docs/make-an-offer.md`.
+
+### Added — PR-1: Pricing v3 (4-plan ladder + grandfathering)
+
+- **New ladder, priced under the field.** Free $0 · Starter **$9** · Growth **$29**
+  · Scale **$69** (annual = 2 months free), vs the mainstream quote-app field
+  ($17–$97). Additive + **flag-gated behind `MANNON_FF_PLAN_V3`** — off by default,
+  so the live app keeps the legacy Starter $29 / Growth $79 behaviour unchanged
+  (nothing 500s mid-migration).
+- **Grandfathering — no one's price is ever silently raised.** Distinct lowercase
+  Shopify plan handles (`free/starter/growth/scale`) never collide with the legacy
+  `Starter`/`Growth` subscriptions, so existing subs stay chargeable at their price.
+  A legacy Starter ($29) maps **up** to Growth capabilities; legacy Growth ($79) up
+  to Scale — persisted via `Shop.legacyPlan` + `Shop.legacyPriceCents`
+  (`resolveGrandfather`, `resolveV3PlanFromName`, migration `pricing_v3`).
+- **Capability map (§1.3)** in `app/lib/billing-v3.ts` (`PLAN_CAPABILITIES`,
+  `getPlanCapabilities`) with the index-ranked ladder (`PLANS`, `meetsPlan`); server
+  gate `requirePlanV3(request, minPlan)` (redirects to the in-app upgrade screen) and
+  `getShopCapabilities(shop)`. Enum adds `FREE` + `SCALE`.
+- **Trust message:** "No per-order fees, ever" on the in-app plan screen and the
+  pricing page — Mannon stays a flat monthly fee, never a per-order commission.
+  Fully unit-tested (ladder, pricing, capability map, grandfathering). Docs:
+  `docs/pricing-v3.md`.
 
 ### Added — Feature 20: White-Label / Agency Multi-Store Management
 
