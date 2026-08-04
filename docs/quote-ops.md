@@ -132,6 +132,43 @@ banners, then **Import** (enabled only when the preview is clean). Reached from 
 **Bulk import** action on the Quotes inbox. The catalog loader is injectable, so
 the service is unit-tested without Shopify.
 
-## Not yet (final slice)
+## PR-9e — New Customer Account UI extension (§6.5)
 
-New customer-account UI extension (PR-9e).
+Surfaces the buyer's quotes + reorder **natively** inside Shopify's new customer
+account (a Customer Account UI extension) — embedded, no external tab —
+strengthening the BFS integration story. Read-only; it deep-links to the
+magic-link portal for anything that acts (reorder / request a similar quote).
+
+### Testable backend
+
+- **`listQuotesForBuyer(shop, email)`** — read-only quote summaries (status,
+  source, item count, estimated total from the agreed line prices, `reorderable`),
+  scoped to a buyer email within one shop. Unit-tested (DB), no mutations.
+- **`GET /api/account/quotes`** — authenticated via
+  `authenticate.public.customerAccount` (proves a logged-in customer of the shop +
+  supplies CORS), gated to a paid plan (Starter+). Returns the quotes + the portal
+  base URL; the extension passes the buyer email (hardening TODO: cross-check it
+  against the token's customer identity).
+
+### Extension scaffold (`extensions/customer-account-quotes/`)
+
+`shopify.extension.toml` (target `customer-account.order-index.block.render`,
+`api_access` + `network_access`) + `src/QuotesBlock.tsx` (reads the session token +
+authenticated customer, fetches the endpoint, renders a read-only list with
+Reorder / Request-similar buttons). It builds with the Shopify CLI, **not** the
+app's Vite/tsc pipeline (excluded from the root `tsconfig`), so verification is
+manual — see the extension README.
+
+## §6.7 acceptance — status
+
+- ✅ PDF renders branded, downloads + resends; white-label removes the footer on the
+  white-label plan (PR-9b).
+- ✅ Convert: accepted/countered quote → draft order with **exact negotiated prices**
+  → invoice; `convertedOrderId` set (PR-9a).
+- ✅ CSV import: valid rows create the quote(s); invalid rows are reported and nothing
+  is partially committed (PR-9d).
+- ✅ Duplicate produces an editable copy with `source = DUPLICATE` (PR-9c).
+- ✅ Customer-account extension lists the buyer's quotes + reorder natively (PR-9e).
+- ✅ Events `QUOTE_CONVERTED`, `QUOTE_PDF_GENERATED`, `QUOTE_IMPORTED`,
+  `QUOTE_DUPLICATED`. Migrations `quote_ops`, `quote_pdf`, `quote_source`,
+  `quote_import`.

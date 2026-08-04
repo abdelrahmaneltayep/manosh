@@ -1,0 +1,20 @@
+# F25.5 — Mannon "Your quotes" Customer Account UI extension. Surfaces the buyer's
+# quotes + reorder inside Shopify's NEW customer account (native, embedded, no
+# external tab), strengthening the Built-for-Shopify integration story. Read-only:
+# it deep-links to the magic-link portal for actions (reorder / request similar).
+api_version = "2025-01"
+
+[[extensions]]
+type = "ui_extension"
+name = "Mannon — Your quotes"
+handle = "customer-account-quotes"
+
+  # Render as a block on the customer-account order index (the account home).
+  [[extensions.targeting]]
+  target = "customer-account.order-index.block.render"
+  module = "./src/QuotesBlock.tsx"
+
+  # Needs to call the Mannon backend for the quote list (session-token auth).
+  [extensions.capabilities]
+  api_access = true
+  network_access = true

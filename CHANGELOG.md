@@ -5,6 +5,22 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 25 (PR-9e): native customer-account quotes (Customer Account UI extension)
+
+- **Read-only backend** — `listQuotesForBuyer(shop, email)` returns quote summaries
+  (status, source, item count, estimated total, `reorderable`) scoped to a buyer
+  email within one shop (unit-tested, no mutations). `GET /api/account/quotes`
+  authenticates via `authenticate.public.customerAccount` (+ CORS), gated Starter+,
+  returning the quotes + portal base URL.
+- **Extension scaffold** `extensions/customer-account-quotes/` — a Customer Account
+  UI extension (`customer-account.order-index.block.render`) that lists the buyer's
+  quotes natively with Reorder / Request-similar buttons deep-linking to the portal.
+  Builds with the Shopify CLI, not the app's Vite/tsc (root `tsconfig` now excludes
+  `extensions`); verification is manual (see the extension README).
+- **Completes F25 §6.7 acceptance:** branded PDF, convert with exact negotiated
+  prices, all-or-nothing CSV import, duplicate, native customer-account quotes.
+  Docs: `docs/quote-ops.md`.
+
 ### Added — Feature 25 (PR-9d): bulk CSV import
 
 - **Import a CSV** to add many products to one quote (`lines`) or create many quotes
