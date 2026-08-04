@@ -81,7 +81,23 @@ pure function; `renderQuotePdf` loads a shop-owned quote and composes it.
 - Both append `QUOTE_PDF_GENERATED` (migration `quote_pdf`). Admin: a **Documents**
   card with Download / Email buttons on the quote detail.
 
+## PR-9c — Duplicate / "Create a similar quote" (§6.4)
+
+Clone an existing quote's **line items + buyer + notes** into a fresh **editable
+draft** (status `SUBMITTED`) so a rep can replicate a recurring request.
+`duplicateQuote` copies the agreed line prices verbatim, resets the expiry to
+`now + shop.quoteExpiryDays`, keeps the rep attribution (F12 `placedByRepId`), and
+does **not** carry over any order (`draftOrderId` / `convertedOrderId` stay null).
+
+- **Source (F23.4).** The default branch had no `Quote.source`; this slice adds a
+  `QuoteSource` enum (`PORTAL | WIDGET | REP | DUPLICATE | IMPORT`, default `PORTAL`)
+  and the column (migration `quote_source`). A duplicate is created with
+  `source = DUPLICATE`, feeding source analytics. `IMPORT` is reserved for PR-9d.
+- **Gating (Starter+)** — the admin `duplicate` action requires a paid plan, then
+  redirects to the new quote's detail. Event `QUOTE_DUPLICATED`.
+- **Admin** — a **Create a similar quote** button in the quote detail's Documents
+  card.
+
 ## Not yet (later slices)
 
-Duplicate quote (PR-9c), bulk CSV import (PR-9d), new customer-account UI
-extension (PR-9e).
+Bulk CSV import (PR-9d), new customer-account UI extension (PR-9e).

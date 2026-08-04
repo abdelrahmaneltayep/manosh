@@ -5,6 +5,19 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 25 (PR-9c): duplicate / "create a similar quote"
+
+- **`duplicateQuote`** clones a quote's line items + buyer + notes into a fresh
+  editable draft (`SUBMITTED`), with agreed line prices verbatim, the expiry reset
+  to `now + quoteExpiryDays`, rep attribution preserved (F12), and no order carried
+  over. Emits `QUOTE_DUPLICATED`.
+- **`Quote.source` (F23.4).** New `QuoteSource` enum
+  (`PORTAL | WIDGET | REP | DUPLICATE | IMPORT`, default `PORTAL`) + column
+  (migration `quote_source`) — the default branch had no source field. Duplicates
+  are `source = DUPLICATE` (feeds source analytics); `IMPORT` reserved for PR-9d.
+- **Admin** (`/app/quotes/:id`): a **Create a similar quote** action (Starter+) that
+  redirects to the new draft. Docs: `docs/quote-ops.md`.
+
 ### Added — Feature 25 (PR-9b): branded quote PDF (download + resend)
 
 - **Dependency-free server-side PDF** (`app/lib/pdf.ts`) — a tiny pure PDF writer

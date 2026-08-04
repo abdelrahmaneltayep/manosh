@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { redirect } from "@remix-run/node";
 import {
   Form,
   useActionData,
@@ -38,6 +39,7 @@ import { featureAccess, GROWTH_PLAN, STARTER_PLAN } from "../lib/billing";
 import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
 import { DraftOrderError } from "../services/draft-order.server";
 import { renderQuotePdf } from "../services/quote-pdf.server";
+import { duplicateQuote, QuoteNotFoundForShopError } from "../services/quote-duplicate.server";
 import { sendEmail } from "../services/mailer.server";
 import { appendEvent } from "../services/events.server";
 import { getCatalog } from "../services/catalog.server";
@@ -127,6 +129,21 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     });
     await appendEvent({ shopId: pdf.shopId, type: "QUOTE_PDF_GENERATED", entityType: "Quote", entityId: quoteId, payload: { via: "email" } });
     return { ok: true as const, kind: "quote" as const, message: "Quote PDF emailed to the buyer." };
+  }
+
+  // --- F25.4 duplicate ("create a similar quote", paid) ---------------------
+  if (intent === "duplicate") {
+    const status = await requireBilling(billing, { isTest: IS_TEST });
+    if (!featureAccess(status, STARTER_PLAN).allowed) {
+      return { ok: false as const, kind: "quote" as const, error: "Duplicating a quote needs a paid plan.", upgrade: true as const };
+    }
+    try {
+      const { quoteId: newId } = await duplicateQuote(session.shop, quoteId);
+      return redirect(`/app/quotes/${newId}`);
+    } catch (error) {
+      if (error instanceof QuoteNotFoundForShopError) throw new Response("Quote not found", { status: 404 });
+      throw error;
+    }
   }
 
   // --- F25.2 convert quote → draft order → invoice (paid) -------------------
@@ -495,6 +512,10 @@ export default function QuoteDetail() {
               <Form method="post">
                 <input type="hidden" name="intent" value="pdf-email" />
                 <Button submit loading={submitting}>Email PDF to buyer</Button>
+              </Form>
+              <Form method="post">
+                <input type="hidden" name="intent" value="duplicate" />
+                <Button submit loading={submitting}>Create a similar quote</Button>
               </Form>
             </InlineStack>
           </BlockStack>

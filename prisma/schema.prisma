@@ -1083,6 +1083,7 @@ model Quote {
   approval       OrderApproval?
   expiresAt      DateTime
   poReference    String?
+  source         QuoteSource         @default(PORTAL) // F23.4: how this quote originated
   draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
   convertedOrderId String? // F25.2: gid set by the merchant one-click convert (mirrors Offer.convertedOrderId)
   totalsSnapshot Json? // exact draftOrderCalculate output
@@ -1352,6 +1353,16 @@ enum QuoteStatus {
   EXPIRED
 }
 
+// F23.4 — how a quote originated (feeds source analytics). PORTAL is the default
+// buyer path; DUPLICATE (F25.4) and IMPORT (F25.3) are merchant-side.
+enum QuoteSource {
+  PORTAL
+  WIDGET
+  REP
+  DUPLICATE
+  IMPORT
+}
+
 enum EventType {
   APP_INSTALLED
   QUOTE_SUBMITTED
@@ -1403,4 +1414,5 @@ enum EventType {
   PRICE_RULE_UPDATED
   QUOTE_CONVERTED
   QUOTE_PDF_GENERATED
+  QUOTE_DUPLICATED
 }
