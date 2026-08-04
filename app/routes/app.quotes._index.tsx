@@ -68,7 +68,7 @@ export default function QuotesInbox() {
   });
 
   return (
-    <Page>
+    <Page primaryAction={{ content: "Bulk import", url: "/app/quotes/import" }}>
       <TitleBar title="Quotes" />
       {usage && nearCap && (
         <div style={{ marginBottom: "var(--p-space-400)" }}>

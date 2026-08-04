@@ -364,6 +364,16 @@ export function quoteCaptureAllowed(plan: string | null | undefined): boolean {
   return plan === "STARTER" || plan === STARTER_PLAN || plan === "GROWTH" || plan === GROWTH_PLAN;
 }
 
+/** F25.3 — bulk CSV import is a Growth feature. Pure. */
+export function bulkImportAllowed(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === GROWTH_PLAN;
+}
+
+/** F25.3 — max rows per import batch (Growth cap; a higher tier would raise it). Pure. */
+export function bulkImportRowCap(plan: string | null | undefined): number {
+  return bulkImportAllowed(plan) ? 200 : 0;
+}
+
 // --- F16 i18n / multi-currency gating ----------------------------------------
 
 /**

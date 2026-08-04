@@ -98,6 +98,40 @@ does **not** carry over any order (`draftOrderId` / `convertedOrderId` stay null
 - **Admin** — a **Create a similar quote** button in the quote detail's Documents
   card.
 
-## Not yet (later slices)
+## PR-9d — Bulk CSV import (§6.3)
 
-Bulk CSV import (PR-9d), new customer-account UI extension (PR-9e).
+Upload a CSV to **add many products to one quote** (`lines` mode) or **create many
+quotes at once** (`quotes` mode). A Polaris preview shows every row with per-row
+status; the commit is **all-or-nothing**. Growth-gated (row cap per plan).
+
+### Two-step, all-or-nothing
+
+- **Preview** (`previewImport`) parses the CSV (pure `parseCsv`/`parseImport`),
+  validates shape (columns, whole-number qty, price, email/group for `quotes`),
+  then resolves each row against the **live catalog** (SKU must exist) and, for
+  `quotes`, against **existing buyers** (email must match — no fabricated
+  companies). Enforces the plan **row cap** (`bulkImportRowCap`, Growth = 200) and,
+  for `lines`, an editable target quote.
+- **Commit** (`commitImport`) re-previews and **refuses the whole batch** if any
+  issue remains (`ImportHasErrorsError`); the writes run in a single
+  `$transaction`, so nothing is ever partially saved. New quotes are `source =
+  IMPORT`, status `SUBMITTED`. Line prices come from the CSV when given, else the
+  catalog reference price. Emits `QUOTE_IMPORTED`.
+
+### CSV columns
+
+- `quotes`: `quote, email, sku, quantity, price` (price optional) — rows group by
+  `quote`; one buyer per group.
+- `lines`: `sku, quantity, price` (price optional) — added to the chosen quote.
+
+### Admin (`/app/quotes/import`, Growth)
+
+Mode picker, a DropZone (reads the `.csv` text client-side) + editable CSV
+textarea, **Preview** → an IndexTable with per-row OK / issue and whole-file error
+banners, then **Import** (enabled only when the preview is clean). Reached from a
+**Bulk import** action on the Quotes inbox. The catalog loader is injectable, so
+the service is unit-tested without Shopify.
+
+## Not yet (final slice)
+
+New customer-account UI extension (PR-9e).

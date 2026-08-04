@@ -5,6 +5,25 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 25 (PR-9d): bulk CSV import
+
+- **Import a CSV** to add many products to one quote (`lines`) or create many quotes
+  at once (`quotes`). Pure parser + validator (`app/lib/quote-import.ts`: `parseCsv`,
+  `parseImport`) checks columns, whole-number qty, price, and email/group; the
+  service resolves each row against the live catalog (SKU must exist) and, for
+  `quotes`, existing buyers (email must match — no fabricated companies).
+- **All-or-nothing.** `commitImport` re-validates and **refuses the whole batch** on
+  any issue (`ImportHasErrorsError`); writes run in one `$transaction`, so nothing is
+  partially saved. New quotes are `source = IMPORT`; line prices come from the CSV
+  when given, else the catalog reference. Emits `QUOTE_IMPORTED` (migration
+  `quote_import`).
+- **Growth-gated** with a per-plan **row cap** (`bulkImportAllowed` /
+  `bulkImportRowCap`, Growth = 200). Admin `/app/quotes/import` (Growth): mode
+  picker, DropZone + CSV textarea, **Preview** (IndexTable with per-row OK/issue),
+  **Import** (enabled only when clean); reached from a **Bulk import** action on the
+  Quotes inbox. The catalog loader is injectable → unit-tested without Shopify.
+  Docs: `docs/quote-ops.md`.
+
 ### Added — Feature 25 (PR-9c): duplicate / "create a similar quote"
 
 - **`duplicateQuote`** clones a quote's line items + buyer + notes into a fresh
