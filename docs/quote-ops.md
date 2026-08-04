@@ -48,7 +48,40 @@ The quote detail shows **Convert to order & send invoice** on an accepted/counte
 quote (not yet ordered); once converted it shows an "Order created" banner. Buyer
 not linked to a company location → a clear error, nothing stranded.
 
+## PR-9b — Branded quote PDF: download + resend (§6.1)
+
+A branded PDF of the quote (brand header, line items, unit + line amounts, an
+**estimated subtotal**, validity, notes). The merchant can **download** it or
+**email** it to the buyer. White-label removes the Mannon footer (Growth, via F20).
+
+### Dependency-free, server-side, off the LCP path
+
+`app/lib/pdf.ts` is a tiny pure PDF writer (Helvetica / Helvetica-Bold, WinAnsi —
+**no font embedding, no npm dep, no headless browser**), so the render is fully
+server-side and deterministic (unit-tested). The layout (`renderQuotePdfBytes`) is a
+pure function; `renderQuotePdf` loads a shop-owned quote and composes it.
+
+- **Estimate, not a computed total.** A quote presents the buyer's *negotiated line
+  prices* and their sum as an **estimated subtotal**, with a clear note that tax +
+  the final total are calculated by Shopify at checkout — we never compute tax or
+  claim a final total (guardrail #1).
+- **Branding (F20).** The header uses the merchant's portal name + primary colour
+  from `getBrandingTokens` when they've customized branding; otherwise the company
+  name + the Mannon indigo. `whiteLabelAllowed(plan)` (Growth) drops the footer.
+- **Localized labels.** English / French / Spanish label sets render a second
+  locale (`fr-CA` → `fr`); non-Latin1 scripts fall back to English glyphs (Helvetica
+  can't draw them without an embedded font — noted for a later embed).
+
+### Surfaces + gating (§6.1 — Starter+)
+
+- **Download** — `GET /app/quotes/:id.pdf` (`Content-Disposition: attachment;
+  filename="quote.pdf"` — nothing sensitive in the name), gated Starter+.
+- **Resend** — the `pdf-email` action attaches the PDF (`EmailMessage.attachments`)
+  and emails the buyer, gated Starter+.
+- Both append `QUOTE_PDF_GENERATED` (migration `quote_pdf`). Admin: a **Documents**
+  card with Download / Email buttons on the quote detail.
+
 ## Not yet (later slices)
 
-Branded quote PDF (PR-9b), duplicate quote (PR-9c), bulk CSV import (PR-9d), new
-customer-account UI extension (PR-9e).
+Duplicate quote (PR-9c), bulk CSV import (PR-9d), new customer-account UI
+extension (PR-9e).

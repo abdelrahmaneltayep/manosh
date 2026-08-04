@@ -37,6 +37,9 @@ import { requireBilling } from "../services/billing.server";
 import { featureAccess, GROWTH_PLAN, STARTER_PLAN } from "../lib/billing";
 import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
 import { DraftOrderError } from "../services/draft-order.server";
+import { renderQuotePdf } from "../services/quote-pdf.server";
+import { sendEmail } from "../services/mailer.server";
+import { appendEvent } from "../services/events.server";
 import { getCatalog } from "../services/catalog.server";
 import {
   generateSuggestionForLine,
@@ -104,6 +107,27 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const quoteId = params.id!;
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+
+  // --- F25.1 email the branded quote PDF to the buyer (paid) -----------------
+  if (intent === "pdf-email") {
+    const status = await requireBilling(billing, { isTest: IS_TEST });
+    if (!featureAccess(status, STARTER_PLAN).allowed) {
+      return { ok: false as const, kind: "quote" as const, error: "Emailing the quote PDF needs a paid plan.", upgrade: true as const };
+    }
+    const catalog = await getCatalog(session.shop);
+    const currencyCode = catalog[0]?.currencyCode ?? "USD";
+    const pdf = await renderQuotePdf(session.shop, quoteId, { currencyCode, plan: status.plan });
+    if (!pdf) return { ok: false as const, kind: "quote" as const, error: "Quote not found." };
+    await sendEmail({
+      to: pdf.buyerEmail,
+      subject: "Your quote",
+      html: "<p>Your quote is attached as a PDF.</p>",
+      text: "Your quote is attached as a PDF.",
+      attachments: [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }],
+    });
+    await appendEvent({ shopId: pdf.shopId, type: "QUOTE_PDF_GENERATED", entityType: "Quote", entityId: quoteId, payload: { via: "email" } });
+    return { ok: true as const, kind: "quote" as const, message: "Quote PDF emailed to the buyer." };
+  }
 
   // --- F25.2 convert quote → draft order → invoice (paid) -------------------
   if (intent === "convert") {
@@ -461,6 +485,20 @@ export default function QuoteDetail() {
             )}
           </BlockStack>
         )}
+
+        <Card>
+          <BlockStack gap="200">
+            <Text as="h2" variant="headingMd">Documents</Text>
+            <Text as="p" tone="subdued" variant="bodyMd">A branded PDF of this quote (line items, totals, validity). Taxes and the final total are calculated by Shopify at checkout.</Text>
+            <InlineStack gap="200">
+              <Button url={`/app/quotes/${quote.id}.pdf`} target="_blank" variant="secondary">Download PDF</Button>
+              <Form method="post">
+                <input type="hidden" name="intent" value="pdf-email" />
+                <Button submit loading={submitting}>Email PDF to buyer</Button>
+              </Form>
+            </InlineStack>
+          </BlockStack>
+        </Card>
 
         {(quote.status === "ACCEPTED" || quote.status === "COUNTERED") && !quote.draftOrderId && !quote.convertedOrderId && (
           <Card>

@@ -11,11 +11,18 @@ import { captureException } from "../lib/sentry.server";
  * overlaid on the defaults below.
  */
 
+export interface EmailAttachment {
+  filename: string;
+  content: Uint8Array;
+  contentType: string;
+}
+
 export interface EmailMessage {
   to: string;
   subject: string;
   html: string;
   text?: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface SendResult {

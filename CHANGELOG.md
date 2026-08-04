@@ -5,6 +5,22 @@ All notable changes to Mannon are recorded here. Format loosely follows
 
 ## [Unreleased]
 
+### Added — Feature 25 (PR-9b): branded quote PDF (download + resend)
+
+- **Dependency-free server-side PDF** (`app/lib/pdf.ts`) — a tiny pure PDF writer
+  (Helvetica/WinAnsi, no font embedding, no npm dep, no headless browser), so the
+  render is deterministic + unit-tested and stays off the LCP path.
+- **Branded quote PDF** (`renderQuotePdfBytes` pure + `renderQuotePdf`): brand header
+  (F20 portal name + primary colour when customized, else company name), line items
+  with unit + line amounts, an **estimated subtotal** with a "tax + final total at
+  checkout" note (we never compute tax/totals — guardrail #1), validity, notes.
+  White-label removes the Mannon footer (`whiteLabelAllowed`, Growth). Localized
+  labels (en/fr/es) render a second locale.
+- **Download** `GET /app/quotes/:id.pdf` (generic `quote.pdf` filename) and **resend**
+  (`pdf-email` action attaches via new `EmailMessage.attachments` and emails the
+  buyer) — both Starter+, both append `QUOTE_PDF_GENERATED` (migration `quote_pdf`).
+  Admin gets a Documents card (Download / Email). Docs: `docs/quote-ops.md`.
+
 ### Added — Feature 25 (PR-9a): one-click convert quote → draft order → invoice
 
 - **Merchant one-click convert** (`convertQuoteToOrder`) — from an accepted quote
