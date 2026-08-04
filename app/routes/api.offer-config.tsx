@@ -1,4 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { getOfferPublicConfig } from "../services/offers.server";
 
 /**
@@ -17,7 +18,7 @@ const CORS = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const shop = new URL(request.url).searchParams.get("shop");
-  if (!shop) return Response.json({ enabled: false }, { headers: CORS });
+  if (!shop) return json({ enabled: false }, { headers: CORS });
   const config = await getOfferPublicConfig(shop);
-  return Response.json(config, { headers: CORS });
+  return json(config, { headers: CORS });
 };

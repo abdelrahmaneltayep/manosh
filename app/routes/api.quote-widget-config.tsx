@@ -1,4 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { getWidgetConfig } from "../services/quote-widget.server";
 
 /**
@@ -15,11 +16,11 @@ const CORS = {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = new URL(request.url).searchParams.get("shop");
-  if (!shop) return Response.json({ enabled: false }, { headers: CORS });
+  if (!shop) return json({ enabled: false }, { headers: CORS });
   const config = await getWidgetConfig(shop);
-  if (!config) return Response.json({ enabled: false }, { headers: CORS });
+  if (!config) return json({ enabled: false }, { headers: CORS });
   // Expose only what the storefront needs.
-  return Response.json(
+  return json(
     { enabled: config.enabled, label: config.label, gated: config.gated, cartEnabled: config.cartEnabled, customFields: config.customFields },
     { headers: CORS },
   );

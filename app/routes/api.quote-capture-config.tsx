@@ -1,4 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { getQuoteCaptureConfig } from "../services/quote-form.server";
 
 /**
@@ -16,6 +17,6 @@ const CORS = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const shop = new URL(request.url).searchParams.get("shop");
-  if (!shop) return Response.json({ enabled: false }, { headers: CORS });
-  return Response.json(await getQuoteCaptureConfig(shop), { headers: CORS });
+  if (!shop) return json({ enabled: false }, { headers: CORS });
+  return json(await getQuoteCaptureConfig(shop), { headers: CORS });
 };

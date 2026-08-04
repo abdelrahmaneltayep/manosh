@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { getBuyerId } from "../services/buyer-session.server";
 import {
   PWA_ENABLED,
@@ -14,23 +15,23 @@ import {
 export const action = async ({ request }: ActionFunctionArgs) => {
   if (!PWA_ENABLED()) throw new Response("Not found", { status: 404 });
   const buyerId = await getBuyerId(request);
-  if (!buyerId) return Response.json({ ok: false, error: "Not signed in." }, { status: 401 });
+  if (!buyerId) return json({ ok: false, error: "Not signed in." }, { status: 401 });
 
   let body: { endpoint?: unknown; keys?: unknown; unsubscribe?: unknown } = {};
   try {
     body = await request.json();
   } catch {
-    return Response.json({ ok: false, error: "Invalid request." }, { status: 400 });
+    return json({ ok: false, error: "Invalid request." }, { status: 400 });
   }
 
   const endpoint = typeof body.endpoint === "string" ? body.endpoint : "";
-  if (!endpoint) return Response.json({ ok: false, error: "Missing endpoint." }, { status: 400 });
+  if (!endpoint) return json({ ok: false, error: "Missing endpoint." }, { status: 400 });
 
   if (body.unsubscribe) {
     await deletePushSubscription(endpoint);
-    return Response.json({ ok: true });
+    return json({ ok: true });
   }
 
   await savePushSubscription(buyerId, endpoint, body.keys);
-  return Response.json({ ok: true });
+  return json({ ok: true });
 };

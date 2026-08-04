@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { applyStockUpdate, getInboundSecret } from "../services/erp.server";
 
 /**
@@ -15,7 +16,7 @@ import { applyStockUpdate, getInboundSecret } from "../services/erp.server";
  * `variant_id,qty` CSV. Feature-flagged with MANNON_FF_ERP_SYNC.
  */
 export const action = async ({ request }: ActionFunctionArgs): Promise<Response> => {
-  if (process.env.MANNON_FF_ERP_SYNC !== "true") return Response.json({ ok: true, skipped: "feature-off" });
+  if (process.env.MANNON_FF_ERP_SYNC !== "true") return json({ ok: true, skipped: "feature-off" });
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
 
   const shopDomain = request.headers.get("x-shop-domain");
@@ -29,7 +30,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response>
   const payload: unknown = contentType.includes("application/json") ? await request.json() : await request.text();
 
   const { applied, errors } = await applyStockUpdate(shopDomain, payload);
-  return Response.json({ ok: true, applied, skipped: errors.length });
+  return json({ ok: true, applied, skipped: errors.length });
 };
 
 export const loader = () => new Response("Method not allowed", { status: 405 });

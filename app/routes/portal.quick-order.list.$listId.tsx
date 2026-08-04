@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { redirect } from "@remix-run/node";
+import { json, redirect } from "@remix-run/node";
 import prisma from "../db.server";
 import { requireBuyerId } from "../services/buyer-session.server";
 import { getSavedListItems } from "../services/saved-order.server";
@@ -12,5 +12,5 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const buyer = await prisma.buyer.findUnique({ where: { id: buyerId }, select: { companyId: true } });
   if (!buyer) throw redirect("/portal/signin");
   const items = await getSavedListItems(buyer.companyId, params.listId!);
-  return Response.json(items);
+  return json(items);
 };

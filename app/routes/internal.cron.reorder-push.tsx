@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { PWA_ENABLED, runReorderPushForShop, sendInstallNudges } from "../services/pwa.server";
 
@@ -14,7 +15,7 @@ import { PWA_ENABLED, runReorderPushForShop, sendInstallNudges } from "../servic
  * webhook, so no HMAC — guarded by CRON_SECRET. Behind MANNON_FF_BUYER_PWA.
  */
 async function run(request: Request): Promise<Response> {
-  if (!PWA_ENABLED()) return Response.json({ ok: true, skipped: "feature-off" });
+  if (!PWA_ENABLED()) return json({ ok: true, skipped: "feature-off" });
   const secret = process.env.CRON_SECRET;
   if (!secret) return new Response("CRON_SECRET not set", { status: 503 });
   if (request.headers.get("x-cron-secret") !== secret) return new Response("Unauthorized", { status: 401 });
@@ -29,7 +30,7 @@ async function run(request: Request): Promise<Response> {
     results.push({ shop: shop.shopifyDomain, pushed, nudged });
   }
 
-  return Response.json({ ok: true, results });
+  return json({ ok: true, results });
 }
 
 export const action = ({ request }: ActionFunctionArgs) => run(request);

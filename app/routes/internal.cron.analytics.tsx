@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { rollupAllShops, getAnalytics } from "../services/quote-analytics.server";
 import { resolveTemplate, renderTemplate, sendEmail } from "../services/mailer.server";
@@ -16,7 +17,7 @@ import { resolveTemplate, renderTemplate, sendEmail } from "../services/mailer.s
 
 async function run(request: Request): Promise<Response> {
   if (process.env.MANNON_FF_QUOTE_ANALYTICS !== "true") {
-    return Response.json({ ok: true, skipped: "feature-off" });
+    return json({ ok: true, skipped: "feature-off" });
   }
   const secret = process.env.CRON_SECRET;
   if (!secret) return new Response("CRON_SECRET not set", { status: 503 });
@@ -48,7 +49,7 @@ async function run(request: Request): Promise<Response> {
     }
   }
 
-  return Response.json({ ok: true, ranAt: now.toISOString(), rolled, digests });
+  return json({ ok: true, ranAt: now.toISOString(), rolled, digests });
 }
 
 export const action = ({ request }: ActionFunctionArgs) => run(request);

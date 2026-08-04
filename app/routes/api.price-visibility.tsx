@@ -1,4 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { evaluatePriceVisibility } from "../services/price-visibility.server";
 
 /**
@@ -23,7 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   const url = new URL(request.url);
   const shop = url.searchParams.get("shop");
-  if (!shop) return Response.json({ hidePrice: false, hideAtc: false, ctaLabel: null }, { headers: CORS });
+  if (!shop) return json({ hidePrice: false, hideAtc: false, ctaLabel: null }, { headers: CORS });
 
   const decision = await evaluatePriceVisibility(shop, {
     loggedIn: url.searchParams.get("loggedIn") === "1" || url.searchParams.get("loggedIn") === "true",
@@ -33,5 +34,5 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
 
   // Decision is { hidePrice, hideAtc, ctaLabel } — no price, by construction.
-  return Response.json(decision, { headers: CORS });
+  return json(decision, { headers: CORS });
 };

@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { runExportForShop, sendFailureDigest, makeConnector } from "../services/erp.server";
 
@@ -13,7 +14,7 @@ import { runExportForShop, sendFailureDigest, makeConnector } from "../services/
  * Feature-flagged with MANNON_FF_ERP_SYNC.
  */
 async function run(request: Request): Promise<Response> {
-  if (process.env.MANNON_FF_ERP_SYNC !== "true") return Response.json({ ok: true, skipped: "feature-off" });
+  if (process.env.MANNON_FF_ERP_SYNC !== "true") return json({ ok: true, skipped: "feature-off" });
   const secret = process.env.CRON_SECRET;
   if (!secret) return new Response("CRON_SECRET not set", { status: 503 });
   if (request.headers.get("x-cron-secret") !== secret) return new Response("Unauthorized", { status: 401 });
@@ -26,7 +27,7 @@ async function run(request: Request): Promise<Response> {
     const digested = await sendFailureDigest(shop.shopifyDomain);
     results.push({ shop: shop.shopifyDomain, synced: summary.synced, failed: summary.failed, digested });
   }
-  return Response.json({ ok: true, ranAt: now.toISOString(), results });
+  return json({ ok: true, ranAt: now.toISOString(), results });
 }
 
 export const action = ({ request }: ActionFunctionArgs) => run(request);

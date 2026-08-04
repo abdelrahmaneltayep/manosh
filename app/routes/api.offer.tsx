@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { submitPublicOffer, type PublicOfferLine } from "../services/offers.server";
 
 /**
@@ -30,17 +31,17 @@ function toLines(raw: unknown): PublicOfferLine[] {
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
-  if (request.method !== "POST") return Response.json({ ok: false, error: "Method not allowed" }, { status: 405, headers: CORS });
+  if (request.method !== "POST") return json({ ok: false, error: "Method not allowed" }, { status: 405, headers: CORS });
 
   let body: Record<string, unknown> = {};
   try {
     body = (await request.json()) as Record<string, unknown>;
   } catch {
-    return Response.json({ ok: false, error: "Invalid request." }, { status: 400, headers: CORS });
+    return json({ ok: false, error: "Invalid request." }, { status: 400, headers: CORS });
   }
 
   const shop = String(body.shop ?? "");
-  if (!shop) return Response.json({ ok: false, error: "Missing shop." }, { status: 400, headers: CORS });
+  if (!shop) return json({ ok: false, error: "Missing shop." }, { status: 400, headers: CORS });
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "0.0.0.0";
 
@@ -60,9 +61,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (result.ok) {
     // A silent (spam/rate-limited) drop is indistinguishable from a real submit.
-    return Response.json({ ok: true, outcome: result.outcome ?? "pending", counterTotal: result.counterTotal ?? null }, { headers: CORS });
+    return json({ ok: true, outcome: result.outcome ?? "pending", counterTotal: result.counterTotal ?? null }, { headers: CORS });
   }
-  return Response.json({ ok: false, error: result.error }, { status: 400, headers: CORS });
+  return json({ ok: false, error: result.error }, { status: 400, headers: CORS });
 };
 
 export const loader = () => new Response("Method not allowed", { status: 405 });

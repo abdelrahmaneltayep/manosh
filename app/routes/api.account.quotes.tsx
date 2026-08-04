@@ -1,4 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { listQuotesForBuyer } from "../services/account-quotes.server";
@@ -28,9 +29,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = shopDomain ? await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { plan: true } }) : null;
   const paid = shop?.plan === "STARTER" || shop?.plan === "GROWTH";
   if (!QUOTE_OPS_ENABLED() || !shop || !paid || !email) {
-    return cors(Response.json({ quotes: [], portalBase, enabled: false }));
+    return cors(json({ quotes: [], portalBase, enabled: false }));
   }
 
   const quotes = await listQuotesForBuyer(shopDomain, email);
-  return cors(Response.json({ quotes, portalBase, enabled: true }));
+  return cors(json({ quotes, portalBase, enabled: true }));
 };

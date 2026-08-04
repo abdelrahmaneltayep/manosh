@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { refreshOverdue } from "../services/invoice.server";
 import { runRemindersForShop } from "../services/reminders.server";
@@ -22,7 +23,7 @@ function unauthorized() {
 
 async function run(request: Request): Promise<Response> {
   if (process.env.MANNON_FF_CREDIT !== "true") {
-    return Response.json({ ok: true, skipped: "feature-off" });
+    return json({ ok: true, skipped: "feature-off" });
   }
   const secret = process.env.CRON_SECRET;
   if (!secret) return new Response("CRON_SECRET not set", { status: 503 });
@@ -44,7 +45,7 @@ async function run(request: Request): Promise<Response> {
     results.push({ shop: shop.shopifyDomain, sent: res.sent });
   }
 
-  return Response.json({ ok: true, ranAt: now.toISOString(), results });
+  return json({ ok: true, ranAt: now.toISOString(), results });
 }
 
 async function shopIdFor(domain: string): Promise<string | null> {

@@ -1,3 +1,4 @@
+import { json } from "@remix-run/node";
 import { summarizeConfigHealth } from "../lib/config-health";
 
 /**
@@ -26,7 +27,7 @@ export const loader = () => {
     // count only — never names, never values
     requiredIssues: health.requiredMissing.length + health.requiredPlaceholder.length,
   };
-  return Response.json(body, {
+  return json(body, {
     status: health.ok ? 200 : 503,
     headers: { "Cache-Control": "no-store" },
   });
