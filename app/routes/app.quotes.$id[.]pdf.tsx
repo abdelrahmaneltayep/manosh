@@ -5,6 +5,7 @@ import { featureAccess, STARTER_PLAN } from "../lib/billing";
 import { getCatalog } from "../services/catalog.server";
 import { renderQuotePdf } from "../services/quote-pdf.server";
 import { appendEvent } from "../services/events.server";
+import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -16,6 +17,7 @@ const IS_TEST = process.env.NODE_ENV !== "production";
  */
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
+  if (!QUOTE_OPS_ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
   if (!featureAccess(status, STARTER_PLAN).allowed) {
     throw new Response("Downloading the quote PDF needs a paid plan.", { status: 402 });

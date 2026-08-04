@@ -10,11 +10,13 @@ import { requireBilling } from "../services/billing.server";
 import { bulkImportAllowed, bulkImportRowCap, GROWTH_PLAN } from "../lib/billing";
 import { previewImport, commitImport, ImportHasErrorsError } from "../services/quote-import.server";
 import type { ImportMode } from "../lib/quote-import";
+import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { billing } = await authenticate.admin(request);
+  if (!QUOTE_OPS_ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
   return { plan: status.plan, allowed: bulkImportAllowed(status.plan), cap: bulkImportRowCap(status.plan) };
 };
@@ -26,6 +28,7 @@ type ActionResult =
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
+  if (!QUOTE_OPS_ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
   if (!bulkImportAllowed(status.plan)) return { ok: false, error: "Bulk import is a Growth feature." };
 

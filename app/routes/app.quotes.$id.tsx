@@ -43,6 +43,7 @@ import { duplicateQuote, QuoteNotFoundForShopError } from "../services/quote-dup
 import { sendEmail } from "../services/mailer.server";
 import { appendEvent } from "../services/events.server";
 import { getCatalog } from "../services/catalog.server";
+import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
 import {
   generateSuggestionForLine,
   generateSuggestionsForQuote,
@@ -82,6 +83,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return {
     aiEnabled,
     aiAllowed,
+    quoteOpsEnabled: QUOTE_OPS_ENABLED(),
     suggestions,
     quote: {
       id: quote.id,
@@ -109,6 +111,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const quoteId = params.id!;
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+
+  // F25 Quote Ops (convert / PDF email / duplicate) is dark-launched behind its flag.
+  if ((intent === "convert" || intent === "pdf-email" || intent === "duplicate") && !QUOTE_OPS_ENABLED()) {
+    throw new Response("Not found", { status: 404 });
+  }
 
   // --- F25.1 email the branded quote PDF to the buyer (paid) -----------------
   if (intent === "pdf-email") {
@@ -246,7 +253,7 @@ function money(value: string): string {
 }
 
 export default function QuoteDetail() {
-  const { quote, aiEnabled, aiAllowed, suggestions } = useLoaderData<typeof loader>();
+  const { quote, aiEnabled, aiAllowed, quoteOpsEnabled, suggestions } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const aiFetcher = useFetcher<typeof action>();
@@ -503,25 +510,27 @@ export default function QuoteDetail() {
           </BlockStack>
         )}
 
-        <Card>
-          <BlockStack gap="200">
-            <Text as="h2" variant="headingMd">Documents</Text>
-            <Text as="p" tone="subdued" variant="bodyMd">A branded PDF of this quote (line items, totals, validity). Taxes and the final total are calculated by Shopify at checkout.</Text>
-            <InlineStack gap="200">
-              <Button url={`/app/quotes/${quote.id}.pdf`} target="_blank" variant="secondary">Download PDF</Button>
-              <Form method="post">
-                <input type="hidden" name="intent" value="pdf-email" />
-                <Button submit loading={submitting}>Email PDF to buyer</Button>
-              </Form>
-              <Form method="post">
-                <input type="hidden" name="intent" value="duplicate" />
-                <Button submit loading={submitting}>Create a similar quote</Button>
-              </Form>
-            </InlineStack>
-          </BlockStack>
-        </Card>
+        {quoteOpsEnabled && (
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h2" variant="headingMd">Documents</Text>
+              <Text as="p" tone="subdued" variant="bodyMd">A branded PDF of this quote (line items, totals, validity). Taxes and the final total are calculated by Shopify at checkout.</Text>
+              <InlineStack gap="200">
+                <Button url={`/app/quotes/${quote.id}.pdf`} target="_blank" variant="secondary">Download PDF</Button>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="pdf-email" />
+                  <Button submit loading={submitting}>Email PDF to buyer</Button>
+                </Form>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="duplicate" />
+                  <Button submit loading={submitting}>Create a similar quote</Button>
+                </Form>
+              </InlineStack>
+            </BlockStack>
+          </Card>
+        )}
 
-        {(quote.status === "ACCEPTED" || quote.status === "COUNTERED") && !quote.draftOrderId && !quote.convertedOrderId && (
+        {quoteOpsEnabled && (quote.status === "ACCEPTED" || quote.status === "COUNTERED") && !quote.draftOrderId && !quote.convertedOrderId && (
           <Card>
             <BlockStack gap="200">
               <Text as="h2" variant="headingMd">Turn this into an order</Text>

@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { listQuotesForBuyer } from "../services/account-quotes.server";
+import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
 
 /**
  * F25.5 — read-only quotes for the buyer's native customer account (Customer
@@ -26,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const shop = shopDomain ? await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { plan: true } }) : null;
   const paid = shop?.plan === "STARTER" || shop?.plan === "GROWTH";
-  if (!shop || !paid || !email) {
+  if (!QUOTE_OPS_ENABLED() || !shop || !paid || !email) {
     return cors(Response.json({ quotes: [], portalBase, enabled: false }));
   }
 

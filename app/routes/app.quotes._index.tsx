@@ -17,6 +17,7 @@ import { listQuotesForShop } from "../services/quote-inbox.server";
 import { canCreateQuote } from "../services/plan-limits.server";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate } from "../lib/format";
+import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -33,11 +34,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       ? { used: allowance.used, cap: allowance.cap }
       : null;
 
-  return { quotes, usage };
+  return { quotes, usage, quoteOpsEnabled: QUOTE_OPS_ENABLED() };
 };
 
 export default function QuotesInbox() {
-  const { quotes, usage } = useLoaderData<typeof loader>();
+  const { quotes, usage, quoteOpsEnabled } = useLoaderData<typeof loader>();
   const atCap = usage && usage.used >= usage.cap;
   const nearCap = usage && usage.used >= usage.cap * 0.8;
 
@@ -68,7 +69,7 @@ export default function QuotesInbox() {
   });
 
   return (
-    <Page primaryAction={{ content: "Bulk import", url: "/app/quotes/import" }}>
+    <Page primaryAction={quoteOpsEnabled ? { content: "Bulk import", url: "/app/quotes/import" } : undefined}>
       <TitleBar title="Quotes" />
       {usage && nearCap && (
         <div style={{ marginBottom: "var(--p-space-400)" }}>
