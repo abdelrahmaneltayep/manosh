@@ -4,8 +4,8 @@
   "license": "UNLICENSED",
   "description": "Mannon — Your quotes: Customer Account UI extension (F25.5)",
   "dependencies": {
-    "@shopify/ui-extensions": "2025.1.x",
-    "@shopify/ui-extensions-react": "2025.1.x",
+    "@shopify/ui-extensions": "2025.7.4",
+    "@shopify/ui-extensions-react": "2025.7.4",
     "react": "^18.2.0",
     "react-reconciler": "0.29.0"
   }

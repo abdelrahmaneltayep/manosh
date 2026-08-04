@@ -2,7 +2,7 @@
 # quotes + reorder inside Shopify's NEW customer account (native, embedded, no
 # external tab), strengthening the Built-for-Shopify integration story. Read-only:
 # it deep-links to the magic-link portal for actions (reorder / request similar).
-api_version = "2025-01"
+api_version = "2025-07"
 
 [[extensions]]
 type = "ui_extension"
