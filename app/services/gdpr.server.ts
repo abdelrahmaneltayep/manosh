@@ -52,7 +52,19 @@ export async function collectCustomerData(
   return { buyers };
 }
 
-/** app/uninstalled: remove the shop's sessions immediately. */
+/**
+ * app/uninstalled (BFS §3.1). Two things, immediately (full data erasure follows
+ * ~48h later via shop/redact):
+ *  1. Revoke tokens — delete the shop's sessions (they hold the access tokens).
+ *  2. Deactivate the theme-app-extension config — so a reinstall starts clean and
+ *     nothing renders on the storefront until the merchant re-enables it. Today
+ *     that's the F17 Request-a-Quote widget toggle; new extension toggles are
+ *     added here as they ship.
+ */
 export async function cleanupUninstall(shopDomain: string): Promise<void> {
   await prisma.session.deleteMany({ where: { shop: shopDomain } });
+  await prisma.shop.updateMany({
+    where: { shopifyDomain: shopDomain },
+    data: { quoteWidgetEnabled: false },
+  });
 }

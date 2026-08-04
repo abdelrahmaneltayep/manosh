@@ -178,6 +178,23 @@ All notable changes to Mannon are recorded here. Format loosely follows
   form's fields — falling back to its built-in fields when none is configured.
   Submissions carry `formId` + answers through `/api/quote-request`. No LCP impact.
 - Dark-launched behind `MANNON_FF_QUOTE_CAPTURE`. Docs: `docs/quote-capture.md`.
+### Changed — PR-2: Built-for-Shopify integration hardening (§3.1)
+
+- **App Bridge (audit):** confirmed loaded from the **unversioned CDN**
+  (`app-bridge.js`) via `@shopify/shopify-app-remix` `AppProvider` — latest, not
+  bundled, not pinned. Documented in `app.tsx`; deliberately not double-loaded via a
+  raw `<head>` tag (would risk the live embedded frame). `docs/bfs-integration.md`.
+- **Session-token auth (audit):** verified **every `app.*` route** authenticates via
+  `authenticate.admin` (shell + own loader/action) — no cookie-only admin routes.
+  Non-admin surfaces (webhooks = HMAC, widget API = CORS+honeypot+rate-limit, buyer
+  portal = magic-link) are protected appropriately. Audit command in the doc.
+- **Clean uninstall:** `cleanupUninstall` now **deactivates the theme-app-extension
+  config** (turns off the F17 widget so a reinstall starts clean) in addition to
+  **revoking tokens** (deleting sessions). New test in `gdpr.server.test.ts`.
+- **Webhooks:** the 4 GDPR/lifecycle webhooks (`app/uninstalled`,
+  `customers/data_request`, `customers/redact`, `shop/redact`) remain HMAC-verified
+  (bad/missing signature → 401), covered by `webhooks.test.ts`.
+- **No Asset API:** confirmed the storefront is theme-app-extension only.
 
 ### Added — Feature 20: White-Label / Agency Multi-Store Management
 
