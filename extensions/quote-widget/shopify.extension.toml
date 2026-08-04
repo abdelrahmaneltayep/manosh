@@ -1,10 +1,16 @@
-# F17 — Mannon "Request a Quote" theme app extension.
-# Merchants add the app block from the theme editor (Online Store → Customize)
-# on any product or cart section — no theme code editing.
+# Mannon storefront theme app extension — the single theme app extension for the
+# app (Shopify allows only one per app). It hosts every storefront block:
+#   F17  Request a Quote      (quote_button.liquid)
+#   F24  Add to Quote         (add_to_quote.liquid)
+#   F24  Cart to Quote        (cart_to_quote.liquid)
+#   F24  Price gate           (price_gate.liquid)
+#   F21  Make an Offer        (make_offer_button.liquid)
+# Merchants add each block from the theme editor (Online Store → Customize) on any
+# product or cart section — no theme code editing.
 api_version = "2025-01"
 
 [[extensions]]
-name = "Request a Quote"
+name = "Mannon"
 handle = "quote-widget"
 type = "theme"
 

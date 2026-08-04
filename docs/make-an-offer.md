@@ -10,7 +10,11 @@ flow (queue, detail + thread + counter/accept/decline), rules editor, widget
 config. **PR-4 (§2.2 scale path + §2.3):** the storefront theme-app-extension,
 Scale auto-execution + PWYW, and offer → native draft order conversion.
 
-## Storefront (theme app extension `extensions/make-an-offer/`)
+## Storefront (theme app extension — `make_offer_button.liquid` in `extensions/quote-widget/`)
+
+> Note: Shopify allows only one theme app extension per app, so the Make an Offer
+> block ships inside the shared `quote-widget` theme app extension (alongside the
+> F17/F24 blocks), not a standalone `make-an-offer` extension.
 
 Mirrors F17's Request-a-Quote block. The merchant adds the **Make an Offer** app
 block from the theme editor (no theme-code editing). It loads **async** (never

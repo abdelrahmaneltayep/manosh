@@ -19,8 +19,11 @@ changes nothing for live merchants until you flip a flag.
       migrations**: `pricing_v3`, `make_an_offer`, `quote_capture`,
       `quote_capture_advanced`, `price_visibility`, `quote_capture_i18n`, `quote_ops`,
       `quote_pdf`, `quote_source`, `quote_import`. Additive — existing rows default cleanly.
-- [ ] `shopify app deploy` — ships the 3 extensions: `quote-widget` (F17 + F24 blocks),
-      `make-an-offer` (F21), `customer-account-quotes` (F25).
+- [ ] `shopify app deploy` — ships the 2 extensions: `quote-widget` — the single
+      theme app extension, holding every storefront block (F17 Request a Quote, F24
+      Add-to-Quote / Cart-to-Quote / Price gate, **and F21 Make an Offer**) — and
+      `customer-account-quotes` (F25). Shopify allows only one theme app extension
+      per app, so the F21 block lives inside `quote-widget`, not a separate extension.
 - [ ] Runtime secrets set (`fly secrets list`): `SHOPIFY_API_KEY/SECRET`, `SHOPIFY_APP_URL`,
       `SESSION_SECRET`, `DATABASE_URL`.
 - [ ] `/healthz` → `configOk: true`; app boots and loads in Admin.
@@ -50,7 +53,7 @@ changes nothing for live merchants until you flip a flag.
 
 - **Flag:** `MANNON_FF_MAKE_AN_OFFER=true` (off → `/app/offers` 404)
 - **Gate:** teaser (free/starter) · manual + rules (growth) · automation + PWYW + convert (scale)
-- **Extension:** `make-an-offer`
+- **Extension:** the **Make an Offer** block lives in the `quote-widget` theme app extension
 - [ ] Add the **Make an Offer** block to a product template.
 - [ ] Submit an offer → lands in `/app/offers`; the **margin floor is never breached** on
       auto-accept/counter.
