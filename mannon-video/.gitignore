@@ -1,0 +1,19 @@
+# Regenerable intermediates — rebuilt by the build scripts (Chromium + ffmpeg).
+png/
+frames/
+part2/png/
+part2/frames/
+fonts/
+# Temp render artifacts
+_silent.mp4
+_bed.m4a
+# Local scratch / probes
+.chrome_path
+test.html
+test.png
+_ar.html
+_ar.png
+_ar2.png
+cairo.css
+cairo2.css
+mannon-video-pack.zip
