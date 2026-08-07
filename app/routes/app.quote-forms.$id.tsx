@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Button, Box, TextField, Select, Checkbox, Divider, Tooltip,
 } from "@shopify/polaris";
@@ -10,6 +10,17 @@ import { requireBilling } from "../services/billing.server";
 import { quoteFormFeatures, quoteCaptureAllowed } from "../lib/billing";
 import { FIELD_TYPES, SURFACES, emptyField, moveField, type QuoteFormField, type QuoteFieldType, type Translations, type LocaleTranslation } from "../lib/quote-form";
 import { QUOTE_CAPTURE_ENABLED, getForm, saveForm, type SuccessMode } from "../services/quote-form.server";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draft } from "../services/claude.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -19,15 +30,47 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const form = await getForm(session.shop, params.id!);
   if (!form) throw new Response("Form not found", { status: 404 });
-  return { form, features: quoteFormFeatures(status.plan), paid: quoteCaptureAllowed(status.plan) };
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
+  return { form, features: quoteFormFeatures(status.plan), paid: quoteCaptureAllowed(status.plan), access };
 };
 
-type ActionResult = { ok: boolean; message?: string; error?: string };
+type ActionResult = { ok: boolean; message?: string; error?: string; draft?: string; upgrade?: boolean };
 
 export const action = async ({ request, params }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session } = await authenticate.admin(request);
   if (!QUOTE_CAPTURE_ENABLED()) throw new Response("Not found", { status: 404 });
   const form = await request.formData();
+
+  // --- F24.1 dual-mode: Claude drafts the thank-you copy; merchant saves ------
+  if (String(form.get("intent") ?? "") === "ai-thankyou") {
+    const { access, shop } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    let fieldLabels: string[] = [];
+    try {
+      const parsed = JSON.parse(String(form.get("fields") ?? "[]"));
+      if (Array.isArray(parsed)) fieldLabels = parsed.map((f: { label?: unknown }) => String(f?.label ?? "")).filter(Boolean);
+    } catch {
+      fieldLabels = [];
+    }
+    const { output } = await draft({
+      feature: "thankyou_message",
+      shopId: shop.id,
+      input: {
+        formName: String(form.get("name") ?? ""),
+        surface: String(form.get("surface") ?? "PRODUCT"),
+        fieldLabels,
+      },
+    });
+    const message = typeof output.message === "string" ? output.message.trim() : "";
+    return { ok: true, draft: message };
+  }
+
   let fields: unknown = [];
   let translations: unknown = {};
   try {
@@ -50,10 +93,17 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
 };
 
 export default function QuoteFormBuilder() {
-  const { form, features, paid } = useLoaderData<typeof loader>();
+  const { form, features, paid, access } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
+
+  // Dual-mode: Claude drafts the thank-you copy into the field below.
+  const thankyouFetcher = useFetcher<typeof action>();
+  const draftingThankyou = thankyouFetcher.state !== "idle";
+  const thankyouData = thankyouFetcher.data;
+  const thankyouDraft = thankyouData && thankyouData.ok && typeof thankyouData.draft === "string" ? thankyouData.draft : null;
+  const thankyouErr = thankyouData && !thankyouData.ok ? thankyouData.error : null;
 
   const [name, setName] = useState(form.name);
   const [surface, setSurface] = useState(form.surface);
@@ -193,8 +243,46 @@ export default function QuoteFormBuilder() {
                     onChange={(v) => setSuccessMode(v as SuccessMode)}
                   />
                   {successMode === "MESSAGE" ? (
-                    <TextField label="Thank-you message" value={successValue} onChange={setSuccessValue} autoComplete="off" multiline={2}
-                      placeholder="Thanks — we got your request and will reply with pricing." helpText="Shown to the buyer after they submit." />
+                    <BlockStack gap="200">
+                      <TextField label="Thank-you message" value={successValue} onChange={setSuccessValue} autoComplete="off" multiline={2}
+                        placeholder="Thanks — we got your request and will reply with pricing." helpText="Shown to the buyer after they submit." />
+                      {access.state === "trial" && access.daysLeft != null && (
+                        <InlineStack gap="200" blockAlign="center">
+                          <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                        </InlineStack>
+                      )}
+                      {access.allowed ? (
+                        <BlockStack gap="200">
+                          <InlineStack>
+                            <Button
+                              size="slim"
+                              disabled={draftingThankyou}
+                              loading={draftingThankyou}
+                              onClick={() => thankyouFetcher.submit({ intent: "ai-thankyou", name, surface, fields: JSON.stringify(fields) }, { method: "post" })}
+                            >
+                              ✦ Draft with Claude
+                            </Button>
+                          </InlineStack>
+                          {thankyouErr && <Banner tone="warning">{thankyouErr}</Banner>}
+                          {thankyouDraft && (
+                            <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                              <BlockStack gap="200">
+                                <Text as="p" variant="bodySm">{thankyouDraft}</Text>
+                                <InlineStack gap="200">
+                                  <Button size="slim" variant="primary" onClick={() => setSuccessValue(thankyouDraft)}>Use this</Button>
+                                </InlineStack>
+                                <InlineStack gap="200" blockAlign="center" wrap>
+                                  <Badge tone="info">✦ Drafted by Claude</Badge>
+                                  <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                                </InlineStack>
+                              </BlockStack>
+                            </Box>
+                          )}
+                        </BlockStack>
+                      ) : (
+                        <UpgradeToClaude access={access as ClaudeAccess} upgradeUrl="/app/settings" />
+                      )}
+                    </BlockStack>
                   ) : (
                     <TextField label="Redirect URL" value={successValue} onChange={setSuccessValue} autoComplete="off" type="url"
                       placeholder="https://your-store.com/thank-you" helpText="The buyer is sent here after a successful submit." />

@@ -21,9 +21,11 @@ import "./offer-counter"; // F21 Make an Offer — counter draft
 import "./portal-translations"; // F16 i18n — portal string translations
 import "./followup-message"; // F8 follow-ups — reminder body draft
 import "./wholesale-decision"; // F6 wholesale — decision note draft
+import "./thankyou-message"; // F24.1 quote-form — thank-you copy draft
 
 export { draftTextFeature, type DraftTextInput } from "./draft-text";
 export { offerCounterFeature, type OfferCounterInput } from "./offer-counter";
 export { portalTranslationsFeature, type TranslationsInput } from "./portal-translations";
 export { followupMessageFeature, type FollowupMessageInput } from "./followup-message";
 export { wholesaleDecisionFeature, type WholesaleDecisionInput, type WholesaleDecision } from "./wholesale-decision";
+export { thankYouFeature, type ThankYouInput } from "./thankyou-message";
