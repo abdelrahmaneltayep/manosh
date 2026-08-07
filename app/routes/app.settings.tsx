@@ -259,7 +259,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return { ok: false, kind: "billing", error: "Choose a valid plan." } satisfies ActionResult;
     }
     const appUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
-    await billing.request({ plan, isTest: IS_TEST, returnUrl: `${appUrl}/app/settings` });
+    // The return URL MUST carry the embedded context (shop + host). Without it,
+    // Shopify's post-approval top-level redirect lands on the OAuth "enter your
+    // store" page, the merchant never gets back into the embedded app, and the
+    // new subscription is never reconciled (App Store review 1.2.3).
+    const host = new URL(request.url).searchParams.get("host") ?? "";
+    const back = new URLSearchParams({ shop: session.shop, embedded: "1" });
+    if (host) back.set("host", host);
+    await billing.request({ plan, isTest: IS_TEST, returnUrl: `${appUrl}/app/settings?${back.toString()}` });
     return null; // unreachable — request() throws the redirect
   }
 
