@@ -62,6 +62,7 @@ model Shop {
   quoteWidgetCustomFields Json? // F17: extra form fields (Growth)
   weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
   timezone              String? // F8: IANA tz for quiet-hours-safe follow-up sends
+  claudeTrialStartedAt  DateTime? // Dual-mode: when the one-time 7-day Claude trial began (Starter only); null = not started
   installedAt           DateTime               @default(now())
   companies             Company[]
   events                Event[]
@@ -91,8 +92,26 @@ model Shop {
   offers                Offer[]
   offerRules            OfferRule[]
   offerWidgetConfig     OfferWidgetConfig?
+  aiEvents              AiEvent[]
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+}
+
+// Dual-mode analytics — an append-only record of every Claude "draft" call
+// (guardrail #6 spirit: insert-only, no update/delete path in app code). One row
+// per model invocation, carrying WHICH dual-mode feature it served and token
+// usage for cost/adoption reporting (F: X4). No PII — feature key + counts only.
+model AiEvent {
+  id        String   @id @default(cuid())
+  shopId    String
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  feature   String // dual-mode feature key, e.g. "quote_counter", "reorder_note"
+  mode      String   @default("claude") // which mode produced it (claude | manual)
+  tokensIn  Int      @default(0)
+  tokensOut Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([shopId, feature, createdAt])
 }
 
 // F17 — a lead captured by the storefront "Request a Quote" widget (theme app
