@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, Link, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -13,6 +13,8 @@ import {
   Button,
   Box,
   TextField,
+  Select,
+  Divider,
   IndexTable,
   EmptyState,
 } from "@shopify/polaris";
@@ -29,6 +31,17 @@ import {
   WholesaleFormCapError,
 } from "../services/wholesale.server";
 import { formatDate } from "../lib/format";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draftDecisionNote, isWholesaleDecision } from "../services/wholesale-ai.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_WHOLESALE_REG === "true";
@@ -45,9 +58,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   ]);
   const allowance = evaluateFormAllowance(forms.length, cap);
   const appUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
 
   return {
     isGrowth: status.plan === GROWTH_PLAN,
+    access,
     forms,
     applications: applications.map((a) => ({
       id: a.id,
@@ -62,7 +81,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-type ActionResult = { ok: true; message: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string; draft?: { applicationId: string; decision: string; note: string } }
+  | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<Response | ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -73,6 +94,20 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
   const intent = String(form.get("intent") ?? "");
   const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
 
+  // --- F6 dual-mode: Claude drafts a decision note; merchant edits + sends -----
+  if (intent === "ai-wholesale-note") {
+    const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const id = String(form.get("applicationId") ?? "");
+    const decision = String(form.get("decision") ?? "");
+    if (!isWholesaleDecision(decision)) return { ok: false, error: "Pick a decision first." };
+    const drafted = await draftDecisionNote(session.shop, id, decision);
+    if (!drafted) return { ok: false, error: "That application is no longer available." };
+    return { ok: true, draft: drafted };
+  }
+
   try {
     if (intent === "create-form") {
       const created = await createForm(session.shop, String(form.get("name") ?? ""), cap);
@@ -81,7 +116,8 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
     if (intent === "decide") {
       const id = String(form.get("applicationId") ?? "");
       const decision = String(form.get("decision") ?? "") as "APPROVED" | "REJECTED" | "MORE_INFO";
-      await decideApplication(session.shop, id, decision, session.shop, baseUrl);
+      const customNote = String(form.get("note") ?? "").trim() || undefined;
+      await decideApplication(session.shop, id, decision, session.shop, baseUrl, { customNote });
       const verb = decision === "APPROVED" ? "approved" : decision === "REJECTED" ? "rejected" : "marked for more info";
       return { ok: true, message: `Application ${verb}.` };
     }
@@ -96,6 +132,96 @@ function statusTone(s: string) {
   return s === "APPROVED" ? "success" : s === "REJECTED" ? "critical" : s === "MORE_INFO" ? "attention" : "info";
 }
 
+const DECISION_OPTIONS = [
+  { label: "Approve", value: "APPROVED" },
+  { label: "Request more info", value: "MORE_INFO" },
+  { label: "Decline", value: "REJECTED" },
+];
+
+function WholesaleReplyRow({
+  app,
+  access,
+  divider,
+}: {
+  app: { id: string; companyName: string; contactEmail: string };
+  access: ClaudeAccess;
+  divider: boolean;
+}) {
+  const draftFetcher = useFetcher<typeof action>();
+  const drafting = draftFetcher.state !== "idle";
+  const [decision, setDecision] = useState("APPROVED");
+  const [note, setNote] = useState("");
+  const d = draftFetcher.data;
+  const draft = d && d.ok && d.draft && d.draft.applicationId === app.id ? d.draft : null;
+  const draftErr = d && !d.ok ? d.error : null;
+
+  return (
+    <div>
+      {divider && <Divider />}
+      <Box paddingBlock="300">
+        <BlockStack gap="200">
+          <InlineStack gap="200" blockAlign="center" align="space-between" wrap>
+            <InlineStack gap="200" blockAlign="center">
+              <Link to={`/app/quotes`}>{app.companyName}</Link>
+              <Text as="span" tone="subdued" variant="bodySm">{app.contactEmail}</Text>
+            </InlineStack>
+            <InlineStack gap="200" blockAlign="end">
+              <Select label="Decision" labelHidden options={DECISION_OPTIONS} value={decision} onChange={setDecision} />
+              {access.allowed && (
+                <Button
+                  size="slim"
+                  disabled={drafting}
+                  loading={drafting}
+                  onClick={() => draftFetcher.submit({ intent: "ai-wholesale-note", applicationId: app.id, decision }, { method: "post" })}
+                >
+                  ✦ Draft with Claude
+                </Button>
+              )}
+            </InlineStack>
+          </InlineStack>
+
+          {draftErr && <Banner tone="warning">{draftErr}</Banner>}
+          {draft && (
+            <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm">{draft.note}</Text>
+                <InlineStack gap="200">
+                  <Button size="slim" variant="primary" onClick={() => setNote(draft.note)}>Use this</Button>
+                </InlineStack>
+                <InlineStack gap="200" blockAlign="center" wrap>
+                  <Badge tone="info">✦ Drafted by Claude</Badge>
+                  <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                </InlineStack>
+              </BlockStack>
+            </Box>
+          )}
+
+          <Form method="post">
+            <input type="hidden" name="intent" value="decide" />
+            <input type="hidden" name="applicationId" value={app.id} />
+            <input type="hidden" name="decision" value={decision} />
+            <BlockStack gap="200">
+              <TextField
+                label="Note to applicant (optional)"
+                labelHidden
+                name="note"
+                value={note}
+                onChange={setNote}
+                multiline={2}
+                autoComplete="off"
+                placeholder="Leave blank to send the default decision email, or draft a note with Claude above."
+              />
+              <InlineStack>
+                <Button size="slim" submit>Send decision</Button>
+              </InlineStack>
+            </BlockStack>
+          </Form>
+        </BlockStack>
+      </Box>
+    </div>
+  );
+}
+
 export default function WholesaleQueue() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -106,6 +232,7 @@ export default function WholesaleQueue() {
   const error = actionData && !actionData.ok ? actionData.error : null;
   const message = actionData && actionData.ok ? actionData.message : null;
   const pending = data.applications.filter((a) => a.status === "PENDING");
+  const respondable = data.applications.filter((a) => a.status === "PENDING" || a.status === "MORE_INFO");
 
   return (
     <Page>
@@ -188,6 +315,29 @@ export default function WholesaleQueue() {
             )}
           </BlockStack>
         </Card>
+
+        {/* Respond with a personalised (Claude-drafted) note */}
+        {respondable.length > 0 && (
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Respond with a note</Text>
+                {data.access.state === "trial" && data.access.daysLeft != null && (
+                  <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                )}
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Send your decision with a personal note. Draft it with Claude, review, then send.
+              </Text>
+              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />}
+              <BlockStack gap="0">
+                {respondable.map((a, i) => (
+                  <WholesaleReplyRow key={a.id} app={a} access={data.access as ClaudeAccess} divider={i > 0} />
+                ))}
+              </BlockStack>
+            </BlockStack>
+          </Card>
+        )}
 
         {/* Approval queue */}
         <Card padding="0">
