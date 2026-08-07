@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -22,6 +22,17 @@ import { requireBilling } from "../services/billing.server";
 import { getPlanLimits, contractRatesAllowed, currencyCapMessage, GROWTH_PLAN } from "../lib/billing";
 import { SUPPORTED_LOCALES, localeName } from "../lib/i18n";
 import { getShopI18n, saveShopI18n, listRates, upsertRate, deleteRate, getStoreCurrency } from "../services/i18n.server";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draftPortalTranslations, UnsupportedLocaleError } from "../services/i18n-ai.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_I18N === "true";
@@ -32,6 +43,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const [settings, rates, storeCurrency] = await Promise.all([getShopI18n(session.shop), listRates(session.shop), getStoreCurrency(session.shop)]);
   const limits = getPlanLimits(status.plan);
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return {
     isGrowth: status.plan === GROWTH_PLAN,
     contractRates: contractRatesAllowed(status.plan),
@@ -42,10 +58,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     currencyCap: Number.isFinite(limits.extraCurrencyCap) ? limits.extraCurrencyCap : null,
     currencyCapMessage: currencyCapMessage(limits.extraCurrencyCap),
     locales: SUPPORTED_LOCALES,
+    access,
   };
 };
 
-type ActionResult = { ok: true; message: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string; stringsDraft?: string; covered?: number; total?: number }
+  | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -54,6 +73,36 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const limits = getPlanLimits(status.plan);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+
+  // --- F16 dual-mode: Claude drafts translations into the overrides JSON ------
+  if (intent === "ai-translate") {
+    if (!contractRatesAllowed(status.plan)) return { ok: false, error: "Custom translations need Growth." };
+    const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const locale = String(form.get("locale") ?? "");
+    let existing: Record<string, Record<string, string>> = {};
+    try {
+      existing = JSON.parse(String(form.get("current") ?? "{}")) ?? {};
+    } catch {
+      existing = {};
+    }
+    try {
+      const drafted = await draftPortalTranslations(session.shop, locale);
+      if (!drafted) return { ok: false, error: "Store not found." };
+      const merged = { ...existing, [drafted.locale]: { ...(existing[drafted.locale] ?? {}), ...drafted.translations } };
+      return {
+        ok: true,
+        stringsDraft: JSON.stringify(merged, null, 2),
+        covered: drafted.covered,
+        total: drafted.total,
+      };
+    } catch (error) {
+      if (error instanceof UnsupportedLocaleError) return { ok: false, error: error.message };
+      return { ok: false, error: "Couldn’t draft translations right now. Please try again." };
+    }
+  }
 
   if (intent === "settings") {
     const supportedLocales = SUPPORTED_LOCALES.map((l) => l.code).filter((c) => form.get(`loc_${c}`) === "on");
@@ -109,6 +158,14 @@ export default function I18nSettings() {
   const [quote, setQuote] = useState("");
   const [rate, setRate] = useState("");
   const [strings, setStrings] = useState(JSON.stringify(data.settings.i18nStrings ?? {}, null, 2));
+
+  // Dual-mode: Claude drafts translations into the overrides JSON.
+  const translateFetcher = useFetcher<typeof action>();
+  const translating = translateFetcher.state !== "idle";
+  const [targetLocale, setTargetLocale] = useState(SUPPORTED_LOCALES.find((l) => l.code !== "en")?.code ?? "ar");
+  const translateResult = translateFetcher.data;
+  const translateDraft = translateResult && translateResult.ok && translateResult.stringsDraft ? translateResult : null;
+  const translateError = translateResult && !translateResult.ok ? translateResult.error : null;
 
   return (
     <Page>
@@ -190,13 +247,65 @@ export default function I18nSettings() {
               {!data.contractRates && <Badge tone="info">Growth</Badge>}
             </InlineStack>
             {data.contractRates ? (
-              <Form method="post">
-                <input type="hidden" name="intent" value="strings" />
-                <BlockStack gap="200">
-                  <TextField label="Overrides (JSON: { locale: { key: value } })" name="strings" value={strings} onChange={setStrings} multiline={4} autoComplete="off" />
-                  <InlineStack><Button submit loading={busy}>Save translations</Button></InlineStack>
-                </BlockStack>
-              </Form>
+              <BlockStack gap="300">
+                {/* Claude draft assist — pre-fills the JSON editor below. */}
+                {data.access.state === "trial" && data.access.daysLeft != null && (
+                  <InlineStack gap="200" blockAlign="center">
+                    <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                  </InlineStack>
+                )}
+                {data.access.allowed ? (
+                  <BlockStack gap="200">
+                    <InlineStack gap="200" blockAlign="end" wrap>
+                      <Select
+                        label="Translate portal into"
+                        options={SUPPORTED_LOCALES.filter((l) => l.code !== "en").map((l) => ({ label: localeName(l.code), value: l.code }))}
+                        value={targetLocale}
+                        onChange={setTargetLocale}
+                      />
+                      <Button
+                        disabled={translating}
+                        loading={translating}
+                        onClick={() => translateFetcher.submit({ intent: "ai-translate", locale: targetLocale, current: strings }, { method: "post" })}
+                      >
+                        ✦ Draft with Claude
+                      </Button>
+                    </InlineStack>
+                    {translateError && <Banner tone="warning">{translateError}</Banner>}
+                    {translateDraft && (
+                      <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                        <BlockStack gap="200">
+                          <Text as="span" fontWeight="semibold">
+                            Claude drafted {translateDraft.covered}/{translateDraft.total} strings for {localeName(targetLocale)}
+                          </Text>
+                          <Text as="p" variant="bodySm" tone="subdued">
+                            Review the JSON below after applying, then save.
+                          </Text>
+                          <InlineStack gap="200">
+                            <Button size="slim" variant="primary" onClick={() => translateDraft.stringsDraft && setStrings(translateDraft.stringsDraft)}>
+                              Use this
+                            </Button>
+                          </InlineStack>
+                          <InlineStack gap="200" blockAlign="center" wrap>
+                            <Badge tone="info">✦ Drafted by Claude</Badge>
+                            <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                          </InlineStack>
+                        </BlockStack>
+                      </Box>
+                    )}
+                  </BlockStack>
+                ) : (
+                  <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />
+                )}
+
+                <Form method="post">
+                  <input type="hidden" name="intent" value="strings" />
+                  <BlockStack gap="200">
+                    <TextField label="Overrides (JSON: { locale: { key: value } })" name="strings" value={strings} onChange={setStrings} multiline={4} autoComplete="off" />
+                    <InlineStack><Button submit loading={busy}>Save translations</Button></InlineStack>
+                  </BlockStack>
+                </Form>
+              </BlockStack>
             ) : (
               <Text as="p" tone="subdued" variant="bodySm">Editing custom portal strings per language is a Growth feature.</Text>
             )}

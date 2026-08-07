@@ -18,6 +18,8 @@ export {
 // --- registered features (import for side-effect registration) ---------------
 import "./draft-text"; // F0 seed — generic drafting helper
 import "./offer-counter"; // F21 Make an Offer — counter draft
+import "./portal-translations"; // F16 i18n — portal string translations
 
 export { draftTextFeature, type DraftTextInput } from "./draft-text";
 export { offerCounterFeature, type OfferCounterInput } from "./offer-counter";
+export { portalTranslationsFeature, type TranslationsInput } from "./portal-translations";
