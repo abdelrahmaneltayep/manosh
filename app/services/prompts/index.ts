@@ -27,6 +27,7 @@ import "./quote-request-reply"; // F17 quote requests — acknowledgement reply 
 import "./rep-invite-note"; // F12 sales-rep — invite personal note draft
 import "./tax-reject-note"; // F14 tax/VAT — rejection reason draft
 import "./widget-label"; // F21 storefront widget — button-label draft
+import "./catalog-title"; // F19 catalog sharing — public title draft
 
 export { draftTextFeature, type DraftTextInput } from "./draft-text";
 export { offerCounterFeature, type OfferCounterInput } from "./offer-counter";
@@ -39,3 +40,4 @@ export { quoteRequestReplyFeature, type QuoteRequestReplyInput } from "./quote-r
 export { repInviteNoteFeature, type RepInviteNoteInput } from "./rep-invite-note";
 export { taxRejectNoteFeature, type TaxRejectNoteInput } from "./tax-reject-note";
 export { widgetLabelFeature, type WidgetLabelInput } from "./widget-label";
+export { catalogTitleFeature, type CatalogTitleInput } from "./catalog-title";
