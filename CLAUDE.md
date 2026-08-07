@@ -32,7 +32,9 @@ Shopify does that. We orchestrate and present.
    with 401 before any handler logic runs.
 4. **AI never acts autonomously.** Every AI output lands on a **confirm screen**. The buyer/merchant
    explicitly confirms before anything is written (cart, draft order, quote). Temperature 0, and
-   every AI-returned id is validated server-side against the live catalog.
+   every AI-returned id is validated server-side against the live catalog. Merchant-facing screens
+   follow the **dual-mode** pattern (Manual + `✦ Draft with Claude`, pre-fill only) — see
+   `/docs/dual-mode.md`.
 5. **Polaris components only.** No custom UI where Polaris has a pattern. If Polaris has a component
    for it, use it. Custom UI is a last resort and must be justified.
 6. **Events are append-only.** The `Event` table is written through an insert-only helper. There is
@@ -118,7 +120,7 @@ manosh/
 │   │   ├── catalog.server.ts     # cached catalog reads
 │   │   └── ai/order-parser.server.ts  # AI-1 Magic Order Pad — see /docs/ai-spec.md
 │   └── lib/                      # small shared utilities (hmac, analytics, formatting)
-└── docs/                         # prd.md · ai-spec.md · data-model.md · compliance.md · metrics.md
+└── docs/                         # prd.md · ai-spec.md · dual-mode.md · data-model.md · compliance.md · metrics.md
 ```
 
 Keep domain logic in `app/services/*` **UI-free and unit-testable**. Routes are thin: load, call a
