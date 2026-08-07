@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -34,6 +34,17 @@ import {
   setManualExempt,
   NotFoundError,
 } from "../services/tax.server";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draft } from "../services/claude.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_TAX_VAT === "true";
@@ -52,6 +63,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ...p,
     idValid: p.taxId ? validateTaxId(p.taxIdType as TaxIdType, p.taxId).valid : null,
   }));
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return {
     isGrowth: status.plan === GROWTH_PLAN,
     regionsAllowed: taxRegionsAllowed(status.plan),
@@ -59,10 +75,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     profiles: profilesWithValidation,
     regionRules,
     defaultRatePct: defaultRate != null ? Math.round(defaultRate * 10000) / 100 : null,
+    access,
   };
 };
 
-type ActionResult = { ok: true; message: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string; draft?: { companyId: string; reason: string } }
+  | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -70,6 +89,26 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+
+  // --- F14 dual-mode: Claude drafts a rejection reason; merchant sends --------
+  if (intent === "ai-reject-note") {
+    if (!taxCertWorkflowAllowed(status.plan)) return { ok: false, error: "That needs the Growth plan." };
+    const { access, shop } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const companyId = String(form.get("companyId") ?? "");
+    const { output } = await draft({
+      feature: "tax_reject_note",
+      shopId: shop.id,
+      input: {
+        companyName: String(form.get("companyName") ?? "this company"),
+        taxIdType: String(form.get("taxIdType") ?? "") || null,
+        hasCertificate: form.get("hasCertificate") === "on",
+      },
+    });
+    return { ok: true, draft: { companyId, reason: typeof output.reason === "string" ? output.reason.trim() : "" } };
+  }
 
   try {
     if (intent === "default-rate") {
@@ -111,6 +150,87 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
 
 const STATUS_TONE: Record<string, "success" | "attention" | "critical"> = { VERIFIED: "success", UNVERIFIED: "attention", REJECTED: "critical" };
 
+function TaxRejectRow({
+  p,
+  access,
+  divider,
+}: {
+  p: { companyId: string; companyName: string; taxIdType: string | null; hasCertificate: boolean };
+  access: ClaudeAccess;
+  divider: boolean;
+}) {
+  const draftFetcher = useFetcher<typeof action>();
+  const drafting = draftFetcher.state !== "idle";
+  const [reason, setReason] = useState("");
+  const d = draftFetcher.data;
+  const draft = d && d.ok && d.draft && d.draft.companyId === p.companyId ? d.draft : null;
+  const draftErr = d && !d.ok ? d.error : null;
+
+  return (
+    <div>
+      {divider && <Box borderBlockStartWidth="025" borderColor="border" />}
+      <Box paddingBlock="300">
+        <BlockStack gap="200">
+          <InlineStack align="space-between" blockAlign="center" wrap>
+            <Text as="span" fontWeight="semibold">{p.companyName}</Text>
+            {access.allowed && (
+              <Button
+                size="slim"
+                disabled={drafting}
+                loading={drafting}
+                onClick={() =>
+                  draftFetcher.submit(
+                    { intent: "ai-reject-note", companyId: p.companyId, companyName: p.companyName, taxIdType: p.taxIdType ?? "", hasCertificate: p.hasCertificate ? "on" : "" },
+                    { method: "post" },
+                  )
+                }
+              >
+                ✦ Draft reason with Claude
+              </Button>
+            )}
+          </InlineStack>
+
+          {draftErr && <Banner tone="warning">{draftErr}</Banner>}
+          {draft && (
+            <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm">{draft.reason}</Text>
+                <InlineStack gap="200">
+                  <Button size="slim" variant="primary" onClick={() => setReason(draft.reason)}>Use this</Button>
+                </InlineStack>
+                <InlineStack gap="200" blockAlign="center" wrap>
+                  <Badge tone="info">✦ Drafted by Claude</Badge>
+                  <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                </InlineStack>
+              </BlockStack>
+            </Box>
+          )}
+
+          <Form method="post">
+            <input type="hidden" name="intent" value="reject" />
+            <input type="hidden" name="companyId" value={p.companyId} />
+            <BlockStack gap="200">
+              <TextField
+                label="Reason to send the buyer"
+                labelHidden
+                name="reason"
+                value={reason}
+                onChange={setReason}
+                multiline={2}
+                autoComplete="off"
+                placeholder="Draft a reason with Claude above, or write one here."
+              />
+              <InlineStack>
+                <Button size="slim" tone="critical" submit disabled={!reason.trim()}>Reject with this reason</Button>
+              </InlineStack>
+            </BlockStack>
+          </Form>
+        </BlockStack>
+      </Box>
+    </div>
+  );
+}
+
 export default function TaxSettings() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -121,6 +241,7 @@ export default function TaxSettings() {
   const [region, setRegion] = useState("");
   const [regionRate, setRegionRate] = useState("");
   const [regionExempt, setRegionExempt] = useState(false);
+  const unverified = data.profiles.filter((p) => p.status === "UNVERIFIED");
 
   return (
     <Page>
@@ -188,6 +309,29 @@ export default function TaxSettings() {
             )}
           </BlockStack>
         </Card>
+
+        {/* Reject with a considered (Claude-drafted) reason */}
+        {data.certWorkflow && unverified.length > 0 && (
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Reject with a reason</Text>
+                {data.access.state === "trial" && data.access.daysLeft != null && (
+                  <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                )}
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Tell a buyer why their exemption couldn’t be verified and what to re-submit. Draft it with Claude, review, then reject — the buyer is emailed your reason.
+              </Text>
+              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />}
+              <BlockStack gap="0">
+                {unverified.map((p, i) => (
+                  <TaxRejectRow key={p.companyId} p={p} access={data.access as ClaudeAccess} divider={i > 0} />
+                ))}
+              </BlockStack>
+            </BlockStack>
+          </Card>
+        )}
 
         {/* Company profiles / review queue */}
         <Card padding="0">
