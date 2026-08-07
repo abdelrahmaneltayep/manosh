@@ -63,7 +63,7 @@ export async function countReps(shopId: string): Promise<number> {
  */
 export async function inviteRep(
   shopDomain: string,
-  input: { email: string; name?: string | null },
+  input: { email: string; name?: string | null; note?: string | null },
   plan: string | null,
   baseUrl: string,
   now: Date = new Date(),
@@ -104,7 +104,11 @@ export async function inviteRep(
     shopName: shopDomain,
     inviteUrl: url.toString(),
   });
-  await sendEmail({ to: email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+  // A merchant-reviewed (e.g. Claude-drafted) personal note leads the invite; the
+  // template body (with the secure sign-in link) follows.
+  const note = input.note?.trim();
+  const body = note ? `${note}\n\n${tpl.body}` : tpl.body;
+  await sendEmail({ to: email, subject: tpl.subject, html: body.replace(/\n/g, "<br>"), text: body });
 
   return { rep, url: url.toString() };
 }

@@ -24,6 +24,7 @@ import "./wholesale-decision"; // F6 wholesale — decision note draft
 import "./thankyou-message"; // F24.1 quote-form — thank-you copy draft
 import "./email-template"; // F2 invoice/reminder email copy draft
 import "./quote-request-reply"; // F17 quote requests — acknowledgement reply draft
+import "./rep-invite-note"; // F12 sales-rep — invite personal note draft
 
 export { draftTextFeature, type DraftTextInput } from "./draft-text";
 export { offerCounterFeature, type OfferCounterInput } from "./offer-counter";
@@ -33,3 +34,4 @@ export { wholesaleDecisionFeature, type WholesaleDecisionInput, type WholesaleDe
 export { thankYouFeature, type ThankYouInput } from "./thankyou-message";
 export { emailTemplateFeature, type EmailTemplateInput } from "./email-template";
 export { quoteRequestReplyFeature, type QuoteRequestReplyInput } from "./quote-request-reply";
+export { repInviteNoteFeature, type RepInviteNoteInput } from "./rep-invite-note";
