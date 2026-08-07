@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -51,6 +51,16 @@ import {
   GROWTH_PLAN,
   type PlanName,
 } from "../lib/billing";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draft } from "../services/claude.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -145,8 +155,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     const t = resolveTemplate(key, templateOverrides);
     return { key, label: TEMPLATE_LABELS[key], subject: t.subject, body: t.body };
   });
+  const shopClaude = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopClaude ?? { plan: "FREE" }, new Date());
 
   return {
+    access,
     tolerancePercent: settings ? Math.round(settings.autoApproveTolerance * 100) : 0,
     quoteExpiryDays: settings?.quoteExpiryDays ?? 14,
     magicLinkExpiryDays: settings?.magicLinkExpiryDays ?? 7,
@@ -197,12 +213,45 @@ type ActionResult =
   | { ok: true; kind: "settings" }
   | { ok: true; kind: "billing"; message: string }
   | { ok: true; kind: "seat"; message: string }
-  | { ok: false; kind: "settings" | "billing" | "seat"; error: string };
+  | { ok: true; kind: "template"; template: { key: string; subject: string; body: string } }
+  | { ok: false; kind: "settings" | "billing" | "seat" | "template"; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "save-settings");
+
+  // --- F2 dual-mode: Claude drafts an email template's subject + body ---------
+  if (intent === "ai-template") {
+    const { access, shop } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return {
+        ok: false,
+        kind: "template",
+        upgrade: true,
+        error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY,
+      } satisfies ActionResult;
+    }
+    const key = String(form.get("templateKey") ?? "");
+    const { output } = await draft({
+      feature: "email_template",
+      shopId: shop.id,
+      input: {
+        label: String(form.get("label") ?? key),
+        currentSubject: String(form.get("currentSubject") ?? ""),
+        currentBody: String(form.get("currentBody") ?? ""),
+      },
+    });
+    return {
+      ok: true,
+      kind: "template",
+      template: {
+        key,
+        subject: typeof output.subject === "string" ? output.subject.trim() : "",
+        body: typeof output.body === "string" ? output.body.trim() : "",
+      },
+    } satisfies ActionResult;
+  }
 
   if (intent === "billing-subscribe") {
     const plan = String(form.get("plan") ?? "");
@@ -290,6 +339,91 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 function limitLine(quotes: number | null, seats: number) {
   const q = quotes === null ? "Unlimited quotes" : `Up to ${quotes} active quotes / mo`;
   return `${q} · ${seats} seat${seats === 1 ? "" : "s"}`;
+}
+
+function TemplateEditor({
+  t,
+  tpl,
+  setTplField,
+  access,
+}: {
+  t: { key: string; label: string };
+  tpl: Record<string, string>;
+  setTplField: (field: string, value: string) => void;
+  access: ClaudeAccess;
+}) {
+  const fetcher = useFetcher<typeof action>();
+  const drafting = fetcher.state !== "idle";
+  const subjectKey = `${t.key}_subject`;
+  const bodyKey = `${t.key}_body`;
+  const d = fetcher.data;
+  const draftT = d && d.ok && d.kind === "template" && d.template.key === t.key ? d.template : null;
+  const err = d && !d.ok && d.kind === "template" ? d.error : null;
+
+  return (
+    <Box paddingBlockStart="200">
+      <BlockStack gap="150">
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="h3" variant="headingSm">{t.label}</Text>
+          {access.allowed && (
+            <Button
+              size="slim"
+              disabled={drafting}
+              loading={drafting}
+              onClick={() =>
+                fetcher.submit(
+                  { intent: "ai-template", templateKey: t.key, label: t.label, currentSubject: tpl[subjectKey] ?? "", currentBody: tpl[bodyKey] ?? "" },
+                  { method: "post" },
+                )
+              }
+            >
+              ✦ Draft with Claude
+            </Button>
+          )}
+        </InlineStack>
+        <TextField
+          label="Subject"
+          name={`tpl_${t.key}_subject`}
+          value={tpl[subjectKey] ?? ""}
+          onChange={(v) => setTplField(subjectKey, v)}
+          autoComplete="off"
+        />
+        <TextField
+          label="Body"
+          name={`tpl_${t.key}_body`}
+          value={tpl[bodyKey] ?? ""}
+          onChange={(v) => setTplField(bodyKey, v)}
+          autoComplete="off"
+          multiline={4}
+        />
+        {err && <Banner tone="warning">{err}</Banner>}
+        {draftT && (
+          <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+            <BlockStack gap="200">
+              <Text as="p" variant="bodySm" fontWeight="semibold">{draftT.subject}</Text>
+              <Text as="p" variant="bodySm">{draftT.body}</Text>
+              <InlineStack gap="200">
+                <Button
+                  size="slim"
+                  variant="primary"
+                  onClick={() => {
+                    setTplField(subjectKey, draftT.subject);
+                    setTplField(bodyKey, draftT.body);
+                  }}
+                >
+                  Use this
+                </Button>
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Badge tone="info">✦ Drafted by Claude</Badge>
+                <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+              </InlineStack>
+            </BlockStack>
+          </Box>
+        )}
+      </BlockStack>
+    </Box>
+  );
 }
 
 function PlanOption({
@@ -967,29 +1101,14 @@ export default function Settings() {
                   {"{{dueDate}}"}, {"{{buyerName}}"}, {"{{invoiceUrl}}"}. Leave a
                   field as-is to keep the default.
                 </Text>
+                {data.access.state === "trial" && data.access.daysLeft != null && (
+                  <InlineStack gap="200" blockAlign="center">
+                    <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                  </InlineStack>
+                )}
+                {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />}
                 {data.templates.map((t) => (
-                  <Box key={t.key} paddingBlockStart="200">
-                    <BlockStack gap="150">
-                      <Text as="h3" variant="headingSm">
-                        {t.label}
-                      </Text>
-                      <TextField
-                        label="Subject"
-                        name={`tpl_${t.key}_subject`}
-                        value={tpl[`${t.key}_subject`] ?? ""}
-                        onChange={(v) => setTplField(`${t.key}_subject`, v)}
-                        autoComplete="off"
-                      />
-                      <TextField
-                        label="Body"
-                        name={`tpl_${t.key}_body`}
-                        value={tpl[`${t.key}_body`] ?? ""}
-                        onChange={(v) => setTplField(`${t.key}_body`, v)}
-                        autoComplete="off"
-                        multiline={4}
-                      />
-                    </BlockStack>
-                  </Box>
+                  <TemplateEditor key={t.key} t={t} tpl={tpl} setTplField={setTplField} access={data.access as ClaudeAccess} />
                 ))}
                 <Button variant="primary" submit loading={submitting}>
                   Save email templates
