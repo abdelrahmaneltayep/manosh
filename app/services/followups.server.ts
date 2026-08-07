@@ -235,22 +235,40 @@ export async function needsNudgeList(shopDomain: string, now: Date = new Date())
   }));
 }
 
-/** Manual "send now" — dispatch the earliest scheduled reminder for a quote. */
-export async function sendNow(shopDomain: string, quoteId: string, baseUrl: string, now: Date = new Date()): Promise<boolean> {
+/**
+ * Manual "send now" — dispatch the earliest scheduled reminder for a quote.
+ * When `customBody` is provided (e.g. a Claude-drafted, merchant-reviewed
+ * message), it replaces the template body; the quote link + unsubscribe footer
+ * are always appended so the send stays actionable and compliant.
+ */
+export async function sendNow(
+  shopDomain: string,
+  quoteId: string,
+  baseUrl: string,
+  options: { now?: Date; customBody?: string } = {},
+): Promise<boolean> {
+  const now = options.now ?? new Date();
   const owned = await prisma.quote.findFirst({
     where: { id: quoteId, company: { shop: { shopifyDomain: shopDomain } } },
     include: { company: { include: { shop: { select: { id: true, emailTemplates: true } } } }, buyer: { select: { email: true, name: true } } },
   });
   if (!owned || !ACTIVE.includes(owned.status as "SUBMITTED" | "COUNTERED")) return false;
 
+  const quoteUrl = `${baseUrl}/portal/quotes/${owned.id}`;
+  const unsubscribeUrl = `${baseUrl}/portal/unsubscribe/${owned.id}?t=${unsubscribeToken(owned.id)}`;
   const template = resolveTemplate("followup_reminder", owned.company.shop.emailTemplates);
-  const { subject, body } = renderTemplate(template, {
+  const rendered = renderTemplate(template, {
     buyerName: owned.buyer.name ?? "there",
-    quoteUrl: `${baseUrl}/portal/quotes/${owned.id}`,
+    quoteUrl,
     expiresAt: owned.expiresAt.toISOString().slice(0, 10),
-    unsubscribeUrl: `${baseUrl}/portal/unsubscribe/${owned.id}?t=${unsubscribeToken(owned.id)}`,
+    unsubscribeUrl,
     shopName: shopDomain,
   });
+  const custom = options.customBody?.trim();
+  const subject = rendered.subject;
+  const body = custom
+    ? `${custom}\n\nView your quote: ${quoteUrl}\n\nTo stop these reminders: ${unsubscribeUrl}`
+    : rendered.body;
   await sendEmail({ to: owned.buyer.email, subject, html: body, text: body });
 
   // Mark the earliest scheduled reminder as sent (so the cadence advances).

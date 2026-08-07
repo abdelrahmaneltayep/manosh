@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, Link, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -24,6 +24,16 @@ import { GROWTH_PLAN } from "../lib/billing";
 import { getPolicy, upsertPolicy, needsNudgeList, sendNow } from "../services/followups.server";
 import { clampCadence } from "../lib/followups";
 import { formatDate } from "../lib/format";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draftFollowupMessage } from "../services/followups-ai.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_FOLLOWUPS === "true";
@@ -34,7 +44,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const policy = await getPolicy(session.shop);
   const nudge = await needsNudgeList(session.shop);
-  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { timezone: true } });
+  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { timezone: true, plan: true, legacyPlan: true, claudeTrialStartedAt: true } });
+  const access = claudeAccess(shop ?? { plan: "FREE" }, new Date());
 
   return {
     isGrowth: status.plan === GROWTH_PLAN,
@@ -42,10 +53,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     timezone: shop?.timezone ?? "",
     effectiveCadence: clampCadence(policy.cadenceDays, policy.planMax),
     nudge: nudge.map((n) => ({ ...n })),
+    access,
   };
 };
 
-type ActionResult = { ok: true; message: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string; draft?: { quoteId: string; message: string } }
+  | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -55,8 +69,21 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const intent = String(form.get("intent") ?? "");
   const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
 
+  // --- F8 dual-mode: Claude drafts a reminder body; merchant edits + sends -----
+  if (intent === "ai-followup-draft") {
+    const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const quoteId = String(form.get("quoteId") ?? "");
+    const drafted = await draftFollowupMessage(session.shop, quoteId);
+    if (!drafted) return { ok: false, error: "That quote is no longer open." };
+    return { ok: true, draft: drafted };
+  }
+
   if (intent === "send-now") {
-    const ok = await sendNow(session.shop, String(form.get("quoteId") ?? ""), baseUrl);
+    const customBody = String(form.get("message") ?? "").trim() || undefined;
+    const ok = await sendNow(session.shop, String(form.get("quoteId") ?? ""), baseUrl, { customBody });
     return ok ? { ok: true, message: "Reminder sent." } : { ok: false, error: "Couldn’t send that reminder." };
   }
 
@@ -139,28 +166,20 @@ export default function Followups() {
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">Needs a nudge</Text>
+            {data.access.state === "trial" && data.access.daysLeft != null && (
+              <InlineStack gap="200" blockAlign="center">
+                <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+              </InlineStack>
+            )}
+            {!data.access.allowed && data.nudge.length > 0 && (
+              <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />
+            )}
             {data.nudge.length === 0 ? (
               <Text as="p" tone="subdued">No open quotes waiting on a nudge.</Text>
             ) : (
               <BlockStack gap="0">
                 {data.nudge.map((n, i) => (
-                  <div key={n.id}>
-                    {i > 0 && <Divider />}
-                    <Box paddingBlock="200">
-                      <InlineStack align="space-between" blockAlign="center">
-                        <InlineStack gap="200" blockAlign="center">
-                          <Link to={`/app/quotes/${n.id}`}>{n.companyName}</Link>
-                          {n.overdue && <Badge tone="warning">Due</Badge>}
-                          <Text as="span" tone="subdued" variant="bodySm">expires {formatDate(n.expiresAt)}</Text>
-                        </InlineStack>
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="send-now" />
-                          <input type="hidden" name="quoteId" value={n.id} />
-                          <Button size="slim" submit>Send now</Button>
-                        </Form>
-                      </InlineStack>
-                    </Box>
-                  </div>
+                  <NudgeRow key={n.id} n={n} access={data.access as ClaudeAccess} divider={i > 0} />
                 ))}
               </BlockStack>
             )}
@@ -168,5 +187,86 @@ export default function Followups() {
         </Card>
       </BlockStack>
     </Page>
+  );
+}
+
+function NudgeRow({
+  n,
+  access,
+  divider,
+}: {
+  n: { id: string; companyName: string; expiresAt: string | Date; overdue: boolean };
+  access: ClaudeAccess;
+  divider: boolean;
+}) {
+  const draftFetcher = useFetcher<typeof action>();
+  const drafting = draftFetcher.state !== "idle";
+  const [message, setMessage] = useState("");
+  const draftData = draftFetcher.data;
+  const draft =
+    draftData && draftData.ok && draftData.draft && draftData.draft.quoteId === n.id ? draftData.draft : null;
+  const draftErr = draftData && !draftData.ok ? draftData.error : null;
+
+  return (
+    <div>
+      {divider && <Divider />}
+      <Box paddingBlock="300">
+        <BlockStack gap="200">
+          <InlineStack align="space-between" blockAlign="center">
+            <InlineStack gap="200" blockAlign="center">
+              <Link to={`/app/quotes/${n.id}`}>{n.companyName}</Link>
+              {n.overdue && <Badge tone="warning">Due</Badge>}
+              <Text as="span" tone="subdued" variant="bodySm">expires {formatDate(n.expiresAt)}</Text>
+            </InlineStack>
+            {access.allowed && (
+              <Button
+                size="slim"
+                disabled={drafting}
+                loading={drafting}
+                onClick={() => draftFetcher.submit({ intent: "ai-followup-draft", quoteId: n.id }, { method: "post" })}
+              >
+                ✦ Draft with Claude
+              </Button>
+            )}
+          </InlineStack>
+
+          {draftErr && <Banner tone="warning">{draftErr}</Banner>}
+          {draft && (
+            <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm">{draft.message}</Text>
+                <InlineStack gap="200">
+                  <Button size="slim" variant="primary" onClick={() => setMessage(draft.message)}>Use this</Button>
+                </InlineStack>
+                <InlineStack gap="200" blockAlign="center" wrap>
+                  <Badge tone="info">✦ Drafted by Claude</Badge>
+                  <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                </InlineStack>
+              </BlockStack>
+            </Box>
+          )}
+
+          <Form method="post">
+            <input type="hidden" name="intent" value="send-now" />
+            <input type="hidden" name="quoteId" value={n.id} />
+            <BlockStack gap="200">
+              <TextField
+                label="Reminder message (optional)"
+                labelHidden
+                name="message"
+                value={message}
+                onChange={setMessage}
+                multiline={2}
+                autoComplete="off"
+                placeholder="Leave blank to send your default reminder, or draft one with Claude above."
+              />
+              <InlineStack>
+                <Button size="slim" submit>{message.trim() ? "Send this message" : "Send default reminder"}</Button>
+              </InlineStack>
+            </BlockStack>
+          </Form>
+        </BlockStack>
+      </Box>
+    </div>
   );
 }

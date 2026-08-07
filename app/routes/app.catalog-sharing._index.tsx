@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -35,6 +35,17 @@ import {
   NotAllowedError,
 } from "../services/public-catalog.server";
 import { formatDate } from "../lib/format";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draft } from "../services/claude.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -49,6 +60,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     ? await Promise.all([listPublicCatalogs(session.shop), listCatalogs(session.shop), listLeads(session.shop)])
     : [[], [], []];
 
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
+
   return {
     locked: !allowed,
     upgradeMessage: CATALOG_SHARE_UPGRADE_MESSAGE,
@@ -57,10 +74,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     publicCatalogs,
     catalogs: catalogs.map((c) => ({ id: c.id, name: c.name, itemCount: c.itemCount })),
     leads,
+    access,
   };
 };
 
-type ActionResult = { ok: boolean; error?: string; message?: string };
+type ActionResult = { ok: boolean; error?: string; message?: string; draft?: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -73,6 +91,20 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
+
+  // --- F19 dual-mode: Claude drafts the public catalog title -----------------
+  if (intent === "ai-catalog-title") {
+    const { access, shop } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const { output } = await draft({
+      feature: "catalog_title",
+      shopId: shop.id,
+      input: { catalogName: String(form.get("catalogName") ?? ""), currentTitle: String(form.get("currentTitle") ?? "") },
+    });
+    return { ok: true, draft: typeof output.title === "string" ? output.title.trim() : "" };
+  }
 
   try {
     switch (intent) {
@@ -135,6 +167,14 @@ export default function CatalogSharing() {
   const [catalogId, setCatalogId] = useState(data.catalogs[0]?.id ?? "");
   const [title, setTitle] = useState("");
 
+  // Dual-mode: Claude drafts the public catalog title.
+  const titleFetcher = useFetcher<typeof action>();
+  const draftingTitle = titleFetcher.state !== "idle";
+  const titleData = titleFetcher.data;
+  const titleDraft = titleData && titleData.ok && typeof titleData.draft === "string" ? titleData.draft : null;
+  const titleErr = titleData && !titleData.ok ? titleData.error : null;
+  const access = data.access as ClaudeAccess;
+
   if (data.locked) {
     return (
       <Page>
@@ -173,15 +213,59 @@ export default function CatalogSharing() {
             ) : (
               <Form method="post">
                 <input type="hidden" name="intent" value="create" />
-                <InlineStack gap="300" blockAlign="end" wrap>
-                  <Box minWidth="16rem">
-                    <Select label="Catalog" options={catalogOptions} value={catalogId} onChange={setCatalogId} name="catalogId" />
-                  </Box>
-                  <Box minWidth="16rem">
-                    <TextField label="Public title" value={title} onChange={setTitle} name="title" autoComplete="off" placeholder="e.g. Spring 2026 wholesale" />
-                  </Box>
-                  <Button submit variant="primary" disabled={busy}>Create draft</Button>
-                </InlineStack>
+                <BlockStack gap="200">
+                  <InlineStack gap="300" blockAlign="end" wrap>
+                    <Box minWidth="16rem">
+                      <Select label="Catalog" options={catalogOptions} value={catalogId} onChange={setCatalogId} name="catalogId" />
+                    </Box>
+                    <Box minWidth="16rem">
+                      <TextField label="Public title" value={title} onChange={setTitle} name="title" autoComplete="off" placeholder="e.g. Spring 2026 wholesale" />
+                    </Box>
+                    <Button submit variant="primary" disabled={busy}>Create draft</Button>
+                  </InlineStack>
+
+                  {access.state === "trial" && access.daysLeft != null && (
+                    <InlineStack gap="200" blockAlign="center">
+                      <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                    </InlineStack>
+                  )}
+                  {access.allowed ? (
+                    <BlockStack gap="200">
+                      <InlineStack>
+                        <Button
+                          size="slim"
+                          disabled={draftingTitle}
+                          loading={draftingTitle}
+                          onClick={() =>
+                            titleFetcher.submit(
+                              { intent: "ai-catalog-title", catalogName: data.catalogs.find((c) => c.id === catalogId)?.name ?? "", currentTitle: title },
+                              { method: "post" },
+                            )
+                          }
+                        >
+                          ✦ Draft title with Claude
+                        </Button>
+                      </InlineStack>
+                      {titleErr && <Banner tone="warning">{titleErr}</Banner>}
+                      {titleDraft && (
+                        <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                          <BlockStack gap="200">
+                            <Text as="p" variant="bodyMd" fontWeight="semibold">{titleDraft}</Text>
+                            <InlineStack gap="200">
+                              <Button size="slim" variant="primary" onClick={() => setTitle(titleDraft)}>Use this</Button>
+                            </InlineStack>
+                            <InlineStack gap="200" blockAlign="center" wrap>
+                              <Badge tone="info">✦ Drafted by Claude</Badge>
+                              <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                            </InlineStack>
+                          </BlockStack>
+                        </Box>
+                      )}
+                    </BlockStack>
+                  ) : (
+                    <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
+                  )}
+                </BlockStack>
               </Form>
             )}
           </BlockStack>

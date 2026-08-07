@@ -201,6 +201,48 @@ export async function declineRequest(shopDomain: string, id: string): Promise<vo
   await prisma.quoteRequest.updateMany({ where: { id, shopId: shop.id, status: "NEW" }, data: { status: "DECLINED" } });
 }
 
+export interface QuoteRequestContext {
+  id: string;
+  email: string;
+  companyName: string | null;
+  note: string | null;
+  itemCount: number;
+}
+
+/** Load one owned request's context (for the Claude reply draft). */
+export async function getQuoteRequestForShop(shopDomain: string, id: string): Promise<QuoteRequestContext | null> {
+  const shop = await shopFor(shopDomain);
+  if (!shop) return null;
+  const r = await prisma.quoteRequest.findFirst({
+    where: { id, shopId: shop.id },
+    select: { id: true, email: true, companyName: true, note: true, lines: true },
+  });
+  if (!r) return null;
+  return {
+    id: r.id,
+    email: r.email,
+    companyName: r.companyName,
+    note: r.note,
+    itemCount: Array.isArray(r.lines) ? (r.lines as unknown[]).length : 0,
+  };
+}
+
+/**
+ * Email a merchant-reviewed (e.g. Claude-drafted) acknowledgement reply to the
+ * requester. Does not change the request status — the merchant still converts or
+ * declines separately.
+ */
+export async function replyToRequest(shopDomain: string, id: string, body: string): Promise<boolean> {
+  const shop = await shopFor(shopDomain);
+  if (!shop) return false;
+  const request = await prisma.quoteRequest.findFirst({ where: { id, shopId: shop.id }, select: { id: true, email: true } });
+  if (!request) return false;
+  const text = body.trim();
+  if (!text) return false;
+  await sendEmail({ to: request.email, subject: "About your quote request", html: text.replace(/\n/g, "<br>"), text });
+  return true;
+}
+
 /**
  * Ensure a Company + Buyer for a request's email. Reuses a known buyer (prefills
  * their company + price list); otherwise provisions a lightweight "lead" company

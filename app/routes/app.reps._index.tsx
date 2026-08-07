@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -31,6 +31,17 @@ import {
   repLeaderboard,
   RepSeatCapError,
 } from "../services/rep.server";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draft } from "../services/claude.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_REP_PORTAL === "true";
@@ -40,18 +51,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const isGrowth = repPortalAllowed(status.plan);
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   if (!isGrowth) {
-    return { isGrowth, reps: [], companies: [], leaderboard: [], seatCap: 0 };
+    return { isGrowth, reps: [], companies: [], leaderboard: [], seatCap: 0, access };
   }
   const [reps, companies, leaderboard] = await Promise.all([
     listReps(session.shop),
     listCompaniesForShop(session.shop),
     repLeaderboard(session.shop),
   ]);
-  return { isGrowth, reps, companies, leaderboard, seatCap: getPlanLimits(status.plan).repSeatCap };
+  return { isGrowth, reps, companies, leaderboard, seatCap: getPlanLimits(status.plan).repSeatCap, access };
 };
 
-type ActionResult = { ok: true; message: string; inviteUrl?: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string; inviteUrl?: string; draft?: string }
+  | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -63,11 +81,26 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const intent = String(form.get("intent") ?? "");
   const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
 
+  // --- F12 dual-mode: Claude drafts a personal invite note; merchant sends ----
+  if (intent === "ai-invite-note") {
+    const { access, shop } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const { output } = await draft({
+      feature: "rep_invite_note",
+      shopId: shop.id,
+      input: { repName: String(form.get("name") ?? "").trim() || "there", shopName: session.shop },
+    });
+    return { ok: true, draft: typeof output.note === "string" ? output.note.trim() : "" };
+  }
+
   try {
     if (intent === "invite") {
       const email = String(form.get("email") ?? "").trim();
       if (!email) return { ok: false, error: "Enter an email." };
-      const { url } = await inviteRep(session.shop, { email, name: String(form.get("name") ?? "") }, status.plan, baseUrl);
+      const note = String(form.get("note") ?? "").trim() || undefined;
+      const { url } = await inviteRep(session.shop, { email, name: String(form.get("name") ?? ""), note }, status.plan, baseUrl);
       return { ok: true, message: "Rep invited.", inviteUrl: url };
     }
     if (intent === "assign") {
@@ -97,8 +130,17 @@ export default function Reps() {
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [note, setNote] = useState("");
   const [assignRep, setAssignRep] = useState("");
   const [assignCo, setAssignCo] = useState("");
+
+  // Dual-mode: Claude drafts a personal note into the invite below.
+  const noteFetcher = useFetcher<typeof action>();
+  const draftingNote = noteFetcher.state !== "idle";
+  const noteData = noteFetcher.data;
+  const noteDraft = noteData && noteData.ok && typeof noteData.draft === "string" ? noteData.draft : null;
+  const noteErr = noteData && !noteData.ok ? noteData.error : null;
+  const access = data.access as ClaudeAccess;
 
   if (!data.isGrowth) {
     return (
@@ -146,6 +188,58 @@ export default function Reps() {
               <InlineStack gap="300" blockAlign="end" wrap>
                 <Box minWidth="240px"><TextField label="Email" name="email" type="email" value={email} onChange={setEmail} autoComplete="off" /></Box>
                 <Box minWidth="200px"><TextField label="Name (optional)" name="name" value={name} onChange={setName} autoComplete="off" /></Box>
+              </InlineStack>
+
+              {access.state === "trial" && access.daysLeft != null && (
+                <InlineStack gap="200" blockAlign="center">
+                  <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                </InlineStack>
+              )}
+              {access.allowed ? (
+                <BlockStack gap="200">
+                  <TextField
+                    label="Personal note (optional)"
+                    name="note"
+                    value={note}
+                    onChange={setNote}
+                    multiline={2}
+                    autoComplete="off"
+                    placeholder="Add a warm welcome, or draft one with Claude."
+                  />
+                  <InlineStack>
+                    <Button
+                      size="slim"
+                      disabled={draftingNote}
+                      loading={draftingNote}
+                      onClick={() => noteFetcher.submit({ intent: "ai-invite-note", name }, { method: "post" })}
+                    >
+                      ✦ Draft note with Claude
+                    </Button>
+                  </InlineStack>
+                  {noteErr && <Banner tone="warning">{noteErr}</Banner>}
+                  {noteDraft && (
+                    <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                      <BlockStack gap="200">
+                        <Text as="p" variant="bodySm">{noteDraft}</Text>
+                        <InlineStack gap="200">
+                          <Button size="slim" variant="primary" onClick={() => setNote(noteDraft)}>Use this</Button>
+                        </InlineStack>
+                        <InlineStack gap="200" blockAlign="center" wrap>
+                          <Badge tone="info">✦ Drafted by Claude</Badge>
+                          <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                        </InlineStack>
+                      </BlockStack>
+                    </Box>
+                  )}
+                </BlockStack>
+              ) : (
+                <>
+                  <input type="hidden" name="note" value="" />
+                  <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
+                </>
+              )}
+
+              <InlineStack>
                 <Button variant="primary" submit loading={busy}>Send invite</Button>
               </InlineStack>
               <Text as="p" tone="subdued" variant="bodySm">Seats used: {data.reps.length} of {data.seatCap}.</Text>

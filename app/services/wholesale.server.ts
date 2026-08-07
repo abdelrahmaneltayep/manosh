@@ -362,6 +362,7 @@ export async function decideApplication(
   decision: "APPROVED" | "REJECTED" | "MORE_INFO",
   reviewedBy: string,
   baseUrl: string,
+  options: { customNote?: string } = {},
 ): Promise<void> {
   const shop = await shopFor(shopDomain);
   if (!shop) throw new NotFoundError();
@@ -389,14 +390,18 @@ export async function decideApplication(
 
   // Decision email to the buyer.
   const template = resolveTemplate("application_decision", shop.emailTemplates);
-  const { subject, body } = renderTemplate(template, {
+  const rendered = renderTemplate(template, {
     companyName: app.companyName,
     decision:
       decision === "APPROVED" ? "approved" : decision === "REJECTED" ? "declined" : "in need of more information",
     portalUrl: magicUrl ?? `${baseUrl}/portal`,
     shopName: shopDomain,
   });
-  await sendEmail({ to: app.contactEmail, subject, html: body, text: body });
+  // A merchant-reviewed custom note (e.g. Claude-drafted) leads the email; the
+  // template body (with the portal link) follows so the message stays actionable.
+  const note = options.customNote?.trim();
+  const body = note ? `${note}\n\n${rendered.body}` : rendered.body;
+  await sendEmail({ to: app.contactEmail, subject: rendered.subject, html: body, text: body });
 }
 
 /** Bulk approve a set of applications. */

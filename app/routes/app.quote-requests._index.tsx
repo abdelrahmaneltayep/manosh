@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -14,6 +14,7 @@ import {
   Box,
   TextField,
   Checkbox,
+  Divider,
   IndexTable,
   EmptyState,
 } from "@shopify/polaris";
@@ -27,7 +28,19 @@ import {
   listQuoteRequests,
   convertToQuote,
   declineRequest,
+  replyToRequest,
 } from "../services/quote-widget.server";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draftRequestReply } from "../services/quote-request-ai.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_QUOTE_WIDGET === "true";
@@ -37,10 +50,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const [config, requests] = await Promise.all([getWidgetConfig(session.shop), listQuoteRequests(session.shop)]);
-  return { isGrowth: status.plan === GROWTH_PLAN, features: quoteWidgetFeatures(status.plan), config, requests };
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
+  return { isGrowth: status.plan === GROWTH_PLAN, features: quoteWidgetFeatures(status.plan), config, requests, access };
 };
 
-type ActionResult = { ok: true; message: string } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; message?: string; draft?: { requestId: string; message: string } }
+  | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<Response | ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -48,6 +68,22 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
   await requireBilling(billing, { isTest: IS_TEST });
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+
+  // --- F17 dual-mode: Claude drafts an acknowledgement reply; merchant sends ---
+  if (intent === "ai-reply-draft") {
+    const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const drafted = await draftRequestReply(session.shop, String(form.get("id") ?? ""));
+    if (!drafted) return { ok: false, error: "That request is no longer available." };
+    return { ok: true, draft: drafted };
+  }
+  if (intent === "reply") {
+    const body = String(form.get("message") ?? "");
+    const ok = await replyToRequest(session.shop, String(form.get("id") ?? ""), body);
+    return ok ? { ok: true, message: "Reply sent to the requester." } : { ok: false, error: "Couldn’t send that reply." };
+  }
 
   if (intent === "save") {
     const fieldsRaw = String(form.get("customFields") ?? "").trim();
@@ -79,6 +115,85 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
 
 const STATUS_TONE: Record<string, "success" | "attention" | "critical"> = { CONVERTED: "success", NEW: "attention", DECLINED: "critical" };
 
+function RequestReplyRow({
+  r,
+  access,
+  divider,
+}: {
+  r: { id: string; email: string; companyName: string | null };
+  access: ClaudeAccess;
+  divider: boolean;
+}) {
+  const draftFetcher = useFetcher<typeof action>();
+  const drafting = draftFetcher.state !== "idle";
+  const [message, setMessage] = useState("");
+  const d = draftFetcher.data;
+  const draft = d && d.ok && d.draft && d.draft.requestId === r.id ? d.draft : null;
+  const draftErr = d && !d.ok ? d.error : null;
+
+  return (
+    <div>
+      {divider && <Divider />}
+      <Box paddingBlock="300">
+        <BlockStack gap="200">
+          <InlineStack align="space-between" blockAlign="center" wrap>
+            <InlineStack gap="200" blockAlign="center">
+              <Text as="span" fontWeight="semibold">{r.email}</Text>
+              {r.companyName && <Text as="span" tone="subdued" variant="bodySm">{r.companyName}</Text>}
+            </InlineStack>
+            {access.allowed && (
+              <Button
+                size="slim"
+                disabled={drafting}
+                loading={drafting}
+                onClick={() => draftFetcher.submit({ intent: "ai-reply-draft", id: r.id }, { method: "post" })}
+              >
+                ✦ Draft reply with Claude
+              </Button>
+            )}
+          </InlineStack>
+
+          {draftErr && <Banner tone="warning">{draftErr}</Banner>}
+          {draft && (
+            <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodySm">{draft.message}</Text>
+                <InlineStack gap="200">
+                  <Button size="slim" variant="primary" onClick={() => setMessage(draft.message)}>Use this</Button>
+                </InlineStack>
+                <InlineStack gap="200" blockAlign="center" wrap>
+                  <Badge tone="info">✦ Drafted by Claude</Badge>
+                  <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                </InlineStack>
+              </BlockStack>
+            </Box>
+          )}
+
+          <Form method="post">
+            <input type="hidden" name="intent" value="reply" />
+            <input type="hidden" name="id" value={r.id} />
+            <BlockStack gap="200">
+              <TextField
+                label="Reply to requester"
+                labelHidden
+                name="message"
+                value={message}
+                onChange={setMessage}
+                multiline={2}
+                autoComplete="off"
+                placeholder="Draft a reply with Claude above, or write one here."
+              />
+              <InlineStack>
+                <Button size="slim" submit disabled={!message.trim()}>Send reply</Button>
+              </InlineStack>
+            </BlockStack>
+          </Form>
+        </BlockStack>
+      </Box>
+    </div>
+  );
+}
+
 export default function QuoteRequests() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -91,6 +206,7 @@ export default function QuoteRequests() {
   const [gated, setGated] = useState(c.gated);
   const [cartEnabled, setCartEnabled] = useState(c.cartEnabled);
   const [fields, setFields] = useState(c.customFields.map((f) => `${f.key}=${f.label}`).join("\n"));
+  const newRequests = data.requests.filter((r) => r.status === "NEW");
 
   return (
     <Page>
@@ -134,6 +250,29 @@ export default function QuoteRequests() {
             </BlockStack>
           </Form>
         </Card>
+
+        {/* Reply to new requests with a personal (Claude-drafted) note */}
+        {newRequests.length > 0 && (
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Reply to new requests</Text>
+                {data.access.state === "trial" && data.access.daysLeft != null && (
+                  <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                )}
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Acknowledge a request while you prepare the quote. Draft the reply with Claude, review, then send.
+              </Text>
+              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />}
+              <BlockStack gap="0">
+                {newRequests.map((r, i) => (
+                  <RequestReplyRow key={r.id} r={r} access={data.access as ClaudeAccess} divider={i > 0} />
+                ))}
+              </BlockStack>
+            </BlockStack>
+          </Card>
+        )}
 
         {/* Requests inbox */}
         <Card padding="0">
