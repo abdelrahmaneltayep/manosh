@@ -35,7 +35,18 @@ import {
   QuoteNotFoundError,
 } from "../services/quote.server";
 import { requireBilling } from "../services/billing.server";
-import { featureAccess, GROWTH_PLAN, STARTER_PLAN } from "../lib/billing";
+import { featureAccess, STARTER_PLAN } from "../lib/billing";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { appendAiEvent } from "../services/claude.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
 import { DraftOrderError } from "../services/draft-order.server";
 import { renderQuotePdf } from "../services/quote-pdf.server";
@@ -60,17 +71,23 @@ const IS_TEST = process.env.NODE_ENV !== "production";
 const AI_QUOTE_ENABLED = () => process.env.MANNON_FF_AI_QUOTE === "true";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
   const quote = await getQuoteDetailForShop(session.shop, params.id!);
   if (!quote) {
     throw new Response("Quote not found", { status: 404 });
   }
 
   const aiEnabled = AI_QUOTE_ENABLED();
-  let aiAllowed = false;
+  // Dual-mode gating: Growth/Scale included, Starter on a one-time 7-day trial,
+  // Free/expired locked. Read-only here — the trial is only *started* in the
+  // action, on first real use (never on a page view).
+  let access: ClaudeAccess = claudeAccess({ plan: "FREE" }, new Date());
   if (aiEnabled) {
-    const status = await requireBilling(billing, { isTest: IS_TEST });
-    aiAllowed = featureAccess(status, GROWTH_PLAN).allowed;
+    const shop = await prisma.shop.findUnique({
+      where: { shopifyDomain: session.shop },
+      select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+    });
+    if (shop) access = claudeAccess(shop, new Date());
   }
 
   // Latest suggestion per line (cached view) — only when the feature is on.
@@ -82,7 +99,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   return {
     aiEnabled,
-    aiAllowed,
+    access,
     quoteOpsEnabled: QUOTE_OPS_ENABLED(),
     suggestions,
     quote: {
@@ -172,17 +189,20 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
   }
 
-  // --- AI Quote Assistant (Growth-only, feature-flagged) --------------------
+  // --- F1 AI Quote Assistant, dual-mode (Claude drafts, merchant confirms) ---
   if (intent === "ai-suggest" || intent === "ai-suggest-all") {
     if (!AI_QUOTE_ENABLED()) {
       return { ok: false as const, kind: "ai" as const, error: "This feature isn’t available." };
     }
-    const status = await requireBilling(billing, { isTest: IS_TEST });
-    if (!featureAccess(status, GROWTH_PLAN).allowed) {
+    // Dual-mode gate: included on Growth/Scale; Starter's one-time 7-day trial
+    // *starts here* on first real use; Free/expired are locked. Claude only
+    // pre-fills the counter — the merchant still clicks Send (guardrail #4).
+    const { access, shop } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
       return {
         ok: false as const,
         kind: "ai" as const,
-        error: "Upgrade to Growth for AI counter-offers.",
+        error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY,
         upgrade: true as const,
       };
     }
@@ -192,6 +212,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       } else {
         await generateSuggestionForLine(session.shop, quoteId, String(form.get("lineId") ?? ""));
       }
+      // Append-only dual-mode analytics (feature adoption / cost).
+      await appendAiEvent({ shopId: shop.id, feature: "quote_counter" });
       return { ok: true as const, kind: "ai" as const };
     } catch (error) {
       if (error instanceof AiRateLimitedError) {
@@ -253,7 +275,7 @@ function money(value: string): string {
 }
 
 export default function QuoteDetail() {
-  const { quote, aiEnabled, aiAllowed, quoteOpsEnabled, suggestions } = useLoaderData<typeof loader>();
+  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const aiFetcher = useFetcher<typeof action>();
@@ -311,35 +333,34 @@ export default function QuoteDetail() {
           <Banner tone="success" title={quoteAction.message} />
         )}
         {(aiActionError || aiFetcherError) && (
-          <Banner tone="warning" title="AI Quote Assistant">
+          <Banner tone="warning" title="Draft with Claude">
             <p>{aiActionError || aiFetcherError}</p>
           </Banner>
         )}
 
+        {/* Starter trial countdown — only while the 7-day Claude trial is running. */}
+        {showAi && access.state === "trial" && access.daysLeft != null && (
+          <InlineStack gap="200" blockAlign="center">
+            <Badge tone="attention">
+              {`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}
+            </Badge>
+          </InlineStack>
+        )}
+
         {/* First-run tip: only for eligible merchants with no suggestions yet. */}
-        {showAi && aiAllowed && !hasAnySuggestion && (
-          <Banner tone="info" title="New: AI counter-offers">
+        {showAi && access.allowed && !hasAnySuggestion && (
+          <Banner tone="info" title="Draft a counter-offer with Claude">
             <p>
-              Click <b>AI suggest</b> on any line to get a suggested price, a
-              margin read, and a ready-to-send message. AI drafts it — you always
+              Click <b>Draft with Claude</b> on any line to get a suggested price, a
+              margin read, and a ready-to-send message. Claude drafts it — you always
               confirm before it’s sent.
             </p>
           </Banner>
         )}
 
-        {/* Starter upsell: feature on, but plan too low. */}
-        {showAi && !aiAllowed && (
-          <Banner tone="warning" title="AI counter-offers are a Growth feature">
-            <p>
-              Upgrade to Growth to let Mannon suggest counter-offers with a margin
-              read and a drafted buyer message.
-            </p>
-            <Box paddingBlockStart="200">
-              <Button url="/app/settings" variant="primary">
-                Upgrade to Growth
-              </Button>
-            </Box>
-          </Banner>
+        {/* Locked (Free, or Starter after the trial) — the shared upgrade nudge. */}
+        {showAi && !access.allowed && (
+          <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
         )}
 
         <Card>
@@ -412,8 +433,8 @@ export default function QuoteDetail() {
                           </Box>
                         </InlineStack>
 
-                        {/* AI suggest control (per line) */}
-                        {showAi && aiAllowed && (
+                        {/* Draft-with-Claude control (per line) */}
+                        {showAi && access.allowed && (
                           <InlineStack gap="200" blockAlign="center">
                             <Button
                               size="slim"
@@ -425,7 +446,7 @@ export default function QuoteDetail() {
                                 )
                               }
                             >
-                              {suggestion ? "Refresh AI suggestion" : "AI suggest"}
+                              {suggestion ? "✦ Refresh Claude draft" : "✦ Draft with Claude"}
                             </Button>
                             {generatingLineId === line.id && (
                               <InlineStack gap="100" blockAlign="center">
@@ -458,7 +479,7 @@ export default function QuoteDetail() {
                     <Button variant="primary" submit loading={submitting}>
                       Send counter
                     </Button>
-                    {showAi && aiAllowed && (
+                    {showAi && access.allowed && (
                       <Button
                         disabled={aiFetcher.state !== "idle"}
                         loading={Boolean(generatingAll)}
@@ -466,7 +487,7 @@ export default function QuoteDetail() {
                           aiFetcher.submit({ intent: "ai-suggest-all" }, { method: "post" })
                         }
                       >
-                        Suggest counter-offer for all lines
+                        ✦ Draft all lines with Claude
                       </Button>
                     )}
                   </InlineStack>
@@ -503,7 +524,7 @@ export default function QuoteDetail() {
             </Text>
             {aiEnabled && hasAnySuggestion && (
               <Text as="p" tone="subdued" variant="bodySm">
-                Internal note: an AI suggestion was used on this quote. Buyers never
+                Internal note: a Claude draft was used on this quote. Buyers never
                 see this.
               </Text>
             )}
@@ -590,7 +611,7 @@ function AiSuggestionPanel({
         <InlineStack gap="200" align="space-between" blockAlign="center" wrap>
           <InlineStack gap="200" blockAlign="center">
             <Text as="span" fontWeight="semibold">
-              AI suggests ${money(suggestion.suggestedPrice)}
+              Claude suggests ${money(suggestion.suggestedPrice)}
             </Text>
             <Badge tone={suggestion.belowFloor ? "critical" : "success"}>{marginLabel}</Badge>
           </InlineStack>
@@ -621,11 +642,19 @@ function AiSuggestionPanel({
 
         <InlineStack gap="200">
           <Button size="slim" variant="primary" disabled={suggestion.belowFloor} onClick={onAccept}>
-            Accept (use this price)
+            Use this price
           </Button>
           <Button size="slim" variant="plain" onClick={onDismiss}>
             Dismiss
           </Button>
+        </InlineStack>
+
+        {/* Shared trust line — closes every Claude output (guardrail #4). */}
+        <InlineStack gap="200" blockAlign="center" wrap>
+          <Badge tone="info">✦ Drafted by Claude</Badge>
+          <Text as="span" variant="bodySm">
+            {DRAFTED_BY_CLAUDE_TRUST}
+          </Text>
         </InlineStack>
       </BlockStack>
     </Box>
