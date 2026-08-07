@@ -1,16 +1,27 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Button, Box, TextField, Divider,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import prisma from "../db.server";
 import { getShopCapabilities } from "../services/billing.server";
 import { MAKE_AN_OFFER_ENABLED, getOffer, offerSuggestion, counterOffer, acceptOffer, declineOffer, convertOffer } from "../services/offers.server";
 import { getCatalog } from "../services/catalog.server";
 import { formatDate } from "../lib/format";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draftOfferCounter } from "../services/offers-ai.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -20,6 +31,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const offer = await getOffer(session.shop, params.id!);
   if (!offer) throw new Response("Offer not found", { status: 404 });
   const suggestion = await offerSuggestion(session.shop, offer.id);
+  // Dual-mode gating (read-only here — the Starter trial only *starts* in the action).
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shop ?? { plan: "FREE" }, new Date());
   return {
     offer: {
       id: offer.id, buyerEmail: offer.buyerEmail, source: offer.source, status: offer.status,
@@ -32,10 +49,24 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     },
     suggestion,
     isScale: caps.makeAnOffer === "auto",
+    access,
   };
 };
 
-type ActionResult = { ok: boolean; message?: string; error?: string };
+interface OfferCounterDraftView {
+  counterTotal: number;
+  note: string;
+  floorTotal: number | null;
+  belowFloor: boolean;
+  aboveList: boolean;
+}
+type ActionResult = {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  upgrade?: boolean;
+  draft?: OfferCounterDraftView;
+};
 
 export const action = async ({ request, params }: ActionFunctionArgs): Promise<ActionResult> => {
   const { admin, session } = await authenticate.admin(request);
@@ -45,6 +76,24 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const id = params.id!;
+
+  // --- F21 dual-mode: Claude drafts a counter (amount + note); merchant sends --
+  if (intent === "ai-offer-draft") {
+    const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return {
+        ok: false,
+        upgrade: true,
+        error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY,
+      };
+    }
+    const catalog = await getCatalog(session.shop);
+    const currencyCode = catalog[0]?.currencyCode ?? "USD";
+    const drafted = await draftOfferCounter(session.shop, id, { currencyCode });
+    if (!drafted) return { ok: false, error: "That offer is no longer available." };
+    return { ok: true, draft: drafted };
+  }
+
   if (intent === "counter") {
     const res = await counterOffer(session.shop, id, Number(form.get("amount") ?? 0), String(form.get("note") ?? "") || undefined);
     return res.ok ? { ok: true, message: "Counter sent." } : { ok: false, error: res.error };
@@ -73,15 +122,27 @@ const SUGGESTION_LABEL: Record<string, string> = {
 };
 
 export default function OfferDetail() {
-  const { offer, suggestion, isScale } = useLoaderData<typeof loader>();
+  const { offer, suggestion, isScale, access } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
   const [counter, setCounter] = useState(
     suggestion?.action === "counter" && suggestion.counterCents ? (suggestion.counterCents / 100).toFixed(2) : offer.offeredTotal.toFixed(2),
   );
+  const [note, setNote] = useState("");
   const open = offer.status === "PENDING" || offer.status === "COUNTERED";
   const canConvert = isScale && offer.status === "ACCEPTED" && !offer.convertedOrderId;
+
+  // Dual-mode: Claude drafts a counter + note; the merchant reviews + sends.
+  const draftFetcher = useFetcher<typeof action>();
+  const draftingClaude = draftFetcher.state !== "idle";
+  const claudeDraft = draftFetcher.data?.ok && draftFetcher.data.draft ? draftFetcher.data.draft : null;
+  const claudeError = draftFetcher.data && !draftFetcher.data.ok ? draftFetcher.data.error : null;
+  const useClaudeDraft = () => {
+    if (!claudeDraft) return;
+    setCounter(claudeDraft.counterTotal.toFixed(2));
+    setNote(claudeDraft.note);
+  };
 
   return (
     <Page backAction={{ url: "/app/offers" }}>
@@ -135,13 +196,74 @@ export default function OfferDetail() {
             {open ? (
               <>
                 <Divider />
+                <Text as="h3" variant="headingSm">Respond</Text>
+
+                {/* Dual-mode: Claude drafts a counter + note into the form below. */}
+                {access.state === "trial" && access.daysLeft != null && (
+                  <InlineStack gap="200" blockAlign="center">
+                    <Badge tone="attention">
+                      {`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}
+                    </Badge>
+                  </InlineStack>
+                )}
+                {access.allowed ? (
+                  <BlockStack gap="200">
+                    <InlineStack gap="200" blockAlign="center">
+                      <Button
+                        size="slim"
+                        disabled={draftingClaude}
+                        loading={draftingClaude}
+                        onClick={() => draftFetcher.submit({ intent: "ai-offer-draft" }, { method: "post" })}
+                      >
+                        ✦ Draft counter with Claude
+                      </Button>
+                    </InlineStack>
+                    {claudeError && <Banner tone="warning">{claudeError}</Banner>}
+                    {claudeDraft && (
+                      <Box background={claudeDraft.belowFloor || claudeDraft.aboveList ? "bg-surface-critical" : "bg-surface-secondary"} borderRadius="200" padding="300">
+                        <BlockStack gap="200">
+                          <Text as="span" fontWeight="semibold">
+                            Claude suggests a counter of ${claudeDraft.counterTotal.toFixed(2)}
+                          </Text>
+                          {claudeDraft.belowFloor && (
+                            <Text as="p" tone="critical" variant="bodySm">
+                              This counter is below your floor margin — review before using.
+                            </Text>
+                          )}
+                          {claudeDraft.aboveList && (
+                            <Text as="p" tone="critical" variant="bodySm">
+                              This counter is above the list price — review before using.
+                            </Text>
+                          )}
+                          {claudeDraft.note && (
+                            <Box background="bg-surface" borderRadius="100" padding="200">
+                              <Text as="p" variant="bodySm" tone="subdued">Draft note to buyer</Text>
+                              <Text as="p" variant="bodySm">{claudeDraft.note}</Text>
+                            </Box>
+                          )}
+                          <InlineStack gap="200">
+                            <Button size="slim" variant="primary" disabled={claudeDraft.belowFloor || claudeDraft.aboveList} onClick={useClaudeDraft}>
+                              Use this
+                            </Button>
+                          </InlineStack>
+                          <InlineStack gap="200" blockAlign="center" wrap>
+                            <Badge tone="info">✦ Drafted by Claude</Badge>
+                            <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                          </InlineStack>
+                        </BlockStack>
+                      </Box>
+                    )}
+                  </BlockStack>
+                ) : (
+                  <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
+                )}
+
                 <Form method="post">
                   <input type="hidden" name="intent" value="counter" />
                   <BlockStack gap="200">
-                    <Text as="h3" variant="headingSm">Respond</Text>
                     <InlineStack gap="300" blockAlign="end" wrap>
                       <Box minWidth="10rem"><TextField label="Counter amount" name="amount" type="number" value={counter} onChange={setCounter} autoComplete="off" prefix="$" /></Box>
-                      <Box minWidth="18rem"><TextField label="Note (optional)" name="note" autoComplete="off" /></Box>
+                      <Box minWidth="18rem"><TextField label="Note (optional)" name="note" value={note} onChange={setNote} autoComplete="off" /></Box>
                       <Button submit disabled={busy}>Send counter</Button>
                     </InlineStack>
                   </BlockStack>
