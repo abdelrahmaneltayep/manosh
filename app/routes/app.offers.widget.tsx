@@ -1,14 +1,25 @@
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { useActionData, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
+import { useActionData, useFetcher, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import {
-  Page, Card, BlockStack, InlineStack, Text, Badge, Banner, TextField, Checkbox,
+  Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Box, Button, TextField, Checkbox,
 } from "@shopify/polaris";
 import { TitleBar, SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getShopCapabilities } from "../services/billing.server";
 import { MAKE_AN_OFFER_ENABLED, getWidgetConfig, saveWidgetConfig } from "../services/offers.server";
+import prisma from "../db.server";
+import {
+  claudeAccess,
+  CLAUDE_TRIAL_ENDED_COPY,
+  CLAUDE_UPGRADE_COPY,
+  DRAFTED_BY_CLAUDE_TRUST,
+  type ClaudeAccess,
+} from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draft } from "../services/claude.server";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -17,15 +28,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (caps.makeAnOffer === "teaser") throw redirect("/app/offers");
   const cfg = await getWidgetConfig(session.shop);
   const surfaces = (cfg?.surfaces as Record<string, boolean> | undefined) ?? { button: true, banner: false, inlineForm: true, exitPopup: false };
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return {
     allSurfaces: caps.makeAnOffer === "auto", // Scale unlocks banner + exit popup
     buttonLabel: cfg?.buttonLabel ?? "Make an offer",
     hideAtcUntilOffer: cfg?.hideAtcUntilOffer ?? false,
     surfaces: { button: surfaces.button ?? true, banner: surfaces.banner ?? false, inlineForm: surfaces.inlineForm ?? true, exitPopup: surfaces.exitPopup ?? false },
+    access,
   };
 };
 
-type ActionResult = { ok: boolean; message?: string; error?: string };
+type ActionResult = { ok: boolean; message?: string; error?: string; draft?: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session } = await authenticate.admin(request);
@@ -34,6 +51,21 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   if (caps.makeAnOffer === "teaser") return { ok: false, error: "Upgrade to Growth to configure the widget." };
   const scale = caps.makeAnOffer === "auto";
   const form = await request.formData();
+
+  // --- F21 dual-mode: Claude drafts the storefront button label --------------
+  if (String(form.get("intent") ?? "") === "ai-widget-label") {
+    const { access, shop } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
+    }
+    const { output } = await draft({
+      feature: "widget_label",
+      shopId: shop.id,
+      input: { context: "Make an Offer button on product and cart pages", currentLabel: String(form.get("currentLabel") ?? "") },
+    });
+    return { ok: true, draft: typeof output.label === "string" ? output.label.trim() : "" };
+  }
+
   const on = (k: string) => form.get(k) === "on";
   await saveWidgetConfig(session.shop, {
     surfaces: {
@@ -62,6 +94,14 @@ export default function OfferWidget() {
   const [s, setS] = useState(data.surfaces);
   const [label, setLabel] = useState(data.buttonLabel);
   const [hideAtc, setHideAtc] = useState(data.hideAtcUntilOffer);
+
+  // Dual-mode: Claude drafts the storefront button label.
+  const labelFetcher = useFetcher<typeof action>();
+  const draftingLabel = labelFetcher.state !== "idle";
+  const labelData = labelFetcher.data;
+  const labelDraft = labelData && labelData.ok && typeof labelData.draft === "string" ? labelData.draft : null;
+  const labelErr = labelData && !labelData.ok ? labelData.error : null;
+  const access = data.access as ClaudeAccess;
 
   // Dirty = the form differs from the last-loaded (saved) config. Drives the
   // App Bridge contextual Save Bar (BFS §3.3): unsaved changes are always visible.
@@ -122,6 +162,42 @@ export default function OfferWidget() {
             </InlineStack>
 
             <TextField label="Button label" value={label} onChange={setLabel} autoComplete="off" />
+            {access.state === "trial" && access.daysLeft != null && (
+              <InlineStack gap="200" blockAlign="center">
+                <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+              </InlineStack>
+            )}
+            {access.allowed ? (
+              <BlockStack gap="200">
+                <InlineStack>
+                  <Button
+                    size="slim"
+                    disabled={draftingLabel}
+                    loading={draftingLabel}
+                    onClick={() => labelFetcher.submit({ intent: "ai-widget-label", currentLabel: label }, { method: "post" })}
+                  >
+                    ✦ Draft label with Claude
+                  </Button>
+                </InlineStack>
+                {labelErr && <Banner tone="warning">{labelErr}</Banner>}
+                {labelDraft && (
+                  <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                    <BlockStack gap="200">
+                      <Text as="p" variant="bodyMd" fontWeight="semibold">{labelDraft}</Text>
+                      <InlineStack gap="200">
+                        <Button size="slim" variant="primary" onClick={() => setLabel(labelDraft)}>Use this</Button>
+                      </InlineStack>
+                      <InlineStack gap="200" blockAlign="center" wrap>
+                        <Badge tone="info">✦ Drafted by Claude</Badge>
+                        <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                      </InlineStack>
+                    </BlockStack>
+                  </Box>
+                )}
+              </BlockStack>
+            ) : (
+              <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
+            )}
             <Checkbox label="Hide Add to cart until an offer is made" checked={hideAtc} onChange={setHideAtc} />
           </BlockStack>
         </Card>

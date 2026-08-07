@@ -26,6 +26,7 @@ import "./email-template"; // F2 invoice/reminder email copy draft
 import "./quote-request-reply"; // F17 quote requests — acknowledgement reply draft
 import "./rep-invite-note"; // F12 sales-rep — invite personal note draft
 import "./tax-reject-note"; // F14 tax/VAT — rejection reason draft
+import "./widget-label"; // F21 storefront widget — button-label draft
 
 export { draftTextFeature, type DraftTextInput } from "./draft-text";
 export { offerCounterFeature, type OfferCounterInput } from "./offer-counter";
@@ -37,3 +38,4 @@ export { emailTemplateFeature, type EmailTemplateInput } from "./email-template"
 export { quoteRequestReplyFeature, type QuoteRequestReplyInput } from "./quote-request-reply";
 export { repInviteNoteFeature, type RepInviteNoteInput } from "./rep-invite-note";
 export { taxRejectNoteFeature, type TaxRejectNoteInput } from "./tax-reject-note";
+export { widgetLabelFeature, type WidgetLabelInput } from "./widget-label";
