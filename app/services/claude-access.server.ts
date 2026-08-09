@@ -23,6 +23,7 @@ export interface ShopAccessRow {
   plan: Plan;
   legacyPlan: boolean;
   claudeTrialStartedAt: Date | null;
+  claudeEnabled: boolean;
 }
 
 export interface ClaudeAccessResult {
@@ -49,7 +50,13 @@ export async function requireClaudeAccess(
 
   const shop = await prisma.shop.findUnique({
     where: { shopifyDomain: shopDomain },
-    select: { id: true, plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+    select: {
+      id: true,
+      plan: true,
+      legacyPlan: true,
+      claudeTrialStartedAt: true,
+      claudeEnabled: true,
+    },
   });
   if (!shop) throw new Response("Shop not found", { status: 404 });
 

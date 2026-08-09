@@ -34,17 +34,19 @@ export const CLAUDE_MODEL = "claude-haiku-4-5";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type ClaudeAccessState = "included" | "trial" | "locked";
+export type ClaudeAccessState = "included" | "trial" | "locked" | "off";
 
 export type ClaudeAccessReason =
   | "included" // Growth/Scale — Claude is part of the plan
   | "trial-available" // Starter, trial not yet started
   | "trial-active" // Starter, inside the 7-day window
   | "trial-ended" // Starter, window elapsed → locked
-  | "plan-locked"; // Free — never had access
+  | "plan-locked" // Free — never had access
+  | "toggled-off"; // plan grants Claude, but the merchant turned it off
 
 export interface ClaudeAccess {
-  /** included = paid in; trial = Starter's 7-day window; locked = no access. */
+  /** included = paid in; trial = Starter's 7-day window; off = plan grants Claude
+   *  but the merchant toggled it off; locked = plan doesn't grant it. */
   state: ClaudeAccessState;
   /** Convenience: may the shop invoke a Claude feature right now? */
   allowed: boolean;
@@ -56,6 +58,10 @@ export interface ClaudeAccess {
   /** True the first time a Starter shop is granted the trial — the server guard
    *  must persist `claudeTrialStartedAt = now` exactly once when it sees this. */
   shouldStartTrial: boolean;
+  /** Does the PLAN grant Claude (ignoring the merchant toggle)? True for
+   *  included + trial (and their toggled-off form). The settings toggle is only
+   *  shown when this is true. */
+  planGrantsClaude: boolean;
 }
 
 /** The minimal shape of a Shop row the gating needs. */
@@ -63,6 +69,9 @@ export interface ShopClaudeState {
   plan: PrismaPlan | string | null | undefined;
   legacyPlan?: boolean | null;
   claudeTrialStartedAt?: Date | string | null;
+  /** Merchant on/off toggle. Undefined = on (default). Only applies where the
+   *  plan grants Claude. */
+  claudeEnabled?: boolean | null;
 }
 
 /** Whole days remaining in a trial that started at `startedAt`, evaluated at
@@ -92,8 +101,37 @@ export function claudeAccess(shop: ShopClaudeState, now: Date): ClaudeAccess {
   const handle = effectivePlanHandle(shop.plan, legacy);
   const caps = getPlanCapabilities(shop.plan, legacy);
 
+  // First compute the PLAN decision, ignoring the merchant toggle. Then, if the
+  // plan grants Claude but the merchant has switched it off, downgrade to "off".
+  const base = planClaudeDecision(shop, now, handle, caps.aiCounter);
+
+  // The toggle only bites where the plan actually grants Claude. A Free/locked
+  // shop stays locked regardless of the flag (there's nothing to turn off).
+  if (base.planGrantsClaude && shop.claudeEnabled === false) {
+    return {
+      state: "off",
+      allowed: false,
+      daysLeft: null,
+      reason: "toggled-off",
+      handle,
+      shouldStartTrial: false,
+      planGrantsClaude: true,
+    };
+  }
+
+  return base;
+}
+
+/** The plan-only Claude decision (before the merchant on/off toggle). Split out
+ *  so `claudeAccess` can layer the toggle on top without duplicating the ladder. */
+function planClaudeDecision(
+  shop: ShopClaudeState,
+  now: Date,
+  handle: PlanHandle,
+  included: boolean,
+): ClaudeAccess {
   // Growth / Scale (and grandfathered-up legacy plans) — Claude is included.
-  if (caps.aiCounter) {
+  if (included) {
     return {
       state: "included",
       allowed: true,
@@ -101,6 +139,7 @@ export function claudeAccess(shop: ShopClaudeState, now: Date): ClaudeAccess {
       reason: "included",
       handle,
       shouldStartTrial: false,
+      planGrantsClaude: true,
     };
   }
 
@@ -113,6 +152,7 @@ export function claudeAccess(shop: ShopClaudeState, now: Date): ClaudeAccess {
       reason: "plan-locked",
       handle,
       shouldStartTrial: false,
+      planGrantsClaude: false,
     };
   }
 
@@ -126,6 +166,7 @@ export function claudeAccess(shop: ShopClaudeState, now: Date): ClaudeAccess {
       reason: "trial-available",
       handle,
       shouldStartTrial: true,
+      planGrantsClaude: true,
     };
   }
 
@@ -138,9 +179,12 @@ export function claudeAccess(shop: ShopClaudeState, now: Date): ClaudeAccess {
       reason: "trial-active",
       handle,
       shouldStartTrial: false,
+      planGrantsClaude: true,
     };
   }
 
+  // Trial elapsed → locked. The plan no longer grants Claude, so the toggle is
+  // hidden (nothing to turn on/off until they upgrade).
   return {
     state: "locked",
     allowed: false,
@@ -148,6 +192,7 @@ export function claudeAccess(shop: ShopClaudeState, now: Date): ClaudeAccess {
     reason: "trial-ended",
     handle,
     shouldStartTrial: false,
+    planGrantsClaude: false,
   };
 }
 
@@ -208,6 +253,12 @@ export const CLAUDE_UPGRADE_COPY =
 /** Copy shown to a Starter shop once its 7-day Claude trial has ended. */
 export const CLAUDE_TRIAL_ENDED_COPY =
   "Your 7-day Claude trial has ended. Upgrade to Growth to keep drafting with Claude.";
+
+/** Copy shown when the plan grants Claude but the merchant has toggled it off.
+ *  No upgrade nudge — they already have it; they just switched it off and can
+ *  switch it back on in Settings. */
+export const CLAUDE_OFF_COPY =
+  "Claude drafting is turned off for this store. Turn it back on in Settings whenever you want Claude to pre-fill your drafts.";
 
 /** User-facing message when a Claude draft call fails (missing key, timeout, 429,
  *  5xx). Every ✦ action catches its draft() call and returns this so a model-side

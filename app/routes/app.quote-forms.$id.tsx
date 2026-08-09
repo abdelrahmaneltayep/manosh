@@ -33,7 +33,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!form) throw new Response("Form not found", { status: 404 });
   const shopRow = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
-    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
   });
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return { form, features: quoteFormFeatures(status.plan), paid: quoteCaptureAllowed(status.plan), access };

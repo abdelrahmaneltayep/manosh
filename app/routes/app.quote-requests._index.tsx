@@ -53,7 +53,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const [config, requests] = await Promise.all([getWidgetConfig(session.shop), listQuoteRequests(session.shop)]);
   const shopRow = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
-    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
   });
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return { isGrowth: status.plan === GROWTH_PLAN, features: quoteWidgetFeatures(status.plan), config, requests, access };

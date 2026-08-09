@@ -85,7 +85,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (aiEnabled) {
     const shop = await prisma.shop.findUnique({
       where: { shopifyDomain: session.shop },
-      select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+      select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
     });
     if (shop) access = claudeAccess(shop, new Date());
   }

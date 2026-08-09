@@ -65,7 +65,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }));
   const shopRow = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
-    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
   });
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return {

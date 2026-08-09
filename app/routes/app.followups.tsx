@@ -45,7 +45,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const policy = await getPolicy(session.shop);
   const nudge = await needsNudgeList(session.shop);
-  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { timezone: true, plan: true, legacyPlan: true, claudeTrialStartedAt: true } });
+  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { timezone: true, plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true } });
   const access = claudeAccess(shop ?? { plan: "FREE" }, new Date());
 
   return {

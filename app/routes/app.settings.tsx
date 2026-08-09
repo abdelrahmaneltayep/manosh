@@ -15,6 +15,7 @@ import {
   InlineStack,
   Divider,
   Select,
+  Checkbox,
   Text,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
@@ -158,12 +159,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
   const shopClaude = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
-    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
   });
   const access = claudeAccess(shopClaude ?? { plan: "FREE" }, new Date());
 
   return {
     access,
+    claudeEnabled: shopClaude?.claudeEnabled ?? true,
     tolerancePercent: settings ? Math.round(settings.autoApproveTolerance * 100) : 0,
     quoteExpiryDays: settings?.quoteExpiryDays ?? 14,
     magicLinkExpiryDays: settings?.magicLinkExpiryDays ?? 7,
@@ -215,7 +217,8 @@ type ActionResult =
   | { ok: true; kind: "billing"; message: string }
   | { ok: true; kind: "seat"; message: string }
   | { ok: true; kind: "template"; template: { key: string; subject: string; body: string } }
-  | { ok: false; kind: "settings" | "billing" | "seat" | "template"; error: string; upgrade?: boolean };
+  | { ok: true; kind: "claude"; claudeEnabled: boolean; message: string }
+  | { ok: false; kind: "settings" | "billing" | "seat" | "template" | "claude"; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
@@ -256,6 +259,37 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } catch {
       return { ok: false, kind: "template", error: CLAUDE_UNAVAILABLE_COPY } satisfies ActionResult;
     }
+  }
+
+  // --- dual-mode: merchant turns Claude drafting on/off for the whole store ----
+  if (intent === "claude-toggle") {
+    const shop = await prisma.shop.findUnique({
+      where: { shopifyDomain: session.shop },
+      select: { id: true, plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
+    });
+    if (!shop) {
+      return { ok: false, kind: "claude", error: "Your store isn’t set up yet." } satisfies ActionResult;
+    }
+    // The toggle only applies where the PLAN grants Claude — a Free/locked shop
+    // has nothing to switch. Guard so a hand-crafted request can't flip a flag
+    // that the UI would never show.
+    const access = claudeAccess(shop, new Date());
+    if (!access.planGrantsClaude) {
+      return {
+        ok: false,
+        kind: "claude",
+        upgrade: true,
+        error: CLAUDE_UPGRADE_COPY,
+      } satisfies ActionResult;
+    }
+    const enabled = String(form.get("claudeEnabled") ?? "") === "true";
+    await prisma.shop.update({ where: { id: shop.id }, data: { claudeEnabled: enabled } });
+    return {
+      ok: true,
+      kind: "claude",
+      claudeEnabled: enabled,
+      message: enabled ? "Claude drafting is on." : "Claude drafting is off.",
+    } satisfies ActionResult;
   }
 
   if (intent === "billing-subscribe") {
@@ -435,6 +469,65 @@ function TemplateEditor({
         )}
       </BlockStack>
     </Box>
+  );
+}
+
+/**
+ * Store-wide Claude on/off switch. Only rendered where the PLAN grants Claude
+ * (included, or an active Starter trial) — a Free/locked shop sees the upgrade
+ * nudge instead, never this. Flipping it persists `Shop.claudeEnabled`; when off,
+ * every ✦ "Draft with Claude" control across the app hides and the server guard
+ * blocks model calls, so the merchant stays fully in manual mode.
+ */
+function ClaudeToggleCard({ initialEnabled }: { initialEnabled: boolean }) {
+  const fetcher = useFetcher<typeof action>();
+  const saving = fetcher.state !== "idle";
+  const d = fetcher.data;
+  // Optimistic: reflect the in-flight submission, then the server's confirmed value.
+  const submitted =
+    fetcher.formData?.get("claudeEnabled") != null
+      ? fetcher.formData.get("claudeEnabled") === "true"
+      : null;
+  const confirmed = d && d.ok && d.kind === "claude" ? d.claudeEnabled : null;
+  const enabled = submitted ?? confirmed ?? initialEnabled;
+  const err = d && !d.ok && d.kind === "claude" ? d.error : null;
+  const ok = d && d.ok && d.kind === "claude" ? d.message : null;
+
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack gap="200" blockAlign="center">
+          <Badge tone="info">✦ Claude</Badge>
+          <Text as="h2" variant="headingMd">
+            Draft with Claude
+          </Text>
+        </InlineStack>
+        <Text as="p" tone="subdued" variant="bodySm">
+          When on, Mannon adds a “✦ Draft with Claude” button to quotes, offers,
+          follow-ups and email templates. Claude only pre-fills a draft for you to
+          review — it never sends anything on its own. Turn it off to keep every
+          screen fully manual.
+        </Text>
+        <Checkbox
+          label="Use Claude to draft"
+          helpText="Applies to this whole store. You can turn it back on any time."
+          checked={enabled}
+          disabled={saving}
+          onChange={(next) =>
+            fetcher.submit(
+              { intent: "claude-toggle", claudeEnabled: String(next) },
+              { method: "post" },
+            )
+          }
+        />
+        {err && <Banner tone="warning">{err}</Banner>}
+        {ok && !err && (
+          <Text as="span" variant="bodySm" tone="subdued">
+            {ok}
+          </Text>
+        )}
+      </BlockStack>
+    </Card>
   );
 }
 
@@ -1097,6 +1190,11 @@ export default function Settings() {
             </FormLayout>
           </Form>
         </Card>
+
+        {/* Store-wide Claude on/off — only where the plan grants Claude. */}
+        {data.access.planGrantsClaude && (
+          <ClaudeToggleCard initialEnabled={data.claudeEnabled} />
+        )}
 
         {/* Email templates (F2) — edit the invoice + reminder copy. */}
         {data.creditEnabled && (

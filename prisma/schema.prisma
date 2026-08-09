@@ -63,6 +63,7 @@ model Shop {
   weeklyDigest          Boolean                @default(false) // F7: opt-in "your week in quotes" email (Growth)
   timezone              String? // F8: IANA tz for quiet-hours-safe follow-up sends
   claudeTrialStartedAt  DateTime? // Dual-mode: when the one-time 7-day Claude trial began (Starter only); null = not started
+  claudeEnabled         Boolean                @default(true) // Dual-mode: merchant on/off toggle for Claude drafting (only meaningful where the plan grants Claude); off = manual only
   installedAt           DateTime               @default(now())
   companies             Company[]
   events                Event[]
