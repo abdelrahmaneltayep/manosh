@@ -3,6 +3,7 @@ import { redirect } from "@remix-run/node";
 import type { EventType, Plan } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
+import { captureException } from "../lib/sentry.server";
 import {
   STARTER_PLAN,
   GROWTH_PLAN,
@@ -190,19 +191,42 @@ function checkPlanNames(): string[] {
  *   const { billing } = await authenticate.admin(request);
  *   const status = await requireBilling(billing);
  */
+/** Safe fallback when the billing API can't be reached / read. Treated as "no
+ *  active payment" so the page still renders (with its upgrade prompts) instead
+ *  of crashing. Never used to GRANT a paid feature — only to read/display. */
+const UNKNOWN_BILLING_STATUS: BillingStatus = {
+  plan: null,
+  hasActivePayment: false,
+  onTrial: true,
+  activeSubscriptionName: null,
+  activeSubscriptionId: null,
+};
+
 export async function requireBilling(
   billing: BillingLike,
   options: { isTest?: boolean } = {},
 ): Promise<BillingStatus> {
   const isTest = options.isTest ?? process.env.NODE_ENV !== "production";
-  const { hasActivePayment, appSubscriptions } = await billing.check({
-    // v3 handles are added at runtime when the flag is on; they exist in the
-    // active billing config then, so Shopify accepts them. Cast to satisfy the
-    // legacy-typed BillingLike without widening it for every caller.
-    plans: checkPlanNames() as PlanName[],
-    isTest,
-  });
-  return resolveActivePlan(hasActivePayment, appSubscriptions);
+  try {
+    const { hasActivePayment, appSubscriptions } = await billing.check({
+      // v3 handles are added at runtime when the flag is on; they exist in the
+      // active billing config then, so Shopify accepts them. Cast to satisfy the
+      // legacy-typed BillingLike without widening it for every caller.
+      plans: checkPlanNames() as PlanName[],
+      isTest,
+    });
+    return resolveActivePlan(hasActivePayment, appSubscriptions);
+  } catch (error) {
+    // A billing.check() failure (API error, an unrecognized plan handle in the
+    // Partner Dashboard, a transient 5xx) must NEVER crash the page into App
+    // Bridge's "Something went wrong" — that's an App Store rejection (2.1.1) and
+    // it took down every billing-reading tab. Degrade to "no active payment" so
+    // the screen still renders; report for diagnosis. Enforcement paths
+    // (requirePlan) keep their own stricter handling.
+    console.error(`[requireBilling] billing.check failed (isTest=${isTest}):`, error);
+    captureException(error);
+    return { ...UNKNOWN_BILLING_STATUS };
+  }
 }
 
 /**

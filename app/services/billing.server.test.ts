@@ -114,6 +114,23 @@ describe("requireBilling (skeleton — reads, never enforces)", () => {
     expect(status.plan).toBeNull();
     expect(status.onTrial).toBe(true);
   });
+
+  it("degrades to no-active-payment (never throws) when billing.check fails", async () => {
+    // A billing API failure must NOT crash the page ("Something went wrong" /
+    // App Store 2.1.1) — it degrades to a safe, unpaid status so the screen
+    // still renders. Regression guard for the nav-tab 500s.
+    const check = vi.fn().mockRejectedValue(new Error("billing.check exploded"));
+
+    const status = await requireBilling({ check }, { isTest: false });
+
+    expect(status).toEqual({
+      plan: null,
+      hasActivePayment: false,
+      onTrial: true,
+      activeSubscriptionName: null,
+      activeSubscriptionId: null,
+    });
+  });
 });
 
 describe("plan gating (pure)", () => {
