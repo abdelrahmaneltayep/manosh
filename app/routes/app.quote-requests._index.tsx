@@ -35,6 +35,7 @@ import {
   claudeAccess,
   CLAUDE_TRIAL_ENDED_COPY,
   CLAUDE_UPGRADE_COPY,
+  CLAUDE_UNAVAILABLE_COPY,
   DRAFTED_BY_CLAUDE_TRUST,
   type ClaudeAccess,
 } from "../config/plans";
@@ -75,9 +76,13 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
     if (!access.allowed) {
       return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
     }
-    const drafted = await draftRequestReply(session.shop, String(form.get("id") ?? ""));
-    if (!drafted) return { ok: false, error: "That request is no longer available." };
-    return { ok: true, draft: drafted };
+    try {
+      const drafted = await draftRequestReply(session.shop, String(form.get("id") ?? ""));
+      if (!drafted) return { ok: false, error: "That request is no longer available." };
+      return { ok: true, draft: drafted };
+    } catch {
+      return { ok: false, error: CLAUDE_UNAVAILABLE_COPY };
+    }
   }
   if (intent === "reply") {
     const body = String(form.get("message") ?? "");

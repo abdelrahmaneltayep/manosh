@@ -16,6 +16,7 @@ import {
   claudeAccess,
   CLAUDE_TRIAL_ENDED_COPY,
   CLAUDE_UPGRADE_COPY,
+  CLAUDE_UNAVAILABLE_COPY,
   DRAFTED_BY_CLAUDE_TRUST,
   type ClaudeAccess,
 } from "../config/plans";
@@ -87,11 +88,15 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
         error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY,
       };
     }
-    const catalog = await getCatalog(session.shop);
-    const currencyCode = catalog[0]?.currencyCode ?? "USD";
-    const drafted = await draftOfferCounter(session.shop, id, { currencyCode });
-    if (!drafted) return { ok: false, error: "That offer is no longer available." };
-    return { ok: true, draft: drafted };
+    try {
+      const catalog = await getCatalog(session.shop);
+      const currencyCode = catalog[0]?.currencyCode ?? "USD";
+      const drafted = await draftOfferCounter(session.shop, id, { currencyCode });
+      if (!drafted) return { ok: false, error: "That offer is no longer available." };
+      return { ok: true, draft: drafted };
+    } catch {
+      return { ok: false, error: CLAUDE_UNAVAILABLE_COPY };
+    }
   }
 
   if (intent === "counter") {

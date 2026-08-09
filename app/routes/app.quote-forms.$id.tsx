@@ -15,6 +15,7 @@ import {
   claudeAccess,
   CLAUDE_TRIAL_ENDED_COPY,
   CLAUDE_UPGRADE_COPY,
+  CLAUDE_UNAVAILABLE_COPY,
   DRAFTED_BY_CLAUDE_TRUST,
   type ClaudeAccess,
 } from "../config/plans";
@@ -58,17 +59,21 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
     } catch {
       fieldLabels = [];
     }
-    const { output } = await draft({
-      feature: "thankyou_message",
-      shopId: shop.id,
-      input: {
-        formName: String(form.get("name") ?? ""),
-        surface: String(form.get("surface") ?? "PRODUCT"),
-        fieldLabels,
-      },
-    });
-    const message = typeof output.message === "string" ? output.message.trim() : "";
-    return { ok: true, draft: message };
+    try {
+      const { output } = await draft({
+        feature: "thankyou_message",
+        shopId: shop.id,
+        input: {
+          formName: String(form.get("name") ?? ""),
+          surface: String(form.get("surface") ?? "PRODUCT"),
+          fieldLabels,
+        },
+      });
+      const message = typeof output.message === "string" ? output.message.trim() : "";
+      return { ok: true, draft: message };
+    } catch {
+      return { ok: false, error: CLAUDE_UNAVAILABLE_COPY };
+    }
   }
 
   let fields: unknown = [];

@@ -55,6 +55,7 @@ import {
   claudeAccess,
   CLAUDE_TRIAL_ENDED_COPY,
   CLAUDE_UPGRADE_COPY,
+  CLAUDE_UNAVAILABLE_COPY,
   DRAFTED_BY_CLAUDE_TRUST,
   type ClaudeAccess,
 } from "../config/plans";
@@ -233,24 +234,28 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       } satisfies ActionResult;
     }
     const key = String(form.get("templateKey") ?? "");
-    const { output } = await draft({
-      feature: "email_template",
-      shopId: shop.id,
-      input: {
-        label: String(form.get("label") ?? key),
-        currentSubject: String(form.get("currentSubject") ?? ""),
-        currentBody: String(form.get("currentBody") ?? ""),
-      },
-    });
-    return {
-      ok: true,
-      kind: "template",
-      template: {
-        key,
-        subject: typeof output.subject === "string" ? output.subject.trim() : "",
-        body: typeof output.body === "string" ? output.body.trim() : "",
-      },
-    } satisfies ActionResult;
+    try {
+      const { output } = await draft({
+        feature: "email_template",
+        shopId: shop.id,
+        input: {
+          label: String(form.get("label") ?? key),
+          currentSubject: String(form.get("currentSubject") ?? ""),
+          currentBody: String(form.get("currentBody") ?? ""),
+        },
+      });
+      return {
+        ok: true,
+        kind: "template",
+        template: {
+          key,
+          subject: typeof output.subject === "string" ? output.subject.trim() : "",
+          body: typeof output.body === "string" ? output.body.trim() : "",
+        },
+      } satisfies ActionResult;
+    } catch {
+      return { ok: false, kind: "template", error: CLAUDE_UNAVAILABLE_COPY } satisfies ActionResult;
+    }
   }
 
   if (intent === "billing-subscribe") {

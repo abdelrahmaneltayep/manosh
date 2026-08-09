@@ -8,9 +8,14 @@
 
 ## 1. Verdict
 
-**DO NOT SHIP (yet).** — Blockers open: **2 P0 (deploy-gated) + 4 P1**.
+**DO NOT SHIP (yet).** — Blockers open: **2 P0 (deploy-gated)**. P1-1 and P1-2 are now **fixed in code**; P1-3 and P1-4 remain **product decisions** (not review blockers).
 
-The two Shopify-review rejections (ref 126730) are **fixed in code but not yet deployed or live-verified** (P0 until proven on a dev store). Separately, ~6 Claude actions **500 on any Claude API error or missing key**, which reproduces the *exact* "Something went wrong" class the reviewer rejected — this must be fixed before resubmission. Security (secrets, HMAC, GDPR) is **clean**.
+The two Shopify-review rejections (ref 126730) are **fixed in code but not yet deployed or live-verified** (P0 until proven on a dev store). Security (secrets, HMAC, GDPR) is **clean**.
+
+> **Update (fixes applied, pending deploy):**
+> - **P1-1 RESOLVED** — all 6 unguarded `draft()` actions now `try/catch` and return `CLAUDE_UNAVAILABLE_COPY` (a plain banner) instead of a 500. `app/config/plans.ts` + the 6 routes.
+> - **P1-2 RESOLVED (finding corrected)** — on re-inspection, the Free cap **was** enforced on every Free-reachable create path (portal `submitBuyerQuote`, reorder `createReorder`, and request→quote `convertToQuote` via `submitBuyerQuote`). The real defect was the cap **number**: `canCreateQuote` used the legacy limits (Free/Starter → 50) instead of the v3 ladder. Fixed to read `getPlanCapabilities().quotesCap` → **Free = 10, every paid tier = unlimited** (`app/services/plan-limits.server.ts`), with a regression test.
+> - Build + typecheck clean; suite **550 passed**.
 
 ---
 

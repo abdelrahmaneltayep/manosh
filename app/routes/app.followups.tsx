@@ -28,6 +28,7 @@ import {
   claudeAccess,
   CLAUDE_TRIAL_ENDED_COPY,
   CLAUDE_UPGRADE_COPY,
+  CLAUDE_UNAVAILABLE_COPY,
   DRAFTED_BY_CLAUDE_TRUST,
   type ClaudeAccess,
 } from "../config/plans";
@@ -76,9 +77,13 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
     }
     const quoteId = String(form.get("quoteId") ?? "");
-    const drafted = await draftFollowupMessage(session.shop, quoteId);
-    if (!drafted) return { ok: false, error: "That quote is no longer open." };
-    return { ok: true, draft: drafted };
+    try {
+      const drafted = await draftFollowupMessage(session.shop, quoteId);
+      if (!drafted) return { ok: false, error: "That quote is no longer open." };
+      return { ok: true, draft: drafted };
+    } catch {
+      return { ok: false, error: CLAUDE_UNAVAILABLE_COPY };
+    }
   }
 
   if (intent === "send-now") {

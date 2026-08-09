@@ -208,3 +208,9 @@ export const CLAUDE_UPGRADE_COPY =
 /** Copy shown to a Starter shop once its 7-day Claude trial has ended. */
 export const CLAUDE_TRIAL_ENDED_COPY =
   "Your 7-day Claude trial has ended. Upgrade to Growth to keep drafting with Claude.";
+
+/** User-facing message when a Claude draft call fails (missing key, timeout, 429,
+ *  5xx). Every ✦ action catches its draft() call and returns this so a model-side
+ *  failure degrades to a plain banner — never a 500 / "Something went wrong". */
+export const CLAUDE_UNAVAILABLE_COPY =
+  "Claude is unavailable right now — please try again in a moment. You can still write this yourself.";

@@ -14,6 +14,7 @@ import {
   claudeAccess,
   CLAUDE_TRIAL_ENDED_COPY,
   CLAUDE_UPGRADE_COPY,
+  CLAUDE_UNAVAILABLE_COPY,
   DRAFTED_BY_CLAUDE_TRUST,
   type ClaudeAccess,
 } from "../config/plans";
@@ -58,12 +59,16 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
     if (!access.allowed) {
       return { ok: false, upgrade: true, error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY };
     }
-    const { output } = await draft({
-      feature: "widget_label",
-      shopId: shop.id,
-      input: { context: "Make an Offer button on product and cart pages", currentLabel: String(form.get("currentLabel") ?? "") },
-    });
-    return { ok: true, draft: typeof output.label === "string" ? output.label.trim() : "" };
+    try {
+      const { output } = await draft({
+        feature: "widget_label",
+        shopId: shop.id,
+        input: { context: "Make an Offer button on product and cart pages", currentLabel: String(form.get("currentLabel") ?? "") },
+      });
+      return { ok: true, draft: typeof output.label === "string" ? output.label.trim() : "" };
+    } catch {
+      return { ok: false, error: CLAUDE_UNAVAILABLE_COPY };
+    }
   }
 
   const on = (k: string) => form.get(k) === "on";

@@ -1,10 +1,10 @@
 import prisma from "../db.server";
 import {
-  getPlanLimits,
   evaluateQuoteAllowance,
   ACTIVE_QUOTE_WINDOW_DAYS,
   type QuoteAllowance,
 } from "../lib/billing";
+import { getPlanCapabilities } from "../lib/billing-v3";
 
 /**
  * Enforcement of the Starter vs Growth quote-volume limit (see app/lib/billing.ts).
@@ -41,17 +41,20 @@ export async function canCreateQuote(
 ): Promise<QuoteAllowance> {
   const shop = await prisma.shop.findUnique({
     where: { id: shopId },
-    select: { plan: true },
+    select: { plan: true, legacyPlan: true },
   });
-  const { activeQuoteCap } = getPlanLimits(shop?.plan ?? null);
+  // The quote cap follows the v3 pricing ladder (the live model): Free is capped
+  // (quotesCap = 10), every paid tier is unlimited. Grandfathering is honored via
+  // getPlanCapabilities. (The legacy 2-plan limits wrongly capped Starter at 50.)
+  const cap = getPlanCapabilities(shop?.plan ?? null, shop?.legacyPlan ?? false).quotesCap;
 
-  if (!Number.isFinite(activeQuoteCap)) {
-    return { allowed: true, used: 0, cap: activeQuoteCap };
+  if (!Number.isFinite(cap)) {
+    return { allowed: true, used: 0, cap };
   }
 
   const since = new Date(now.getTime() - ACTIVE_QUOTE_WINDOW_DAYS * DAY_MS);
   const used = await countActiveQuotes(shopId, since);
-  return evaluateQuoteAllowance(used, activeQuoteCap);
+  return evaluateQuoteAllowance(used, cap);
 }
 
 /** Thrown by creation paths (e.g. reorder) that signal blocking via exceptions. */
