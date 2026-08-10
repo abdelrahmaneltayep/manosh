@@ -1,5 +1,5 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { Link, useLoaderData } from "@remix-run/react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { Link, useFetcher, useLoaderData } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -23,6 +23,10 @@ import { featureAccess, GROWTH_PLAN } from "../lib/billing";
 import { appendEvent } from "../services/events.server";
 import { getAnalytics } from "../services/quote-analytics.server";
 import { MIN_QUOTES_FOR_ANALYTICS } from "../lib/analytics-quotes";
+import { claudeAccess, CLAUDE_UNAVAILABLE_COPY, CLAUDE_UPGRADE_COPY, CLAUDE_TRIAL_ENDED_COPY, type ClaudeAccess } from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draftWinRateInsight } from "../services/insights-ai.server";
+import { DraftedByClaude } from "../components/DraftedByClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_QUOTE_ANALYTICS === "true";
@@ -34,16 +38,49 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const isGrowth = featureAccess(status, GROWTH_PLAN).allowed;
   const range = Number(new URL(request.url).searchParams.get("range")) === 90 ? 90 : 30;
 
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { id: true, plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
+  });
+  const access = claudeAccess(shop ?? { plan: "FREE" }, new Date());
+
   if (!isGrowth) {
-    return { locked: true as const, range, analytics: null, minQuotes: MIN_QUOTES_FOR_ANALYTICS };
+    return { locked: true as const, range, analytics: null, minQuotes: MIN_QUOTES_FOR_ANALYTICS, access };
   }
 
   const analytics = await getAnalytics(session.shop, range);
-  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { id: true } });
   if (shop && analytics && analytics.count >= MIN_QUOTES_FOR_ANALYTICS) {
     await appendEvent({ shopId: shop.id, type: "ANALYTICS_VIEWED", entityType: "Shop", entityId: shop.id, payload: { range } });
   }
-  return { locked: false as const, range, analytics, minQuotes: MIN_QUOTES_FOR_ANALYTICS };
+  return { locked: false as const, range, analytics, minQuotes: MIN_QUOTES_FOR_ANALYTICS, access };
+};
+
+type InsightResult =
+  | { ok: true; insight: string; suggestedAction: string }
+  | { ok: false; error: string; upgrade?: boolean };
+
+// AI-12 win-rate insight — Claude reads the numbers and drafts a plain-language
+// takeaway + one action. Dual-mode: advisory text only, nothing is changed.
+export const action = async ({ request }: ActionFunctionArgs): Promise<InsightResult> => {
+  const { session } = await authenticate.admin(request);
+  if (!ENABLED()) return { ok: false, error: "This feature isn’t available." };
+  const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+  if (!access.allowed) {
+    return {
+      ok: false,
+      upgrade: true,
+      error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY,
+    };
+  }
+  const form = await request.formData();
+  const range = Number(form.get("range")) === 90 ? 90 : 30;
+  try {
+    const drafted = await draftWinRateInsight(session.shop, range);
+    if (!drafted) return { ok: false, error: "Not enough quote data yet for a read." };
+    return { ok: true, insight: drafted.insight, suggestedAction: drafted.suggestedAction };
+  } catch {
+    return { ok: false, error: CLAUDE_UNAVAILABLE_COPY };
+  }
 };
 
 function money(currency: string, n: number): string {
@@ -83,6 +120,39 @@ function Kpi({ label, value, spark, tone }: { label: string; value: string; spar
         <Sparkline points={spark} tone={tone} />
       </BlockStack>
     </Box>
+  );
+}
+
+function WinRateInsight({ range, access }: { range: number; access: Pick<ClaudeAccess, "allowed"> }) {
+  const fetcher = useFetcher<typeof action>();
+  if (!access.allowed) return null;
+  const busy = fetcher.state !== "idle";
+  const d = fetcher.data;
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack align="space-between" blockAlign="center" wrap gap="200">
+          <Text as="h3" variant="headingSm">What changed, and what to do</Text>
+          <fetcher.Form method="post">
+            <input type="hidden" name="range" value={range} />
+            <Button submit size="slim" disabled={busy} loading={busy}>
+              ✦ Explain with Claude
+            </Button>
+          </fetcher.Form>
+        </InlineStack>
+        {d && !d.ok && <Banner tone="warning">{d.error}</Banner>}
+        {d && d.ok && (
+          <DraftedByClaude>
+            <BlockStack gap="200">
+              <Text as="p" variant="bodyMd">{d.insight}</Text>
+              {d.suggestedAction && (
+                <Text as="p" variant="bodyMd" fontWeight="semibold">Suggested next step: {d.suggestedAction}</Text>
+              )}
+            </BlockStack>
+          </DraftedByClaude>
+        )}
+      </BlockStack>
+    </Card>
   );
 }
 
@@ -159,6 +229,8 @@ export default function Analytics() {
           <Kpi label="Avg time to close" value={hrs(a.kpis.avgTimeToCloseHrs)} spark={created} />
           <Kpi label="Open pipeline" value={money(a.currency, a.kpis.openPipeline)} spark={value} tone="#A8D423" />
         </InlineGrid>
+
+        <WinRateInsight range={data.range} access={data.access} />
 
         <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
           {/* Top accounts */}
