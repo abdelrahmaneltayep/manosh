@@ -185,3 +185,102 @@ export async function draftUpsellBundle(
   }
   return validated;
 }
+
+// --- AI-13 buyer summary + AI-11 reorder prediction (Buyers) ------------------
+// Both read a company's quote history. An ORDERED quote counts as an order, so
+// cadence / lifetime value / usual items are derived without a separate model.
+
+interface CompanyHistory {
+  name: string;
+  buyerName: string;
+  termsDays: number | null;
+  quotes: { status: string; createdAt: Date; lines: { quantity: number; price: unknown; title: string }[] }[];
+}
+
+async function loadCompanyHistory(shopDomain: string, companyId: string): Promise<CompanyHistory | null> {
+  const company = await prisma.company.findFirst({
+    where: { id: companyId, shop: { shopifyDomain: shopDomain } },
+    select: {
+      name: true,
+      buyers: { select: { name: true, email: true }, take: 1, orderBy: { createdAt: "asc" } },
+      creditProfile: { select: { termsDays: true } },
+      quotes: {
+        select: { status: true, createdAt: true, lines: { select: { quantity: true, price: true, title: true } } },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  if (!company) return null;
+  const buyer = company.buyers[0];
+  return {
+    name: company.name,
+    buyerName: buyer?.name || buyer?.email || "the buyer",
+    termsDays: company.creditProfile?.termsDays ?? null,
+    quotes: company.quotes,
+  };
+}
+
+const OPEN_STATUSES = new Set(["SUBMITTED", "COUNTERED", "ACCEPTED"]);
+const daysAgo = (d: Date) => Math.round((Date.now() - d.getTime()) / DAY_MS);
+
+export async function draftBuyerSummary(shopDomain: string, companyId: string): Promise<string | null> {
+  const h = await loadCompanyHistory(shopDomain, companyId);
+  if (!h) return null;
+  const shopId = await shopIdFor(shopDomain);
+
+  const ordered = h.quotes.filter((q) => q.status === "ORDERED");
+  const ltv = ordered.reduce(
+    (sum, q) => sum + q.lines.reduce((s, l) => s + l.quantity * Number(l.price), 0),
+    0,
+  );
+  const { output } = await draft({
+    feature: "buyer_summary",
+    shopId,
+    input: {
+      companyName: h.name,
+      buyerName: h.buyerName,
+      totalOrders: ordered.length,
+      totalQuotes: h.quotes.length,
+      openQuotes: h.quotes.filter((q) => OPEN_STATUSES.has(q.status)).length,
+      lastOrderDaysAgo: ordered.length ? daysAgo(ordered[ordered.length - 1].createdAt) : null,
+      termsDays: h.termsDays,
+      lifetimeValue: ordered.length ? ltv.toFixed(2) : null,
+      currency: null,
+    },
+  });
+  const summary = typeof output.summary === "string" ? output.summary.trim() : "";
+  return summary || null;
+}
+
+export interface ReorderPredictionResult {
+  likelihood: "due" | "soon" | "not-yet";
+  message: string;
+}
+
+export async function draftReorderPrediction(
+  shopDomain: string,
+  companyId: string,
+): Promise<ReorderPredictionResult | null> {
+  const h = await loadCompanyHistory(shopDomain, companyId);
+  if (!h) return null;
+  const shopId = await shopIdFor(shopDomain);
+
+  const ordered = h.quotes.filter((q) => q.status === "ORDERED");
+  if (ordered.length === 0) return null; // nothing to predict from
+  const gaps: number[] = [];
+  for (let i = 1; i < ordered.length; i++) {
+    gaps.push(Math.max(1, Math.round((ordered[i].createdAt.getTime() - ordered[i - 1].createdAt.getTime()) / DAY_MS)));
+  }
+  const avgIntervalDays = gaps.length ? Math.round(gaps.reduce((a, b) => a + b, 0) / gaps.length) : 30;
+  const daysSinceLastOrder = daysAgo(ordered[ordered.length - 1].createdAt);
+  const usualItems = [...new Set(ordered[ordered.length - 1].lines.map((l) => l.title))].slice(0, 4);
+
+  const { output } = await draft({
+    feature: "reorder_prediction",
+    shopId,
+    input: { companyName: h.name, buyerName: h.buyerName, avgIntervalDays, daysSinceLastOrder, usualItems },
+  });
+  const likelihood = output.likelihood === "due" || output.likelihood === "soon" || output.likelihood === "not-yet" ? output.likelihood : "soon";
+  const message = typeof output.message === "string" ? output.message.trim() : "";
+  return message ? { likelihood, message } : null;
+}
