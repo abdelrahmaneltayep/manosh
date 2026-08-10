@@ -13,6 +13,7 @@ import {
   useIndexResourceState,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { issueMagicLink } from "../services/magic-link.server";
@@ -106,6 +107,7 @@ export default function BuyersPage() {
   return (
     <Page>
       <TitleBar title="Buyers" />
+      <SectionTabs active="buyers" />
       <BlockStack gap="400">
         {error && (
           <Banner tone="critical" title="Couldn’t generate a link">

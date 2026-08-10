@@ -18,6 +18,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { allowedRuleScopes, packRulesAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -126,6 +127,7 @@ export default function OrderRules() {
   return (
     <Page>
       <TitleBar title="Order rules" />
+      <SectionTabs active="order-rules" />
       <BlockStack gap="500">
         {err && <Banner tone="critical" title="Couldn’t save"><p>{err}</p></Banner>}
         {msg && <Banner tone="success" title={msg} />}

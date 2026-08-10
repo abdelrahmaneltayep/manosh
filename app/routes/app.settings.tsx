@@ -63,6 +63,7 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { SectionTabs } from "../components/SectionTabs";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -618,6 +619,7 @@ export default function Settings() {
   return (
     <Page>
       <TitleBar title="Settings" />
+      <SectionTabs active="general" />
       <BlockStack gap="500">
         {data.upgradeTarget && !planMeets(data.plan, data.upgradeTarget) && (
           <Banner tone="warning" title={`That needs the ${data.upgradeTarget} plan`}>
@@ -986,22 +988,20 @@ export default function Settings() {
               </InlineStack>
             </BlockStack>
 
-            <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
-              <PlanOption
-                name={STARTER_PLAN}
-                price={data.pricing[STARTER_PLAN].amount}
-                limits={data.limits.starter}
-                current={data.plan}
-                submitting={submitting}
-              />
-              <PlanOption
-                name={GROWTH_PLAN}
-                price={data.pricing[GROWTH_PLAN].amount}
-                limits={data.limits.growth}
-                current={data.plan}
-                submitting={submitting}
-              />
-            </InlineGrid>
+            {/* The plan picker moved to its own top-level page (NAV-MIGRATION.md)
+                and now shows the full 4-plan ladder (Free/Starter/Growth/Scale)
+                that the App Store listing advertises — see /app/plans. */}
+            <Box background="bg-surface-secondary" borderRadius="200" padding="400">
+              <InlineStack align="space-between" blockAlign="center" wrap gap="300">
+                <Text as="p" variant="bodyMd">
+                  Compare all four plans — Free, Starter, Growth and Scale — and
+                  upgrade or downgrade any time.
+                </Text>
+                <Button variant="primary" url="/app/plans">
+                  View pricing plans
+                </Button>
+              </InlineStack>
+            </Box>
 
             {usage && (
               <>

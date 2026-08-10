@@ -19,6 +19,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { featureAccess, GROWTH_PLAN } from "../lib/billing";
@@ -158,6 +159,7 @@ export default function Credit() {
   return (
     <Page>
       <TitleBar title="Credit & invoices" />
+      <SectionTabs active="credit" />
       <BlockStack gap="500">
         {actionData && !actionData.ok && (
           <Banner tone="critical" title="Couldn’t save">

@@ -17,6 +17,7 @@ import {
   Divider,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { requireBilling } from "../services/billing.server";
@@ -130,6 +131,7 @@ export default function Followups() {
   return (
     <Page>
       <TitleBar title="Follow-ups" />
+      <SectionTabs active="followups" />
       <BlockStack gap="500">
         {err && <Banner tone="critical" title="Couldn’t save"><p>{err}</p></Banner>}
         {msg && <Banner tone="success" title={msg} />}

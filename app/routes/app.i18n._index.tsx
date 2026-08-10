@@ -17,6 +17,7 @@ import {
   IndexTable,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { getPlanLimits, contractRatesAllowed, currencyCapMessage, GROWTH_PLAN } from "../lib/billing";
@@ -170,6 +171,7 @@ export default function I18nSettings() {
   return (
     <Page>
       <TitleBar title="Languages & currencies" />
+      <SectionTabs active="languages" />
       <BlockStack gap="500">
         {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}

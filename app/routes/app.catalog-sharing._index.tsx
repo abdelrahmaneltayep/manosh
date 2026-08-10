@@ -18,6 +18,7 @@ import {
   Link as PolarisLink,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { GROWTH_PLAN, catalogSharingAllowed, CATALOG_SHARE_UPGRADE_MESSAGE } from "../lib/billing";
@@ -179,6 +180,7 @@ export default function CatalogSharing() {
     return (
       <Page>
         <TitleBar title="Catalog sharing" />
+        <SectionTabs active="catalog-sharing" />
         <Banner tone="info" title="Publish a shareable wholesale catalog">
           <p>{data.upgradeMessage}</p>
           <Box paddingBlockStart="200">

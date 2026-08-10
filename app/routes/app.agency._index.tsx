@@ -19,6 +19,7 @@ import {
   Divider,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { GROWTH_PLAN, agencyAllowed, AGENCY_UPGRADE_MESSAGE } from "../lib/billing";
@@ -141,6 +142,7 @@ export default function Agency() {
     return (
       <Page>
         <TitleBar title="Agency" />
+        <SectionTabs active="agency" />
         <Banner tone="info" title="Manage & white-label multiple stores">
           <p>{data.upgradeMessage}</p>
           <Box paddingBlockStart="200">

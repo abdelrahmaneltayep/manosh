@@ -18,6 +18,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { repPortalAllowed, getPlanLimits, repSeatCapMessage, GROWTH_PLAN } from "../lib/billing";
@@ -146,6 +147,7 @@ export default function Reps() {
     return (
       <Page>
         <TitleBar title="Sales reps" />
+        <SectionTabs active="reps" />
         <Banner tone="info" title="Add your sales team — upgrade to Growth">
           <p>
             Give your reps a scoped login to see only their assigned accounts and

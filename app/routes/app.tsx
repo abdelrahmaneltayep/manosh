@@ -6,7 +6,7 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
-import { navFlags } from "../lib/nav";
+import { navFlags, visibleNavParents } from "../lib/nav";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -32,34 +32,22 @@ export default function App() {
   // @shopify/shopify-app-remix APP_BRIDGE_URL) — latest, not bundled, not pinned.
   // This is the Shopify-sanctioned embedded setup; we don't hand-roll the script
   // tag (which would double-load and risk the live embedded frame).
+  // Merged IA: 22 flat pages → 7 tabbed parents (NAV-MIGRATION.md). Each parent
+  // links to its first ENABLED tab so the nav never points at a 404; the in-page
+  // SectionTabs bar switches between the folded pages. Home stays as the required
+  // App Bridge rel="home" row.
+  const parents = visibleNavParents(nav);
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
       <NavMenu>
         <Link to="/app" rel="home">
           Home
         </Link>
-        <Link to="/app/quotes">Quotes</Link>
-        {nav.quoteRequests && <Link to="/app/quote-requests">Requests</Link>}
-        {nav.quoteForms && <Link to="/app/quote-forms">Quote forms</Link>}
-        {nav.priceRules && <Link to="/app/price-rules">Price rules</Link>}
-        {nav.offers && <Link to="/app/offers">Offers</Link>}
-        {nav.followups && <Link to="/app/followups">Follow-ups</Link>}
-        {nav.analytics && <Link to="/app/analytics">Analytics</Link>}
-        <Link to="/app/buyers">Buyers</Link>
-        {nav.reps && <Link to="/app/reps">Reps</Link>}
-        {nav.wholesale && <Link to="/app/wholesale">Wholesale</Link>}
-        {nav.priceLists && <Link to="/app/price-lists">Price lists</Link>}
-        {nav.catalogs && <Link to="/app/catalogs">Catalogs</Link>}
-        {nav.catalogSharing && <Link to="/app/catalog-sharing">Catalog sharing</Link>}
-        {nav.orderRules && <Link to="/app/order-rules">Order rules</Link>}
-        {nav.credit && <Link to="/app/credit">Credit</Link>}
-        {nav.payments && <Link to="/app/payments">Payments</Link>}
-        {nav.tax && <Link to="/app/tax">Tax &amp; VAT</Link>}
-        {nav.i18n && <Link to="/app/i18n">Languages</Link>}
-        {nav.erp && <Link to="/app/erp">ERP sync</Link>}
-        {nav.accounting && <Link to="/app/accounting">Accounting</Link>}
-        {nav.agency && <Link to="/app/agency">Agency</Link>}
-        <Link to="/app/settings">Settings</Link>
+        {parents.map((p) => (
+          <Link key={p.url} to={p.url}>
+            {p.label}
+          </Link>
+        ))}
       </NavMenu>
       <Outlet />
     </AppProvider>

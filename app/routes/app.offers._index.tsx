@@ -5,6 +5,7 @@ import {
   IndexTable, EmptyState, Link as PolarisLink,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { getShopCapabilities } from "../services/billing.server";
 import { GROWTH_PLAN } from "../lib/billing";
@@ -32,6 +33,7 @@ export default function OffersQueue() {
     return (
       <Page>
         <TitleBar title="Offers" />
+        <SectionTabs active="offers" />
         <Banner tone="info" title="Make an Offer — let buyers name their price">
           <p>
             Turn browsers into buyers: accept, counter, or auto-handle price offers with margin-safe

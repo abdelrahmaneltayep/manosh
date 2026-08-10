@@ -19,6 +19,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { erpSyncAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -125,6 +126,7 @@ export default function Erp() {
     return (
       <Page>
         <TitleBar title="ERP & inventory sync" />
+        <SectionTabs active="erp" />
         <Banner tone="info" title="ERP & inventory sync — upgrade to Growth">
           <p>
             Keep stock accurate and export orders to your ERP/WMS (webhook, SFTP,

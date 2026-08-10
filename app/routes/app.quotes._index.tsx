@@ -13,6 +13,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { SectionTabs } from "../components/SectionTabs";
 import { listQuotesForShop } from "../services/quote-inbox.server";
 import { canCreateQuote } from "../services/plan-limits.server";
 import { quoteStatusBadge } from "../lib/quote-status";
@@ -71,6 +72,7 @@ export default function QuotesInbox() {
   return (
     <Page primaryAction={quoteOpsEnabled ? { content: "Bulk import", url: "/app/quotes/import" } : undefined}>
       <TitleBar title="Quotes" />
+      <SectionTabs active="quotes" />
       {usage && nearCap && (
         <div style={{ marginBottom: "var(--p-space-400)" }}>
           <Banner

@@ -16,6 +16,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { flexPayAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -76,6 +77,7 @@ export default function Payments() {
     return (
       <Page>
         <TitleBar title="Payments" />
+        <SectionTabs active="payments" />
         <Banner tone="info" title="Deposits & payment plans — upgrade to Growth">
           <p>
             Take a deposit up front, split large orders into installments, or send a

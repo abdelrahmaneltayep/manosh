@@ -17,6 +17,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import {
@@ -92,6 +93,7 @@ export default function PriceLists() {
   return (
     <Page>
       <TitleBar title="Price lists" />
+      <SectionTabs active="price-lists" />
       <BlockStack gap="500">
         {error && (
           <Banner tone="warning" title="Couldn’t create the list">

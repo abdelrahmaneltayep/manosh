@@ -18,6 +18,7 @@ import {
   EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { accountingSyncAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -139,6 +140,7 @@ export default function Accounting() {
     return (
       <Page>
         <TitleBar title="Accounting sync" />
+        <SectionTabs active="accounting" />
         <Banner tone="info" title="Connect your accounting — upgrade to Growth">
           <p>
             Push every Mannon invoice and payment into QuickBooks Online or Xero

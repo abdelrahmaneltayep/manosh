@@ -6,6 +6,7 @@ import {
   Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Button, Box, TextField, Select, IndexTable, EmptyState,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { quoteFormFeatures, GROWTH_PLAN } from "../lib/billing";
@@ -66,6 +67,7 @@ export default function QuoteForms() {
   return (
     <Page>
       <TitleBar title="Quote forms" />
+      <SectionTabs active="quote-forms" />
       <BlockStack gap="400">
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
