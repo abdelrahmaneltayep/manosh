@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -40,6 +40,10 @@ import {
 } from "../services/credit.server";
 import { AGING_BUCKETS, AGING_LABELS } from "../lib/aging";
 import { formatDate } from "../lib/format";
+import { claudeAccess, CLAUDE_UNAVAILABLE_COPY, CLAUDE_UPGRADE_COPY, CLAUDE_TRIAL_ENDED_COPY, type ClaudeAccess } from "../config/plans";
+import { requireClaudeAccess } from "../services/claude-access.server";
+import { draftCreditRiskFlag } from "../services/insights-ai.server";
+import { DraftedByClaude } from "../components/DraftedByClaude";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const CREDIT_ENABLED = () => process.env.MANNON_FF_CREDIT === "true";
@@ -55,9 +59,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const aging = enabled && growth ? await getAgingReport(session.shop) : null;
   const companies = enabled && growth ? await listCompaniesWithCredit(session.shop) : [];
 
+  const shopRow = await prisma.shop.findUnique({
+    where: { shopifyDomain: session.shop },
+    select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
+  });
+  const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
+
   return {
     enabled,
     growth,
+    access,
     aging,
     companies,
     termOptions: [...TERM_OPTIONS] as number[],
@@ -75,13 +86,36 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 type ActionResult =
   | { ok: true; message: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string }
+  | { ok: true; kind: "risk"; level: "low" | "watch" | "high"; rationale: string; recommendation: string; companyName: string }
+  | { ok: false; kind: "risk"; error: string };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
   if (!CREDIT_ENABLED()) return { ok: false, error: "This feature isn’t available." };
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+
+  // AI-15 credit-risk flag — Claude reads the company's payment behaviour and
+  // returns an advisory level + recommendation. Dual-mode: read-only, changes
+  // nothing (guardrail #4).
+  if (intent === "ai-credit-risk") {
+    const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return {
+        ok: false,
+        kind: "risk",
+        error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY,
+      };
+    }
+    try {
+      const r = await draftCreditRiskFlag(session.shop, String(form.get("companyId") ?? ""));
+      if (!r) return { ok: false, kind: "risk", error: "Not enough history for that company yet." };
+      return { ok: true, kind: "risk", level: r.level, rationale: r.rationale, recommendation: r.recommendation, companyName: r.companyName };
+    } catch {
+      return { ok: false, kind: "risk", error: CLAUDE_UNAVAILABLE_COPY };
+    }
+  }
 
   // Credit-profile writes are Growth-only.
   const status = await requireBilling(billing, { isTest: IS_TEST });
@@ -134,6 +168,55 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   return { ok: false, error: "Unknown action." };
 };
 
+function CreditRiskAssessor({
+  companyId,
+  companyName,
+  access,
+}: {
+  companyId: string;
+  companyName: string;
+  access: Pick<ClaudeAccess, "allowed">;
+}) {
+  const fetcher = useFetcher<typeof action>();
+  if (!access.allowed) return null;
+  const busy = fetcher.state !== "idle";
+  const d = fetcher.data;
+  const risk = d && d.ok && "kind" in d && d.kind === "risk" ? d : null;
+  const err = d && !d.ok && "kind" in d && d.kind === "risk" ? d.error : null;
+  const tone = risk ? (risk.level === "high" ? "critical" : risk.level === "watch" ? "warning" : "success") : undefined;
+  const label = risk ? (risk.level === "high" ? "High risk" : risk.level === "watch" ? "Watch" : "Low risk") : "";
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack align="space-between" blockAlign="center" wrap gap="200">
+          <Text as="h2" variant="headingMd">
+            Credit-risk read {companyName ? `· ${companyName}` : ""}
+          </Text>
+          <fetcher.Form method="post">
+            <input type="hidden" name="intent" value="ai-credit-risk" />
+            <input type="hidden" name="companyId" value={companyId} />
+            <Button submit size="slim" disabled={busy || !companyId} loading={busy}>
+              ✦ Assess risk with Claude
+            </Button>
+          </fetcher.Form>
+        </InlineStack>
+        {err && <Banner tone="warning">{err}</Banner>}
+        {risk && (
+          <DraftedByClaude>
+            <BlockStack gap="200">
+              <Badge tone={tone}>{label}</Badge>
+              <Text as="p" variant="bodyMd">{risk.rationale}</Text>
+              {risk.recommendation && (
+                <Text as="p" variant="bodyMd" fontWeight="semibold">Suggested: {risk.recommendation}</Text>
+              )}
+            </BlockStack>
+          </DraftedByClaude>
+        )}
+      </BlockStack>
+    </Card>
+  );
+}
+
 export default function Credit() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -166,7 +249,9 @@ export default function Credit() {
             <p>{actionData.error}</p>
           </Banner>
         )}
-        {actionData && actionData.ok && <Banner tone="success" title={actionData.message} />}
+        {actionData && actionData.ok && !("kind" in actionData) && (
+          <Banner tone="success" title={actionData.message} />
+        )}
 
         {!data.growth && (
           <Banner tone="warning" title="Credit control is a Growth feature">
@@ -297,6 +382,11 @@ export default function Credit() {
               </BlockStack>
             </Form>
           </Card>
+        )}
+
+        {/* AI-15 credit-risk flag (Growth + Claude) */}
+        {data.growth && data.companies.length > 0 && (
+          <CreditRiskAssessor companyId={companyId} companyName={selected?.name ?? ""} access={data.access} />
         )}
 
         {/* Invoices (all plans — due dates; Growth adds paid/aging context) */}
