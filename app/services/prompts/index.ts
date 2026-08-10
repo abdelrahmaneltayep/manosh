@@ -28,6 +28,11 @@ import "./rep-invite-note"; // F12 sales-rep — invite personal note draft
 import "./tax-reject-note"; // F14 tax/VAT — rejection reason draft
 import "./widget-label"; // F21 storefront widget — button-label draft
 import "./catalog-title"; // F19 catalog sharing — public title draft
+import "./reorder-prediction"; // AI-11 buyers — reorder-due read + nudge draft
+import "./win-rate-insight"; // AI-12 analytics — win-rate read + action draft
+import "./buyer-summary"; // AI-13 buyers — relationship briefing draft
+import "./upsell-bundle"; // AI-14 quotes — complementary add-on suggestions
+import "./credit-risk-flag"; // AI-15 credit — advisory risk read draft
 
 export { draftTextFeature, type DraftTextInput } from "./draft-text";
 export { offerCounterFeature, type OfferCounterInput } from "./offer-counter";
@@ -41,3 +46,8 @@ export { repInviteNoteFeature, type RepInviteNoteInput } from "./rep-invite-note
 export { taxRejectNoteFeature, type TaxRejectNoteInput } from "./tax-reject-note";
 export { widgetLabelFeature, type WidgetLabelInput } from "./widget-label";
 export { catalogTitleFeature, type CatalogTitleInput } from "./catalog-title";
+export { reorderPredictionFeature, type ReorderPredictionInput } from "./reorder-prediction";
+export { winRateInsightFeature, type WinRateInsightInput } from "./win-rate-insight";
+export { buyerSummaryFeature, type BuyerSummaryInput } from "./buyer-summary";
+export { upsellBundleFeature, type UpsellBundleInput, type UpsellCandidate } from "./upsell-bundle";
+export { creditRiskFlagFeature, type CreditRiskInput } from "./credit-risk-flag";
