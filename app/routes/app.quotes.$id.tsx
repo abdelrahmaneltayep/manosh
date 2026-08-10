@@ -41,12 +41,15 @@ import {
   claudeAccess,
   CLAUDE_TRIAL_ENDED_COPY,
   CLAUDE_UPGRADE_COPY,
+  CLAUDE_UNAVAILABLE_COPY,
   DRAFTED_BY_CLAUDE_TRUST,
   type ClaudeAccess,
 } from "../config/plans";
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { appendAiEvent } from "../services/claude.server";
+import { draftUpsellBundle } from "../services/insights-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { DraftedByClaude } from "../components/DraftedByClaude";
 import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
 import { DraftOrderError } from "../services/draft-order.server";
 import { renderQuotePdf } from "../services/quote-pdf.server";
@@ -189,6 +192,31 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
   }
 
+  // --- AI-14 upsell bundle — Claude suggests complementary items from the
+  // catalog; the merchant reviews and adds them via the normal editor. Dual-mode:
+  // suggestions only, nothing is added to the quote by Claude.
+  if (intent === "ai-upsell") {
+    if (!AI_QUOTE_ENABLED()) {
+      return { ok: false as const, kind: "upsell" as const, error: "This feature isn’t available." };
+    }
+    const { access } = await requireClaudeAccess(session.shop, { startTrialOnUse: true });
+    if (!access.allowed) {
+      return {
+        ok: false as const,
+        kind: "upsell" as const,
+        error: access.reason === "trial-ended" ? CLAUDE_TRIAL_ENDED_COPY : CLAUDE_UPGRADE_COPY,
+        upgrade: true as const,
+      };
+    }
+    try {
+      const suggestions = await draftUpsellBundle(session.shop, quoteId);
+      if (suggestions == null) return { ok: false as const, kind: "upsell" as const, error: "Quote not found." };
+      return { ok: true as const, kind: "upsell" as const, suggestions };
+    } catch {
+      return { ok: false as const, kind: "upsell" as const, error: CLAUDE_UNAVAILABLE_COPY };
+    }
+  }
+
   // --- F1 AI Quote Assistant, dual-mode (Claude drafts, merchant confirms) ---
   if (intent === "ai-suggest" || intent === "ai-suggest-all") {
     if (!AI_QUOTE_ENABLED()) {
@@ -272,6 +300,53 @@ function cleanPrice(value: string): string {
 function money(value: string): string {
   const n = Number(value);
   return Number.isFinite(n) ? n.toFixed(2) : value;
+}
+
+function UpsellBundle({ quoteId }: { quoteId: string }) {
+  const fetcher = useFetcher<typeof action>();
+  const busy = fetcher.state !== "idle";
+  const d = fetcher.data;
+  const res = d && d.ok && "kind" in d && d.kind === "upsell" ? d : null;
+  const err = d && !d.ok && "kind" in d && d.kind === "upsell" ? d.error : null;
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack align="space-between" blockAlign="center" wrap gap="200">
+          <Text as="h3" variant="headingSm">Suggested add-ons</Text>
+          <fetcher.Form method="post">
+            <input type="hidden" name="intent" value="ai-upsell" />
+            <Button submit size="slim" disabled={busy} loading={busy}>
+              ✦ Suggest add-ons with Claude
+            </Button>
+          </fetcher.Form>
+        </InlineStack>
+        {err && <Banner tone="warning">{err}</Banner>}
+        {res && res.suggestions.length === 0 && (
+          <Text as="p" tone="subdued" variant="bodySm">
+            Claude didn’t find a good complementary item in your catalog for this quote.
+          </Text>
+        )}
+        {res && res.suggestions.length > 0 && (
+          <DraftedByClaude>
+            <BlockStack gap="200">
+              {res.suggestions.map((s) => (
+                <InlineStack key={s.sku} align="space-between" blockAlign="center" wrap gap="200">
+                  <Text as="span" variant="bodyMd" fontWeight="semibold">
+                    {s.title}{" "}
+                    <Text as="span" tone="subdued" variant="bodySm">({s.sku})</Text>
+                  </Text>
+                  <Text as="span" variant="bodySm" tone="subdued">{s.reason}</Text>
+                </InlineStack>
+              ))}
+              <Text as="p" tone="subdued" variant="bodySm">
+                Add any of these from the editor — Claude only suggests, you decide.
+              </Text>
+            </BlockStack>
+          </DraftedByClaude>
+        )}
+      </BlockStack>
+    </Card>
+  );
 }
 
 export default function QuoteDetail() {
@@ -362,6 +437,9 @@ export default function QuoteDetail() {
         {showAi && !access.allowed && (
           <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
         )}
+
+        {/* AI-14 upsell bundle — complementary add-on suggestions from the catalog. */}
+        {showAi && access.allowed && <UpsellBundle quoteId={quote.id} />}
 
         <Card>
           <BlockStack gap="300">

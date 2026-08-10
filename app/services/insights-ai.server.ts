@@ -1,6 +1,7 @@
 import prisma from "../db.server";
 import { draft } from "./claude.server";
 import { getAnalytics } from "./quote-analytics.server";
+import { getCatalog } from "./catalog.server";
 
 /**
  * Server wrappers for the five dual-mode "insight" Claude features (AI-11..15).
@@ -122,4 +123,65 @@ export async function draftCreditRiskFlag(
   const recommendation = typeof output.recommendation === "string" ? output.recommendation.trim() : "";
   if (!rationale) return null;
   return { level, rationale, recommendation, companyName: company.name };
+}
+
+// --- AI-14 upsell bundle (Quote detail) --------------------------------------
+
+export interface UpsellSuggestion {
+  sku: string;
+  title: string;
+  reason: string;
+}
+
+/** Suggest complementary catalog items to add to a quote. Guardrail: Claude may
+ *  only pick from the catalog candidate list, and every returned sku is
+ *  re-validated here against that list before it's surfaced (the model never
+ *  invents ids). Returns [] when nothing fits; null when the quote is unknown. */
+export async function draftUpsellBundle(
+  shopDomain: string,
+  quoteId: string,
+  maxSuggestions = 3,
+): Promise<UpsellSuggestion[] | null> {
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, company: { shop: { shopifyDomain: shopDomain } } },
+    select: { id: true, lines: { select: { sku: true, title: true } } },
+  });
+  if (!quote) return null;
+  const shopId = await shopIdFor(shopDomain);
+
+  const onQuote = new Set(quote.lines.map((l) => l.sku).filter(Boolean) as string[]);
+  const catalog = await getCatalog(shopDomain);
+  // Candidates: catalog items with a sku, not already on the quote. Cap the list
+  // so the prompt stays small and cache-friendly.
+  const candidates = catalog
+    .filter((c) => c.sku && !onQuote.has(c.sku))
+    .slice(0, 40)
+    .map((c) => ({ sku: c.sku as string, title: c.displayTitle }));
+  if (candidates.length === 0) return [];
+
+  const bySku = new Map(candidates.map((c) => [c.sku, c.title]));
+
+  const { output } = await draft({
+    feature: "upsell_bundle",
+    shopId,
+    input: {
+      currentItems: quote.lines.map((l) => ({ sku: l.sku ?? "", title: l.title })),
+      candidates,
+      maxSuggestions,
+    },
+  });
+
+  const raw = Array.isArray(output.suggestions) ? output.suggestions : [];
+  const seen = new Set<string>();
+  const validated: UpsellSuggestion[] = [];
+  for (const s of raw) {
+    const sku = typeof s?.sku === "string" ? s.sku : "";
+    const reason = typeof s?.reason === "string" ? s.reason.trim() : "";
+    // Re-validate against the candidate list — drop anything invented or dup.
+    if (!bySku.has(sku) || seen.has(sku)) continue;
+    seen.add(sku);
+    validated.push({ sku, title: bySku.get(sku)!, reason });
+    if (validated.length >= maxSuggestions) break;
+  }
+  return validated;
 }
