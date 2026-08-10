@@ -6,6 +6,37 @@ primary_region = "fra"
 
 [build]
 
+# Feature flags (non-secret config, so they live here — NOT in `fly secrets`).
+# Every flag-gated feature route 404s (→ App Bridge "Something went wrong") when
+# its flag is unset, and the nav only links to enabled features. These are the
+# full production feature set for the App Store listing, so they are all on.
+# To ship a feature dark, flip its value to "false" here and redeploy.
+[env]
+  MANNON_FF_PLAN_V3 = "true"
+  MANNON_FF_AI_QUOTE = "true"
+  MANNON_FF_MAKE_AN_OFFER = "true"
+  MANNON_FF_CREDIT = "true"
+  MANNON_FF_PRICELISTS = "true"
+  MANNON_FF_ORDERPAD = "true"
+  MANNON_FF_COMPANY_ACCOUNTS = "true"
+  MANNON_FF_WHOLESALE_REG = "true"
+  MANNON_FF_QUOTE_ANALYTICS = "true"
+  MANNON_FF_FOLLOWUPS = "true"
+  MANNON_FF_MOQ = "true"
+  MANNON_FF_ACCOUNTING_SYNC = "true"
+  MANNON_FF_CUSTOM_CATALOGS = "true"
+  MANNON_FF_REP_PORTAL = "true"
+  MANNON_FF_FLEX_PAY = "true"
+  MANNON_FF_TAX_VAT = "true"
+  MANNON_FF_ERP_SYNC = "true"
+  MANNON_FF_I18N = "true"
+  MANNON_FF_QUOTE_WIDGET = "true"
+  MANNON_FF_QUOTE_CAPTURE = "true"
+  MANNON_FF_QUOTE_OPS = "true"
+  MANNON_FF_BUYER_PWA = "true"
+  MANNON_FF_CATALOG_SHARE = "true"
+  MANNON_FF_WHITE_LABEL = "true"
+
 [deploy]
   # Run Prisma migrations on every release, before the new version goes live.
   release_command = "npx prisma migrate deploy"
