@@ -39,7 +39,10 @@ primary_region = "fra"
 
 [deploy]
   # Run Prisma migrations on every release, before the new version goes live.
-  release_command = "npx prisma migrate deploy"
+  # Retry a few times: the Neon compute auto-suspends when idle, and the first
+  # connection after a cold start can time out (P1001). Retrying gives the DB
+  # time to wake so a transient cold start doesn't abort the whole deploy.
+  release_command = "sh -c 'for i in 1 2 3 4 5 6; do npx prisma migrate deploy && exit 0; echo migrate attempt $i failed, waiting for DB; sleep 10; done; exit 1'"
 
 [http_service]
   internal_port = 3000
