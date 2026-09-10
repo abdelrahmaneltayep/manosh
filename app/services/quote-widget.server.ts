@@ -140,7 +140,13 @@ export async function createQuoteRequest(
     },
   });
 
-  await appendEvent({ shopId: shop.id, type: "QUOTE_REQUEST_CREATED", entityType: "QuoteRequest", entityId: request.id, payload: { source: input.source ?? "PDP", lines: clean.value.lines.length, ...(formId ? { formId } : {}) } });
+  // Best-effort: the QuoteRequest is already saved. Never let the append-only
+  // event log (analytics) turn a captured lead into a 500 for the storefront.
+  try {
+    await appendEvent({ shopId: shop.id, type: "QUOTE_REQUEST_CREATED", entityType: "QuoteRequest", entityId: request.id, payload: { source: input.source ?? "PDP", lines: clean.value.lines.length, ...(formId ? { formId } : {}) } });
+  } catch (error) {
+    captureException(error);
+  }
 
   // Notify the merchant + auto-reply to the visitor (best-effort).
   try {
