@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { QUOTE_CAPTURE_ENABLED, getPublicForm } from "../services/quote-form.server";
 import type { QuoteFormSurface } from "../lib/quote-form";
+import { captureException } from "../lib/sentry.server";
 
 /**
  * F24.1 — public config for the storefront quote form. The theme app extension
@@ -27,6 +28,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const locale = url.searchParams.get("locale");
   if (!shop || !QUOTE_CAPTURE_ENABLED()) return json({ form: null }, { headers: CORS });
   const surface = SURFACES.has(surfaceParam) ? surfaceParam : "PRODUCT";
-  const form = await getPublicForm(shop, surface, locale);
-  return json({ form }, { headers: CORS });
+  try {
+    const form = await getPublicForm(shop, surface, locale);
+    return json({ form }, { headers: CORS });
+  } catch (error) {
+    captureException(error);
+    return json({ form: null }, { headers: CORS });
+  }
 };

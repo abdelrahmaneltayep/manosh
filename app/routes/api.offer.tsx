@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { submitPublicOffer, type PublicOfferLine } from "../services/offers.server";
+import { captureException } from "../lib/sentry.server";
 
 /**
  * F21 (PR-4) — public submission endpoint for the storefront "Make an offer"
@@ -45,25 +46,36 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "0.0.0.0";
 
-  const result = await submitPublicOffer(
-    shop,
-    {
-      buyerEmail: String(body.email ?? ""),
-      companyId: body.companyId == null ? null : String(body.companyId),
-      source: (body.source as "PRODUCT" | "CART" | "ORDER") ?? "PRODUCT",
-      lines: toLines(body.lines),
-      offeredTotal: Number(body.offeredTotal ?? 0),
-      honeypot: typeof body.company_url_confirm === "string" ? body.company_url_confirm : undefined,
-      elapsedMs: typeof body.elapsedMs === "number" ? body.elapsedMs : undefined,
-    },
-    { rateKey: `${shop}:${ip}` },
-  );
+  // Public, cross-origin storefront endpoint: an unhandled throw would reach the
+  // shopper as a 5xx / HTML error page (a storefront web error that fails App
+  // Store review). Catch it, log to Sentry, return a CORS-safe JSON error.
+  try {
+    const result = await submitPublicOffer(
+      shop,
+      {
+        buyerEmail: String(body.email ?? ""),
+        companyId: body.companyId == null ? null : String(body.companyId),
+        source: (body.source as "PRODUCT" | "CART" | "ORDER") ?? "PRODUCT",
+        lines: toLines(body.lines),
+        offeredTotal: Number(body.offeredTotal ?? 0),
+        honeypot: typeof body.company_url_confirm === "string" ? body.company_url_confirm : undefined,
+        elapsedMs: typeof body.elapsedMs === "number" ? body.elapsedMs : undefined,
+      },
+      { rateKey: `${shop}:${ip}` },
+    );
 
-  if (result.ok) {
-    // A silent (spam/rate-limited) drop is indistinguishable from a real submit.
-    return json({ ok: true, outcome: result.outcome ?? "pending", counterTotal: result.counterTotal ?? null }, { headers: CORS });
+    if (result.ok) {
+      // A silent (spam/rate-limited) drop is indistinguishable from a real submit.
+      return json({ ok: true, outcome: result.outcome ?? "pending", counterTotal: result.counterTotal ?? null }, { headers: CORS });
+    }
+    return json({ ok: false, error: result.error }, { status: 400, headers: CORS });
+  } catch (error) {
+    captureException(error);
+    return json(
+      { ok: false, error: "We couldn’t submit your offer right now. Please try again in a moment." },
+      { status: 200, headers: CORS },
+    );
   }
-  return json({ ok: false, error: result.error }, { status: 400, headers: CORS });
 };
 
 export const loader = () => new Response("Method not allowed", { status: 405 });

@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { evaluatePriceVisibility } from "../services/price-visibility.server";
+import { captureException } from "../lib/sentry.server";
 
 /**
  * F24.2 — public price/ATC visibility decision for the storefront. The theme app
@@ -26,13 +27,18 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = url.searchParams.get("shop");
   if (!shop) return json({ hidePrice: false, hideAtc: false, ctaLabel: null }, { headers: CORS });
 
-  const decision = await evaluatePriceVisibility(shop, {
-    loggedIn: url.searchParams.get("loggedIn") === "1" || url.searchParams.get("loggedIn") === "true",
-    customerTags: list(url.searchParams.get("tags")),
-    productId: url.searchParams.get("productId"),
-    collectionIds: list(url.searchParams.get("collectionIds")),
-  });
-
-  // Decision is { hidePrice, hideAtc, ctaLabel } — no price, by construction.
-  return json(decision, { headers: CORS });
+  try {
+    const decision = await evaluatePriceVisibility(shop, {
+      loggedIn: url.searchParams.get("loggedIn") === "1" || url.searchParams.get("loggedIn") === "true",
+      customerTags: list(url.searchParams.get("tags")),
+      productId: url.searchParams.get("productId"),
+      collectionIds: list(url.searchParams.get("collectionIds")),
+    });
+    // Decision is { hidePrice, hideAtc, ctaLabel } — no price, by construction.
+    return json(decision, { headers: CORS });
+  } catch (error) {
+    // Fail open (theme keeps its native price) rather than 5xx the storefront.
+    captureException(error);
+    return json({ hidePrice: false, hideAtc: false, ctaLabel: null }, { headers: CORS });
+  }
 };

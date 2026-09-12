@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { getWidgetConfig } from "../services/quote-widget.server";
+import { captureException } from "../lib/sentry.server";
 
 /**
  * F17 — public widget config for the theme app extension. The storefront block
@@ -17,11 +18,17 @@ const CORS = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shop = new URL(request.url).searchParams.get("shop");
   if (!shop) return json({ enabled: false }, { headers: CORS });
-  const config = await getWidgetConfig(shop);
-  if (!config) return json({ enabled: false }, { headers: CORS });
-  // Expose only what the storefront needs.
-  return json(
-    { enabled: config.enabled, label: config.label, gated: config.gated, cartEnabled: config.cartEnabled, customFields: config.customFields },
-    { headers: CORS },
-  );
+  try {
+    const config = await getWidgetConfig(shop);
+    if (!config) return json({ enabled: false }, { headers: CORS });
+    // Expose only what the storefront needs.
+    return json(
+      { enabled: config.enabled, label: config.label, gated: config.gated, cartEnabled: config.cartEnabled, customFields: config.customFields },
+      { headers: CORS },
+    );
+  } catch (error) {
+    // Public storefront endpoint — fail closed (widget hides) instead of 5xx.
+    captureException(error);
+    return json({ enabled: false }, { headers: CORS });
+  }
 };
