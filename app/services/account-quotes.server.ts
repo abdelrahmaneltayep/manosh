@@ -2,6 +2,36 @@ import type { QuoteStatus, QuoteSource } from "@prisma/client";
 import prisma from "../db.server";
 
 /**
+ * Resolve the authenticated customer's own email from their customer-account
+ * session-token subject (a Customer GID), via the shop's offline Admin session.
+ * This is the ONLY trusted identity — the endpoint must never trust an email the
+ * client passes, or one logged-in customer could read another's quotes (IDOR).
+ * Returns null on any failure so the caller fails closed (shows nothing).
+ *
+ * `shopify.server` is imported lazily so this module stays import-safe for unit
+ * tests (importing it at top-level runs shopifyApp(), which needs env vars).
+ */
+export async function resolveCustomerEmail(shopDomain: string, customerSub: string): Promise<string | null> {
+  const sub = customerSub.trim();
+  if (!sub) return null;
+  const id = sub.startsWith("gid://") ? sub : `gid://shopify/Customer/${sub}`;
+  try {
+    const { unauthenticated } = await import("../shopify.server");
+    const { admin } = await unauthenticated.admin(shopDomain);
+    const res = await admin.graphql(
+      `#graphql
+      query MannonCustomerEmail($id: ID!) { customer(id: $id) { email } }`,
+      { variables: { id } },
+    );
+    const body = (await res.json()) as { data?: { customer?: { email?: string | null } | null } };
+    const email = body?.data?.customer?.email;
+    return typeof email === "string" && email ? email : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * F25.5 — read-only quote list for the buyer's **native customer account** (the
  * Customer Account UI extension). No mutations here: the extension shows the
  * buyer's quotes + status and deep-links to the magic-link portal for anything

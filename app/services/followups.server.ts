@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 import type { FollowupKind } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -29,7 +29,8 @@ export function unsubscribeToken(quoteId: string): string {
 }
 export function verifyUnsubscribeToken(quoteId: string, token: string): boolean {
   const expected = unsubscribeToken(quoteId);
-  return token.length === expected.length && token === expected;
+  if (token.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(token), Buffer.from(expected));
 }
 
 // --- policy ------------------------------------------------------------------
