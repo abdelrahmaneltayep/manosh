@@ -1,9 +1,10 @@
 import type { ActionFunctionArgs } from "@remix-run/node";
 import { verifyWebhook } from "../lib/hmac.server";
-import { collectCustomerData } from "../services/gdpr.server";
+import { deliverCustomerData } from "../services/gdpr.server";
 
-// GDPR customers/data_request. HMAC-verify, then acknowledge. We assemble what
-// we hold on the customer so the merchant can fulfil the request.
+// GDPR customers/data_request. HMAC-verify, then assemble everything we hold on
+// the customer and DELIVER it to the merchant (who owns the obligation to the
+// shopper) — the data is never discarded.
 export const action = async ({ request }: ActionFunctionArgs) => {
   const verification = await verifyWebhook(
     request,
@@ -18,7 +19,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     customer?: { email?: string };
   };
   const shopDomain = payload.shop_domain ?? verification.shopDomain ?? "";
-  await collectCustomerData(shopDomain, { email: payload.customer?.email });
+  await deliverCustomerData(shopDomain, { email: payload.customer?.email });
 
   return new Response(null, { status: 200 });
 };
