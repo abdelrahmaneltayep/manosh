@@ -8,11 +8,12 @@ describe("resolveV3PlanFromName — grandfathering at the billing boundary", () 
     expect(resolveV3PlanFromName("starter")).toEqual({ plan: "STARTER", legacyPlan: false, legacyPriceCents: null });
   });
 
-  it("grandfathers the legacy capitalized names, honoring their old price", () => {
-    // legacy "Starter" ($29) → STARTER enum + legacy flag + 2900¢ (caps map up to growth)
-    expect(resolveV3PlanFromName("Starter")).toEqual({ plan: "STARTER", legacyPlan: true, legacyPriceCents: 2900 });
-    // legacy "Growth" ($79) → GROWTH enum + legacy flag + 7900¢ (caps map up to scale)
-    expect(resolveV3PlanFromName("Growth")).toEqual({ plan: "GROWTH", legacyPlan: true, legacyPriceCents: 7900 });
+  it("normalizes display-case managed plan names to their tier (no legacy grandfathering)", () => {
+    // Managed pricing: names are case-insensitive; there are no pre-v3 shops to grandfather.
+    expect(resolveV3PlanFromName("Starter")).toEqual({ plan: "STARTER", legacyPlan: false, legacyPriceCents: null });
+    expect(resolveV3PlanFromName("Growth")).toEqual({ plan: "GROWTH", legacyPlan: false, legacyPriceCents: null });
+    expect(resolveV3PlanFromName("SCALE")).toEqual({ plan: "SCALE", legacyPlan: false, legacyPriceCents: null });
+    expect(resolveV3PlanFromName("free")).toEqual({ plan: "FREE", legacyPlan: false, legacyPriceCents: null });
   });
 
   it("unknown / no subscription → TRIAL, no legacy", () => {

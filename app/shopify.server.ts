@@ -6,7 +6,6 @@ import {
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
-import { ACTIVE_BILLING_CONFIG } from "./services/billing.server";
 import { ensureShopInstalled } from "./services/shop.server";
 
 /**
@@ -51,7 +50,9 @@ const shopify = shopifyApp({
   authPathPrefix: "/auth",
   sessionStorage: new PrismaSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
-  billing: ACTIVE_BILLING_CONFIG,
+  // Shopify App Pricing (managed pricing): plans live in the Partner Dashboard,
+  // so the app defines NO billing config and never creates charges. This flag
+  // lets billing.check read the merchant's active subscription without one.
   hooks: {
     // Provision the Shop row on install (and record APP_INSTALLED — the top of
     // the acquisition funnel). Idempotent, so re-auth/scope changes no-op.

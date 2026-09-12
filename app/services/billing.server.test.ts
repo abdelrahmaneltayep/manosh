@@ -9,6 +9,7 @@ import {
   requireBilling,
   requirePlan,
   resolveActivePlan,
+  managedPricingUrl,
   planMeets,
   featureAccess,
   planEnumFor,
@@ -88,6 +89,23 @@ describe("resolveActivePlan", () => {
   });
 });
 
+describe("managedPricingUrl", () => {
+  it("builds the Shopify-hosted plan-selection URL for the shop", () => {
+    expect(managedPricingUrl("mannon-9iu9ewku.myshopify.com")).toBe(
+      "https://admin.shopify.com/store/mannon-9iu9ewku/charges/mannon/pricing_plans",
+    );
+  });
+  it("honors SHOPIFY_APP_HANDLE when set", () => {
+    const prev = process.env.SHOPIFY_APP_HANDLE;
+    process.env.SHOPIFY_APP_HANDLE = "custom-handle";
+    expect(managedPricingUrl("s.myshopify.com")).toBe(
+      "https://admin.shopify.com/store/s/charges/custom-handle/pricing_plans",
+    );
+    if (prev === undefined) delete process.env.SHOPIFY_APP_HANDLE;
+    else process.env.SHOPIFY_APP_HANDLE = prev;
+  });
+});
+
 describe("requireBilling (skeleton — reads, never enforces)", () => {
   it("returns the current plan from billing.check without redirecting", async () => {
     const check = vi.fn().mockResolvedValue({
@@ -98,10 +116,8 @@ describe("requireBilling (skeleton — reads, never enforces)", () => {
     const status = await requireBilling({ check }, { isTest: true });
 
     expect(status.plan).toBe(GROWTH_PLAN);
-    expect(check).toHaveBeenCalledWith({
-      plans: [STARTER_PLAN, GROWTH_PLAN],
-      isTest: true,
-    });
+    // Managed pricing: no plans filter — count any active subscription.
+    expect(check).toHaveBeenCalledWith({ isTest: true });
   });
 
   it("reports trial for a store with no active payment", async () => {

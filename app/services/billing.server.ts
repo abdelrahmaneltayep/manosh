@@ -109,35 +109,45 @@ export const ACTIVE_BILLING_CONFIG = PLAN_V3_ENABLED()
   : BILLING_CONFIG;
 
 /**
- * Map a raw Shopify subscription name to the Prisma plan + grandfathering. v3
- * subscribers use the lowercase handles; legacy subscribers keep "Starter"/
- * "Growth" (capital) and are grandfathered up in capabilities at their old price.
- * Pure.
+ * Map a Shopify App Pricing (managed) subscription name to the Prisma plan.
+ * Plans live in the Partner Dashboard; their handles are `free/starter/growth/
+ * scale`. Matching is case-insensitive so a display-case name ("Starter") maps
+ * to the same tier — there is no legacy grandfathering (the app has no pre-v3
+ * paying merchants). Pure.
  */
 export function resolveV3PlanFromName(
   name: string | null,
 ): { plan: Plan; legacyPlan: boolean; legacyPriceCents: number | null } {
-  switch (name) {
+  const handle = (name ?? "").trim().toLowerCase();
+  const none = { legacyPlan: false, legacyPriceCents: null };
+  switch (handle) {
     case "scale":
     case "scale-annual":
-      return { plan: "SCALE", legacyPlan: false, legacyPriceCents: null };
+      return { plan: "SCALE", ...none };
     case "growth":
     case "growth-annual":
-      return { plan: "GROWTH", legacyPlan: false, legacyPriceCents: null };
+      return { plan: "GROWTH", ...none };
     case "starter":
     case "starter-annual":
-      return { plan: "STARTER", legacyPlan: false, legacyPriceCents: null };
-    case GROWTH_PLAN: { // legacy "Growth" $79 → SCALE capabilities, price honored
-      const g = resolveGrandfather("GROWTH");
-      return { plan: "GROWTH", legacyPlan: g.legacyPlan, legacyPriceCents: g.legacyPriceCents };
-    }
-    case STARTER_PLAN: { // legacy "Starter" $29 → GROWTH capabilities, price honored
-      const s = resolveGrandfather("STARTER");
-      return { plan: "STARTER", legacyPlan: s.legacyPlan, legacyPriceCents: s.legacyPriceCents };
-    }
+      return { plan: "STARTER", ...none };
+    case "free":
+      return { plan: "FREE", ...none };
     default:
-      return { plan: "TRIAL", legacyPlan: false, legacyPriceCents: null };
+      return { plan: "TRIAL", ...none };
   }
+}
+
+/**
+ * The Shopify-hosted App Pricing plan-selection page for a shop. Under managed
+ * pricing the app never creates charges — it sends the merchant here (top-level)
+ * and Shopify handles the subscription, trial, proration and cancellation.
+ * The app handle is not in shopify.app.toml, so it is configurable via env
+ * (SHOPIFY_APP_HANDLE) with the app's slug as the default.
+ */
+export function managedPricingUrl(shopDomain: string): string {
+  const store = shopDomain.replace(/\.myshopify\.com$/, "");
+  const handle = process.env.SHOPIFY_APP_HANDLE || "mannon";
+  return `https://admin.shopify.com/store/${store}/charges/${handle}/pricing_plans`;
 }
 
 interface SubscriptionLike {
@@ -168,19 +178,13 @@ export function resolveActivePlan(
   };
 }
 
-/** The subset of the authenticate.admin billing context that we depend on. */
+/** The subset of the authenticate.admin billing context that we depend on.
+ *  Under managed pricing we pass no `plans` filter — we count any active
+ *  subscription and map it to a tier by name. */
 export interface BillingLike {
   check: (options: {
-    plans: PlanName[];
     isTest: boolean;
   }) => Promise<{ hasActivePayment: boolean; appSubscriptions: SubscriptionLike[] }>;
-}
-
-// Plan names to ask Shopify about — legacy always, plus the v3 handles when the
-// flag is on (so a v3 subscription is recognized as an active payment).
-const V3_PLAN_NAMES = ["starter", "starter-annual", "growth", "growth-annual", "scale", "scale-annual"];
-function checkPlanNames(): string[] {
-  return PLAN_V3_ENABLED() ? [STARTER_PLAN, GROWTH_PLAN, ...V3_PLAN_NAMES] : [STARTER_PLAN, GROWTH_PLAN];
 }
 
 /**
@@ -208,13 +212,9 @@ export async function requireBilling(
 ): Promise<BillingStatus> {
   const isTest = options.isTest ?? process.env.NODE_ENV !== "production";
   try {
-    const { hasActivePayment, appSubscriptions } = await billing.check({
-      // v3 handles are added at runtime when the flag is on; they exist in the
-      // active billing config then, so Shopify accepts them. Cast to satisfy the
-      // legacy-typed BillingLike without widening it for every caller.
-      plans: checkPlanNames() as PlanName[],
-      isTest,
-    });
+    // Managed pricing: no plans filter — count ANY active app subscription and
+    // map it to a tier by name (reconcileShopPlanV3 → resolveV3PlanFromName).
+    const { hasActivePayment, appSubscriptions } = await billing.check({ isTest });
     return resolveActivePlan(hasActivePayment, appSubscriptions);
   } catch (error) {
     // A billing.check() failure (API error, an unrecognized plan handle in the

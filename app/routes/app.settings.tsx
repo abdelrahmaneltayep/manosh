@@ -34,8 +34,7 @@ import {
   type TemplateKey,
 } from "../services/mailer.server";
 import prisma from "../db.server";
-import { requireBilling, reconcileShopPlan } from "../services/billing.server";
-import { cancelPlan } from "../services/billing-actions.server";
+import { requireBilling, reconcileShopPlan, managedPricingUrl } from "../services/billing.server";
 import { NO_PER_ORDER_FEES_COPY } from "../lib/billing-v3";
 import { canCreateQuote } from "../services/plan-limits.server";
 import {
@@ -222,7 +221,7 @@ type ActionResult =
   | { ok: false; kind: "settings" | "billing" | "seat" | "template" | "claude"; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, redirect } = await authenticate.admin(request);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "save-settings");
 
@@ -293,33 +292,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     } satisfies ActionResult;
   }
 
-  if (intent === "billing-subscribe") {
-    const plan = String(form.get("plan") ?? "");
-    if (plan !== STARTER_PLAN && plan !== GROWTH_PLAN) {
-      return { ok: false, kind: "billing", error: "Choose a valid plan." } satisfies ActionResult;
-    }
-    const appUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
-    // The return URL MUST carry the embedded context (shop + host). Without it,
-    // Shopify's post-approval top-level redirect lands on the OAuth "enter your
-    // store" page, the merchant never gets back into the embedded app, and the
-    // new subscription is never reconciled (App Store review 1.2.3).
-    const host = new URL(request.url).searchParams.get("host") ?? "";
-    const back = new URLSearchParams({ shop: session.shop, embedded: "1" });
-    if (host) back.set("host", host);
-    await billing.request({ plan, isTest: IS_TEST, returnUrl: `${appUrl}/app/settings?${back.toString()}` });
-    return null; // unreachable — request() throws the redirect
-  }
-
-  if (intent === "billing-cancel") {
-    const status = await requireBilling(billing, { isTest: IS_TEST });
-    const { cancelled } = await cancelPlan(billing, session.shop, status, { isTest: IS_TEST });
-    return {
-      ok: true,
-      kind: "billing",
-      message: cancelled
-        ? "Your subscription was cancelled."
-        : "There was no active subscription to cancel.",
-    } satisfies ActionResult;
+  if (intent === "billing-subscribe" || intent === "billing-cancel") {
+    // Shopify App Pricing (managed): the app never creates or cancels charges.
+    // All plan changes happen on Shopify's hosted plan page — redirect there at
+    // the top level (it lives on admin.shopify.com, outside the app iframe).
+    return redirect(managedPricingUrl(session.shop), { target: "_top" });
   }
 
   if (intent === "seat-invite" || intent === "seat-remove") {
@@ -608,7 +585,6 @@ export default function Settings() {
   const settingsError =
     actionData && !actionData.ok && actionData.kind === "settings" ? actionData.error : null;
   const settingsSaved = actionData?.ok === true && actionData.kind === "settings";
-  const billingMessage = actionData?.ok === true && actionData.kind === "billing" ? actionData.message : null;
   const seatMessage = actionData?.ok === true && actionData.kind === "seat" ? actionData.message : null;
   const seatError = actionData && !actionData.ok && actionData.kind === "seat" ? actionData.error : null;
 
@@ -626,7 +602,6 @@ export default function Settings() {
             <p>Choose {data.upgradeTarget} below.</p>
           </Banner>
         )}
-        {billingMessage && <Banner tone="success" title={billingMessage} />}
 
         {/* First-run checklist: set up credit */}
         {data.creditEnabled && !data.hasCreditProfile && (

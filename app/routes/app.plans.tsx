@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useLoaderData, useNavigation } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -16,8 +16,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { requireBilling, reconcileShopPlan } from "../services/billing.server";
-import { cancelPlan } from "../services/billing-actions.server";
+import { requireBilling, reconcileShopPlan, managedPricingUrl } from "../services/billing.server";
 import {
   PLAN_PRICING_V3,
   PLAN_DISPLAY_NAME,
@@ -65,40 +64,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return { current };
 };
 
-type ActionResult = { ok: false; error: string } | { ok: true; message: string };
-
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
-  const form = await request.formData();
-  const plan = String(form.get("plan") ?? "");
-
-  // Downgrade to Free = cancel the active subscription.
-  if (plan === "free") {
-    const status = await requireBilling(billing, { isTest: IS_TEST });
-    const { cancelled } = await cancelPlan(billing, session.shop, status, { isTest: IS_TEST });
-    return {
-      ok: true,
-      message: cancelled ? "Moved to the Free plan." : "You're already on the Free plan.",
-    } satisfies ActionResult;
-  }
-
-  if (plan !== "starter" && plan !== "growth" && plan !== "scale") {
-    return { ok: false, error: "Choose a valid plan." } satisfies ActionResult;
-  }
-
-  // The return URL MUST carry the embedded context (shop + host) or Shopify's
-  // post-approval redirect lands on the OAuth "enter your store" page and the
-  // subscription is never reconciled (App Store review 1.2.3).
-  const appUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
-  const host = new URL(request.url).searchParams.get("host") ?? "";
-  const back = new URLSearchParams({ shop: session.shop, embedded: "1" });
-  if (host) back.set("host", host);
-  await billing.request({
-    plan: plan as never, // v3 handle; present in ACTIVE_BILLING_CONFIG when the flag is on
-    isTest: IS_TEST,
-    returnUrl: `${appUrl}/app/plans?${back.toString()}`,
-  });
-  return null; // unreachable — request() throws the redirect
+  // Shopify App Pricing (managed): the app never creates, changes or cancels a
+  // charge. Every plan action opens Shopify's hosted plan-selection page, which
+  // handles approval, trial, proration and downgrade to Free. It's on
+  // admin.shopify.com, so redirect at the top level (out of the app iframe).
+  const { session, redirect } = await authenticate.admin(request);
+  return redirect(managedPricingUrl(session.shop), { target: "_top" });
 };
 
 function dollars(cents: number): string {
@@ -107,7 +79,6 @@ function dollars(cents: number): string {
 
 export default function Plans() {
   const { current } = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const submitting = nav.state === "submitting";
   const pendingPlan = submitting ? String(nav.formData?.get("plan") ?? "") : null;
@@ -116,9 +87,6 @@ export default function Plans() {
     <Page>
       <TitleBar title="Pricing plans" />
       <BlockStack gap="400">
-        {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
-        {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
-
         <Text as="p" tone="subdued" variant="bodySm">
           {NO_PER_ORDER_FEES_COPY}
         </Text>
@@ -185,8 +153,9 @@ export default function Plans() {
         </InlineGrid>
 
         <Text as="p" tone="subdued" variant="bodySm">
-          Prices are billed through Shopify. Upgrades take effect immediately; a
-          downgrade to Free cancels your current subscription.
+          Plans are billed and managed by Shopify. Choosing a plan opens
+          Shopify&rsquo;s secure plan page, where your subscription, free trial
+          and any change take effect.
         </Text>
       </BlockStack>
     </Page>
