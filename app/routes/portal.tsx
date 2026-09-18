@@ -16,6 +16,7 @@ import { localeDir, localeName, SUPPORTED_LOCALES, t } from "../lib/i18n";
 import { PWA_ENABLED } from "../services/pwa.server";
 import { getBuyerId } from "../services/buyer-session.server";
 import { getBrandingTokens, WHITE_LABEL_ENABLED } from "../services/branding.server";
+import { isDemoEmail } from "../services/demo.server";
 
 export const links: LinksFunction = () => [
   { rel: "stylesheet", href: portalStyles },
@@ -60,7 +61,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     }
   }
 
-  return { locale, dir: localeDir(locale), i18nOn: I18N_ENABLED(), locales: SUPPORTED_LOCALES, pwaOn: PWA_ENABLED(), brand };
+  // Public demo (landing "Try the demo"): a visitor buyer sees a banner so it's
+  // clear this is a sample portal, not their supplier's. Cheap indexed read;
+  // best-effort so a DB hiccup never blocks the layout.
+  let isDemo = false;
+  try {
+    const buyerId = await getBuyerId(request);
+    if (buyerId) {
+      const b = await prisma.buyer.findUnique({ where: { id: buyerId }, select: { email: true } });
+      isDemo = isDemoEmail(b?.email);
+    }
+  } catch {
+    isDemo = false;
+  }
+
+  return { locale, dir: localeDir(locale), i18nOn: I18N_ENABLED(), locales: SUPPORTED_LOCALES, pwaOn: PWA_ENABLED(), brand, isDemo };
 };
 
 // F18 — progressive enhancement. Only runs when the flag is on and the browser
@@ -79,7 +94,7 @@ if ('serviceWorker' in navigator) {
 `;
 
 export default function PortalLayout() {
-  const { locale, dir, i18nOn, locales, pwaOn, brand } = useLoaderData<typeof loader>();
+  const { locale, dir, i18nOn, locales, pwaOn, brand, isDemo } = useLoaderData<typeof loader>();
   const location = useLocation();
   // F20 — inject the client's brand as CSS custom properties (buyer-facing only).
   // The text color on the primary is picked server-side for AA contrast.
@@ -90,6 +105,16 @@ export default function PortalLayout() {
   return (
     <main className="portal" dir={dir} lang={locale} style={brandStyle}>
       {pwaOn && <script dangerouslySetInnerHTML={{ __html: PWA_BOOTSTRAP }} />}
+      {isDemo && (
+        <div className="portal-demobar" role="note">
+          <strong>Demo portal.</strong> You&rsquo;re a sample buyer on the Mannon
+          demo store. Quotes you accept become real draft orders there — nothing
+          is charged.{" "}
+          <a href="/" className="portal-link">
+            Install Mannon on your store
+          </a>
+        </div>
+      )}
       {brand?.custom && (
         <div className="portal-brandbar" aria-label={brand.portalName}>
           {brand.logo ? (

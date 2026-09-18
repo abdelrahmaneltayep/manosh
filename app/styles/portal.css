@@ -30,6 +30,20 @@
   color: var(--text);
 }
 
+/* Public demo banner — a visitor from the landing "Try the demo" is a sample
+   buyer; make that unmistakable without getting in the way. AA contrast on the
+   light tint. */
+.portal-demobar {
+  padding: 0.7rem 0.9rem;
+  margin: 0 0 0.75rem;
+  border: 1px solid #c7d2fe;
+  border-radius: 0.6rem;
+  background: #eef2ff;
+  color: #1c1d2b;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
 body {
   margin: 0;
   background: var(--bg);

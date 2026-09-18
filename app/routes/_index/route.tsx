@@ -3,6 +3,7 @@ import { redirect } from "@remix-run/node";
 import { Form, useLoaderData } from "@remix-run/react";
 
 import { login } from "../../shopify.server";
+import { isDemoEnabled } from "../../services/demo.server";
 
 import styles from "./styles.module.css";
 
@@ -13,11 +14,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  return { showForm: Boolean(login), showDemo: isDemoEnabled() };
 };
 
 export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
+  const { showForm, showDemo } = useLoaderData<typeof loader>();
 
   return (
     <div className={styles.index}>
@@ -64,6 +65,18 @@ export default function App() {
               Log in
             </button>
           </Form>
+        )}
+
+        {showDemo && (
+          <p className={styles.demo}>
+            <a className={styles.buttonSecondary} href="/demo">
+              Try the demo
+            </a>
+            <span className={styles.demoHint}>
+              Opens a sample buyer portal on our demo store. No install, no
+              sign-up.
+            </span>
+          </p>
         )}
 
         <ul className={styles.list}>
