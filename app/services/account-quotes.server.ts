@@ -18,13 +18,19 @@ export async function resolveCustomerEmail(shopDomain: string, customerSub: stri
   try {
     const { unauthenticated } = await import("../shopify.server");
     const { admin } = await unauthenticated.admin(shopDomain);
+    // `Customer.email` is deprecated; `defaultEmailAddress.emailAddress` is the
+    // supported field (validated against the current Admin schema).
     const res = await admin.graphql(
       `#graphql
-      query MannonCustomerEmail($id: ID!) { customer(id: $id) { email } }`,
+      query MannonCustomerEmail($id: ID!) {
+        customer(id: $id) { defaultEmailAddress { emailAddress } }
+      }`,
       { variables: { id } },
     );
-    const body = (await res.json()) as { data?: { customer?: { email?: string | null } | null } };
-    const email = body?.data?.customer?.email;
+    const body = (await res.json()) as {
+      data?: { customer?: { defaultEmailAddress?: { emailAddress?: string | null } | null } | null };
+    };
+    const email = body?.data?.customer?.defaultEmailAddress?.emailAddress;
     return typeof email === "string" && email ? email : null;
   } catch {
     return null;
