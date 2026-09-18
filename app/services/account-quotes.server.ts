@@ -65,7 +65,7 @@ export async function listQuotesForBuyer(shopDomain: string, email: string): Pro
   if (!shop) return [];
 
   const quotes = await prisma.quote.findMany({
-    where: { buyer: { email: clean }, company: { shopId: shop.id } },
+    where: { buyer: { email: { equals: clean, mode: "insensitive" } }, company: { shopId: shop.id } },
     orderBy: { createdAt: "desc" },
     take: 100,
     include: { lines: { select: { quantity: true, price: true } } },

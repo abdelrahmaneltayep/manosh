@@ -151,7 +151,7 @@ Growth and above; Free and Starter must not advertise AI.
 | Privacy policy | `https://manosh.fly.dev/privacy` |
 | Support / contact email | *(fill in — must be a monitored address)* |
 | Demo store URL | *(fill in your dev/demo store)* |
-| Public demo (landing page) | `https://manosh.fly.dev/demo` — live once `MANNON_DEMO_SHOP` is set on Fly to the demo store's myshopify domain |
+| Public demo (landing page) | `https://manosh.fly.dev/demo` — hub with the live buyer demo (`/demo/buyer`, needs `MANNON_DEMO_SHOP` set on Fly) and the guided merchant tour (`/demo/tour`, sample screens, always on) |
 
 ---
 

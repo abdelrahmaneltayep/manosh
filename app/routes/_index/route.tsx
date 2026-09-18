@@ -58,12 +58,15 @@ export default function App() {
                 type="text"
                 name="shop"
                 placeholder="my-shop-domain.myshopify.com"
+                aria-describedby="shop-hint"
               />
-              <span className={styles.hint}>e.g. my-shop-domain.myshopify.com</span>
             </label>
             <button className={styles.button} type="submit">
               Log in
             </button>
+            <span id="shop-hint" className={styles.hint}>
+              e.g. my-shop-domain.myshopify.com
+            </span>
           </Form>
         )}
 
@@ -73,8 +76,8 @@ export default function App() {
               Try the demo
             </a>
             <span className={styles.demoHint}>
-              Opens a sample buyer portal on our demo store. No install, no
-              sign-up.
+              A live buyer portal on our demo store, plus a guided tour of the
+              merchant side. No install, no sign-up.
             </span>
           </p>
         )}

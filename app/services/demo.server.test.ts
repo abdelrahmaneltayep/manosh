@@ -5,6 +5,7 @@ import {
   DemoRateLimiter,
   clientIp,
   demoBuyerEmail,
+  demoCounterPrice,
   demoShopDomain,
   fetchDemoCompany,
   fetchDemoOrders,
@@ -76,6 +77,14 @@ describe("demo config + helpers (pure)", () => {
     expect(isDemoEmail("buyer@acme-wholesale.example")).toBe(false);
     expect(isDemoEmail(null)).toBe(false);
     expect(demoBuyerEmail()).not.toBe(demoBuyerEmail());
+  });
+
+  it("counter price is a plain merchant-style unit price a few percent under list", () => {
+    expect(demoCounterPrice("12.40")).toBe("11.90");
+    expect(demoCounterPrice("4.20")).toBe("4.03");
+    expect(demoCounterPrice("100")).toBe("96.00");
+    expect(demoCounterPrice("0")).toBe("0"); // never negative or NaN
+    expect(demoCounterPrice("abc")).toBe("abc");
   });
 
   it("prefers Fly-Client-IP, then the first X-Forwarded-For hop", () => {
@@ -173,9 +182,41 @@ describe.skipIf(!hasDb)("startDemo (DB)", () => {
     expect(r).toEqual({ ok: false, reason: "not-installed" });
   });
 
+  const CATALOG = [
+    { variantId: "gid://shopify/ProductVariant/1", displayTitle: "Nitrile Gloves (M)", sku: "GLV-M", price: "12.40", currencyCode: "USD" },
+    { variantId: "gid://shopify/ProductVariant/2", displayTitle: "Hand Sanitizer 500ml", sku: "SAN-500", price: "4.20", currencyCode: "USD" },
+    { variantId: "gid://shopify/ProductVariant/3", displayTitle: "Face Masks (50)", sku: "MSK-50", price: "9.00", currencyCode: "USD" },
+    { variantId: "gid://shopify/ProductVariant/4", displayTitle: "Thermometer", sku: "THM-1", price: "22.00", currencyCode: "USD" },
+  ];
+
+  it("seeds a countered quote to accept, a pending request, and a net-terms invoice", async () => {
+    const shop = await prisma.shop.create({ data: { shopifyDomain: DOMAIN, defaultTermsDays: 30 } });
+    const r = await startDemo({ ip: "1.1.1.1", limiter: fresh(), adminFor: async () => admin, catalogFor: async () => CATALOG });
+    expect(r.ok).toBe(true);
+    const buyerId = (r as { buyerId: string }).buyerId;
+    const quotes = await prisma.quote.findMany({ where: { buyerId }, include: { lines: true, company: true }, orderBy: { createdAt: "asc" } });
+    expect(quotes.map((q) => q.status).sort()).toEqual(["COUNTERED", "SUBMITTED"]);
+    const countered = quotes.find((q) => q.status === "COUNTERED")!;
+    expect(countered.lines).toHaveLength(3);
+    // Real variant ids from the catalog, countered a little under list.
+    expect(countered.lines[0].variantId).toBe("gid://shopify/ProductVariant/1");
+    expect(countered.lines.map((l) => l.price.toString())).toEqual(["11.9", "4.03", "8.64"]);
+    const invoices = await prisma.invoice.findMany({ where: { companyId: countered.companyId } });
+    expect(invoices).toHaveLength(1);
+    expect(invoices[0]).toMatchObject({ orderId: "gid://shopify/Order/1032", status: "OPEN", currency: "USD" });
+    expect(countered.company.shopId).toBe(shop.id);
+  });
+
+  it("does not seed quotes when the catalog is empty, and still opens the demo", async () => {
+    await prisma.shop.create({ data: { shopifyDomain: DOMAIN } });
+    const r = await startDemo({ ip: "1.1.1.1", limiter: fresh(), adminFor: async () => admin, catalogFor: async () => [] });
+    expect(r.ok).toBe(true);
+    expect(await prisma.quote.count()).toBe(0);
+  });
+
   it("provisions the real company, reorder cards, and a fresh visitor buyer", async () => {
     const shop = await prisma.shop.create({ data: { shopifyDomain: DOMAIN } });
-    const r = await startDemo({ ip: "1.1.1.1", limiter: fresh(), adminFor: async () => admin, random: () => "deadbeef" });
+    const r = await startDemo({ ip: "1.1.1.1", limiter: fresh(), adminFor: async () => admin, catalogFor: async () => [], random: () => "deadbeef" });
     expect(r.ok).toBe(true);
     const buyer = await prisma.buyer.findUniqueOrThrow({ where: { id: (r as { buyerId: string }).buyerId }, include: { company: true } });
     expect(buyer.email).toBe(`visitor-deadbeef@${DEMO_EMAIL_DOMAIN}`);
@@ -188,8 +229,8 @@ describe.skipIf(!hasDb)("startDemo (DB)", () => {
 
   it("gives each visit its own buyer under one company, and is idempotent for Shopify rows", async () => {
     await prisma.shop.create({ data: { shopifyDomain: DOMAIN } });
-    const a = await startDemo({ ip: "1.1.1.1", limiter: fresh(), adminFor: async () => admin });
-    const b = await startDemo({ ip: "2.2.2.2", limiter: fresh(), adminFor: async () => admin });
+    const a = await startDemo({ ip: "1.1.1.1", limiter: fresh(), adminFor: async () => admin, catalogFor: async () => [] });
+    const b = await startDemo({ ip: "2.2.2.2", limiter: fresh(), adminFor: async () => admin, catalogFor: async () => [] });
     expect(a.ok && b.ok && a.buyerId !== b.buyerId).toBe(true);
     expect(await prisma.company.count()).toBe(1);
     expect(await prisma.reorderSource.count()).toBe(2);

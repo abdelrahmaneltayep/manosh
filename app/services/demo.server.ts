@@ -198,6 +198,105 @@ export type StartDemoResult =
   | { ok: true; buyerId: string }
   | { ok: false; reason: "disabled" | "not-installed" | "no-company" | "rate-limited" };
 
+/** Minimal catalog item shape the seeder needs (matches catalog.server's CatalogItem). */
+export interface DemoCatalogItem {
+  variantId: string;
+  displayTitle: string;
+  sku: string | null;
+  price: string;
+  currencyCode: string;
+}
+
+/**
+ * A merchant-style counter price: the list price less a small discount, as a
+ * money string. This is a *proposed unit price* the merchant would type — not
+ * a total, tax, or anything Shopify computes (guardrail #1 still holds: the
+ * quote's totals come from draftOrderCalculate when the buyer accepts).
+ */
+export function demoCounterPrice(listPrice: string, discountPct = 4): string {
+  const n = Number(listPrice);
+  if (!Number.isFinite(n) || n <= 0) return listPrice;
+  return (Math.round(n * (100 - discountPct)) / 100).toFixed(2);
+}
+
+/**
+ * Seed the visitor's portal so every buyer feature has something to show:
+ * one COUNTERED quote (the merchant has replied — the buyer can accept it and
+ * get a real Shopify draft order), one SUBMITTED quote (awaiting the supplier),
+ * and, for the company, one open net-terms invoice on the most recent real
+ * order. Lines use real variants from the store's catalog — never fabricated.
+ * Best-effort throughout: a seeding hiccup must never block the demo.
+ */
+export async function seedDemoBuyerData(input: {
+  shopId: string;
+  companyId: string;
+  buyerId: string;
+  catalog: DemoCatalogItem[];
+  orders: DemoOrderRef[];
+  termsDays: number;
+  now?: Date;
+}): Promise<{ quotes: number; invoices: number }> {
+  const now = input.now ?? new Date();
+  const items = input.catalog.filter((c) => Number(c.price) > 0).slice(0, 5);
+  let quotes = 0;
+  let invoices = 0;
+
+  if (items.length > 0) {
+    const { submitQuote, counterQuote } = await import("./quote.server");
+    const line = (c: DemoCatalogItem, quantity: number) => ({
+      variantId: c.variantId,
+      sku: c.sku,
+      title: c.displayTitle,
+      quantity,
+      price: c.price,
+    });
+
+    // 1) A countered quote the visitor can accept right away.
+    const first = items.slice(0, 3);
+    const countered = await submitQuote({
+      companyId: input.companyId,
+      buyerId: input.buyerId,
+      lines: first.map((c, idx) => line(c, [24, 12, 6][idx] ?? 6)),
+      poReference: "PO-DEMO-1042",
+      now,
+    });
+    await counterQuote(countered.id, {
+      lines: countered.lines.map((l) => ({ id: l.id, price: demoCounterPrice(l.price.toString()) })),
+      now,
+    });
+    quotes += 1;
+
+    // 2) A fresh request still with the supplier.
+    const rest = items.slice(3, 5).length ? items.slice(3, 5) : items.slice(0, 2);
+    await submitQuote({
+      companyId: input.companyId,
+      buyerId: input.buyerId,
+      lines: rest.map((c) => line(c, 10)),
+      now,
+    });
+    quotes += 1;
+  }
+
+  // 3) One open net-terms invoice for the company's latest real order
+  //    (idempotent by orderId, so repeat visitors share it).
+  const latest = input.orders[0];
+  if (latest) {
+    const { createInvoiceForOrder } = await import("./invoice.server");
+    await createInvoiceForOrder({
+      companyId: input.companyId,
+      shopId: input.shopId,
+      orderId: latest.id,
+      amount: latest.amount,
+      currency: latest.currencyCode,
+      termsDays: input.termsDays,
+      now,
+    });
+    invoices += 1;
+  }
+
+  return { quotes, invoices };
+}
+
 /**
  * Provision (idempotently) the demo company + a fresh visitor buyer on the demo
  * store and return the buyer id to start a portal session for. Never throws for
@@ -209,6 +308,8 @@ export async function startDemo(options: {
   now?: Date;
   /** Injectable for tests; defaults to the shop's offline Admin session. */
   adminFor?: (shopDomain: string) => Promise<AdminGraphql>;
+  /** Injectable for tests; defaults to the cached live catalog read. */
+  catalogFor?: (shopDomain: string) => Promise<DemoCatalogItem[]>;
   random?: () => string;
 }): Promise<StartDemoResult> {
   const domain = demoShopDomain();
@@ -218,7 +319,10 @@ export async function startDemo(options: {
   const now = options.now ?? new Date();
   if (!limiter.allow(options.ip, now.getTime())) return { ok: false, reason: "rate-limited" };
 
-  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: domain }, select: { id: true } });
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: domain },
+    select: { id: true, defaultTermsDays: true },
+  });
   if (!shop) return { ok: false, reason: "not-installed" };
 
   const adminFor = options.adminFor ?? defaultAdminFor;
@@ -234,8 +338,9 @@ export async function startDemo(options: {
   });
 
   // Reorder cards from real past orders — best-effort, never blocks the demo.
+  let orders: DemoOrderRef[] = [];
   try {
-    const orders = await fetchDemoOrders(admin);
+    orders = await fetchDemoOrders(admin);
     for (const o of orders) {
       await prisma.reorderSource.upsert({
         where: { companyId_shopifyOrderId: { companyId: companyRow.id, shopifyOrderId: o.id } },
@@ -273,7 +378,31 @@ export async function startDemo(options: {
     },
     select: { id: true },
   });
+
+  // Sample quotes + invoice so the portal isn't empty — best-effort.
+  try {
+    const catalogFor = options.catalogFor ?? defaultCatalogFor;
+    const catalog = await catalogFor(domain);
+    await seedDemoBuyerData({
+      shopId: shop.id,
+      companyId: companyRow.id,
+      buyerId: buyer.id,
+      catalog,
+      orders,
+      termsDays: shop.defaultTermsDays,
+      now,
+    });
+  } catch (error) {
+    const { captureException } = await import("../lib/sentry.server");
+    captureException(error);
+  }
+
   return { ok: true, buyerId: buyer.id };
+}
+
+async function defaultCatalogFor(shopDomain: string): Promise<DemoCatalogItem[]> {
+  const { getCatalog } = await import("./catalog.server");
+  return getCatalog(shopDomain);
 }
 
 /** Delete demo visitor buyers older than the TTL. Returns the count removed. */

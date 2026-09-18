@@ -1,20 +1,71 @@
-/* Buyer portal — light, standalone styles. Kept small for fast first paint. */
+/* Buyer portal — light, standalone styles. Kept small for fast first paint.
+   Default theme is the Mannon brand (indigo + lime, see docs/brand.md); a store
+   on white-label overrides --accent/--accent-text/--link/--lime at runtime. */
 :root {
-  --bg: #f6f6f7;
+  --bg: #f6f5ff;
   --surface: #ffffff;
-  --text: #1a1a1a;
-  --muted: #616161;
-  --border: #e1e3e5;
-  --accent: #008060;
+  --text: #1c1d2b;
+  --muted: #5b5f6e;
+  --border: #e6e6ef;
+  --accent: #4f46e5;
   --accent-text: #ffffff;
-  /* Darker green for link text so it clears AA (4.5:1) on both the white card
-     and the off-white page background; the brand green stays for button fills. */
-  --link: #00674e;
+  /* Deeper indigo for link text so it clears AA (4.5:1) on the white card and
+     the tinted page background; the brand indigo stays for button fills. */
+  --link: #4338ca;
+  --lime: #84cc16;
   --danger: #8e1f0b;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Default portal header: the Mannon mark. Hidden when a store white-labels
+   (its own brand bar renders instead). */
+.portal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0 0.8rem;
+  margin-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.portal-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.portal-logo .mark {
+  position: relative;
+  color: var(--accent);
+  font-weight: 900;
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.portal-logo .mark::after {
+  content: "";
+  position: absolute;
+  right: -0.32rem;
+  bottom: 0.08rem;
+  width: 0.36rem;
+  height: 0.36rem;
+  border-radius: 50%;
+  background: var(--lime);
+}
+
+.portal-header-tag {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 /* F20 — white-label brand bar (buyer-facing only). Shown when a store applies
@@ -63,14 +114,22 @@ body {
 .portal-card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 0.75rem;
+  border-radius: 1rem;
   padding: 1.5rem;
   margin-top: 1rem;
+  box-shadow: 0 12px 40px rgba(28, 29, 43, 0.06);
 }
 
 .portal h1 {
-  font-size: 1.5rem;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
   margin: 0 0 0.25rem;
+}
+
+.portal h2 {
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 .portal p {
@@ -89,14 +148,25 @@ body {
   display: inline-block;
   appearance: none;
   border: none;
-  border-radius: 0.5rem;
+  border-radius: 0.7rem;
   background: var(--accent);
   color: var(--accent-text);
   font-size: 1rem;
-  font-weight: 600;
-  padding: 0.7rem 1.25rem;
+  font-weight: 800;
+  font-family: inherit;
+  padding: 0.75rem 1.3rem;
   cursor: pointer;
   text-decoration: none;
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.22);
+  transition: filter 0.15s, transform 0.05s;
+}
+
+.portal-button:hover {
+  filter: brightness(0.92);
+}
+
+.portal-button:active {
+  transform: translateY(1px);
 }
 
 .portal-button:focus-visible {
@@ -106,6 +176,7 @@ body {
 
 .portal-link {
   color: var(--link);
+  font-weight: 600;
 }
 
 .portal-link:focus-visible {
@@ -219,8 +290,8 @@ body {
   color: #8a6116;
 }
 .status-countered {
-  background: #ebf3ff;
-  color: #1f5199;
+  background: #eef0ff;
+  color: #3730a3;
 }
 .status-accepted,
 .status-ordered {
@@ -359,9 +430,9 @@ body {
   cursor: pointer;
 }
 .portal-localebtn.on {
-  background: #4f46e5;
-  border-color: #4f46e5;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 

@@ -105,23 +105,35 @@ export default function PortalLayout() {
   return (
     <main className="portal" dir={dir} lang={locale} style={brandStyle}>
       {pwaOn && <script dangerouslySetInnerHTML={{ __html: PWA_BOOTSTRAP }} />}
-      {isDemo && (
-        <div className="portal-demobar" role="note">
-          <strong>Demo portal.</strong> You&rsquo;re a sample buyer on the Mannon
-          demo store. Quotes you accept become real draft orders there — nothing
-          is charged.{" "}
-          <a href="/" className="portal-link">
-            Install Mannon on your store
-          </a>
-        </div>
-      )}
-      {brand?.custom && (
+      {brand?.custom ? (
         <div className="portal-brandbar" aria-label={brand.portalName}>
           {brand.logo ? (
             <img src={brand.logo} alt={brand.portalName} style={{ height: "28px", width: "auto" }} />
           ) : (
             <strong>{brand.portalName}</strong>
           )}
+        </div>
+      ) : (
+        <header className="portal-header">
+          <Link to="/portal" className="portal-logo" aria-label="Mannon wholesale portal">
+            <span className="mark" aria-hidden="true">M</span>
+            <span>mannon</span>
+          </Link>
+          <span className="portal-header-tag">{t(locale, "portal_title")}</span>
+        </header>
+      )}
+      {isDemo && (
+        <div className="portal-demobar" role="note">
+          <strong>Demo portal.</strong> You&rsquo;re a sample buyer on the Mannon
+          demo store. Quotes you accept become real draft orders there — nothing
+          is charged.{" "}
+          <a href="/demo" className="portal-link">
+            Back to the demo
+          </a>
+          {" · "}
+          <a href="/" className="portal-link">
+            Install Mannon on your store
+          </a>
         </div>
       )}
       {i18nOn && (
