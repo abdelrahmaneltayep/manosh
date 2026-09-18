@@ -151,7 +151,7 @@ Growth and above; Free and Starter must not advertise AI.
 | Privacy policy | `https://manosh.fly.dev/privacy` |
 | Support / contact email | *(fill in — must be a monitored address)* |
 | Demo store URL | *(fill in your dev/demo store)* |
-| Public demo (landing page) | `https://manosh.fly.dev/demo` — hub with the live buyer demo (`/demo/buyer`, needs `MANNON_DEMO_SHOP` set on Fly) and the guided merchant tour (`/demo/tour`, sample screens, always on) |
+| Public demo | The landing page `https://manosh.fly.dev` has a **Try before you install** strip with both entries; `/demo` is the hub. Live buyer demo at `/demo/buyer` (needs `MANNON_DEMO_SHOP` set on Fly); guided merchant tour at `/demo/tour` (sample screens, always on) |
 
 ---
 
@@ -200,7 +200,7 @@ STEPS
 9. Reorder: from a past order, use one-tap reorder to clone it into a fresh draft, re-priced by Shopify.
 10. Pricing plans: click Choose plan. Shopify's plan-selection page opens (managed pricing); pick a plan and approve. You return to the embedded app with the plan active.
 11. Storefront: on the online store, open a product page with the "Request a Quote" block and submit the form — it confirms in place and the request appears under Quotes > Requests.
-12. Public demo (no login): https://manosh.fly.dev/demo — Open the buyer demo drops you in the buyer portal as a sample buyer with a countered quote (accepting creates a real draft order on the demo store); Start the tour shows the merchant screens with sample data.
+12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, Open the buyer demo makes you a sample buyer with a countered quote (accepting creates a real draft order on the demo store); Start the tour shows the merchant screens with sample data.
 
 NOTES
 - AI is human-in-the-loop: temperature 0, every AI output lands on a confirm screen, and every AI-returned product id is validated against the live catalog before use. Claude never writes a quote, cart, or order on its own.
