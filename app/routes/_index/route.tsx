@@ -41,8 +41,11 @@ export default function App() {
         </h1>
 
         <p className={styles.text}>
-          Mannon gives your B2B buyers a quote inbox and one-tap reorder, built
-          on your store&rsquo;s native B2B — no rebuilt pricing, no spreadsheets.
+          Quote, counter with Claude, and reorder in one tap — the B2B buying
+          workflow your store is missing.
+        </p>
+        <p className={styles.accent}>
+          Built on Shopify&rsquo;s native B2B — every price comes from Shopify.
         </p>
 
         {showForm && (
@@ -89,21 +92,21 @@ export default function App() {
             </span>
             <strong>One-tap reorder</strong>
             <span className={styles.cardText}>
-              Past orders become reorder cards your buyers can send from their
-              phone.
+              Past orders become reorder cards — a fresh draft, re-priced live
+              by Shopify, from any phone.
             </span>
           </li>
           <li className={styles.card}>
             <span className={styles.ic} aria-hidden="true">
               <svg viewBox="0 0 24 24">
-                <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
-                <path d="M9 12l2 2 4-4" />
+                <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+                <path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z" />
               </svg>
             </span>
-            <strong>Built on native B2B</strong>
+            <strong>Draft with Claude</strong>
             <span className={styles.cardText}>
-              Companies, catalogs, and payment terms stay Shopify&rsquo;s —
-              Mannon just orchestrates.
+              Claude drafts counters, replies, and carts. You review and send —
+              it never acts on its own.
             </span>
           </li>
         </ul>

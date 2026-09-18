@@ -128,6 +128,14 @@
   color: var(--sub);
 }
 
+.accent {
+  margin: 0.9rem auto 0;
+  max-width: 40rem;
+  font-size: clamp(0.95rem, 1.6vw, 1.1rem);
+  font-weight: 700;
+  color: var(--indigo);
+}
+
 /* ---- login form ---- */
 .form {
   display: flex;
