@@ -168,9 +168,10 @@ Generated from `shots.html`; no pricing and no outcome claims in any frame.
 | 5 | `05-ai-order-pad.png` | Paste any list. Get a ready cart. | AI drafts · you confirm every time |
 | 6 | `06-draft-with-claude.png` | Claude drafts the reply. You send it. | Claude drafts · you confirm every time |
 | 7 | `07-reorder.png` | Reorder a past order in one tap. | One tap · re-priced live by Shopify |
+| 8 | `08-try-the-demo.png` | Try the demo. No install, no sign-up. | Try the demo · manosh.fly.dev |
 
 Shopify's guidance is 3–6 screenshots; if trimming to 6, drop #2 (its story is
-covered by #3).
+covered by #3) and #5 (the order pad also appears in the screencast).
 
 **App icon:** monogram "M" on indigo `#4F46E5`, high contrast, legible at 48px,
 1200×1200 PNG.
