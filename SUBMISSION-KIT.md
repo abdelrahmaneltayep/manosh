@@ -30,16 +30,16 @@ Mannon — B2B Quotes & Reorders
 Quote, counter with Claude, and reorder in one tap. The B2B buying workflow your store is missing.
 ```
 
-## App details  (≤ 500 characters · plain text, no formatting)
+## App details  (≤ 500 characters · plain text, no formatting, no links)
 
 ```
 Mannon gives your wholesale and B2B buyers a real buying workflow, not just a cart.
 
 Buyers request a quote, you counter, they approve, and it becomes a native Shopify draft order. Built on Shopify's native B2B, so every price, tax and total comes from Shopify.
 
-Claude drafts your counters, replies and order carts, and flags win rates, credit risk and buyer summaries. You review and send; it never acts on its own.
+Claude drafts counters, replies and order carts, and flags win rates and credit risk. You review and send; it never acts on its own.
 
-Buyers get a passwordless portal and one-tap reorder.
+Buyers get a passwordless portal and one-tap reorder. Try the live demo before you install.
 ```
 
 ## Features  (5 × ≤ 80 characters)
@@ -66,10 +66,10 @@ B2B quotes and counters with Claude, plus one-tap reorder
 Mannon — AI B2B Quotes, Net Terms & Reorder for Shopify
 ```
 
-**Meta description** (≤ 160 · 153/160)
+**Meta description** (≤ 160 · 143/160)
 
 ```
-Mannon adds the B2B buying workflow your store is missing: send branded quotes, counter with Claude, accept net terms, and let buyers reorder in one tap.
+The B2B buying workflow your store is missing: branded quotes, Claude-drafted counters, net terms and one-tap reorder. Try the live demo first.
 ```
 
 ## Categories, search terms, languages
@@ -200,6 +200,7 @@ STEPS
 9. Reorder: from a past order, use one-tap reorder to clone it into a fresh draft, re-priced by Shopify.
 10. Pricing plans: click Choose plan. Shopify's plan-selection page opens (managed pricing); pick a plan and approve. You return to the embedded app with the plan active.
 11. Storefront: on the online store, open a product page with the "Request a Quote" block and submit the form — it confirms in place and the request appears under Quotes > Requests.
+12. Public demo (no login): https://manosh.fly.dev/demo — Open the buyer demo drops you in the buyer portal as a sample buyer with a countered quote (accepting creates a real draft order on the demo store); Start the tour shows the merchant screens with sample data.
 
 NOTES
 - AI is human-in-the-loop: temperature 0, every AI output lands on a confirm screen, and every AI-returned product id is validated against the live catalog before use. Claude never writes a quote, cart, or order on its own.
