@@ -237,6 +237,126 @@
   color: var(--sub);
 }
 
+/* ---- demo strip (mirrors the /demo hub) ---- */
+.demoStrip {
+  margin-top: 3.5rem;
+  width: 100%;
+}
+
+.demoStripHead {
+  text-align: center;
+}
+
+.kicker {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--indigo);
+}
+
+.demoStripTitle {
+  margin: 0.5rem 0 0;
+  font-size: clamp(1.5rem, 3.2vw, 2.2rem);
+  line-height: 1.12;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.demoCards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  margin-top: 1.75rem;
+}
+
+.demoCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  background: var(--card);
+  border-radius: 1rem;
+  padding: 1.9rem 1.5rem 1.6rem;
+  text-align: left;
+  box-shadow: 0 16px 40px rgba(28, 29, 43, 0.08);
+  overflow: hidden;
+}
+
+.demoCard::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 1rem;
+  right: 1rem;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: var(--lime);
+}
+
+.demoCard strong {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.demoKicker {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--indigo);
+}
+
+.demoCardBtn,
+.demoCardBtnGhost {
+  align-self: flex-start;
+  margin-top: 0.9rem;
+  padding: 0.75rem 1.3rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  border-radius: 0.7rem;
+  text-decoration: none;
+  border: 2px solid var(--indigo);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.demoCardBtn {
+  color: #fff;
+  background: var(--indigo);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
+}
+
+.demoCardBtn:hover,
+.demoCardBtn:focus-visible {
+  background: var(--indigo-ink);
+  border-color: var(--indigo-ink);
+}
+
+.demoCardBtnGhost {
+  color: var(--indigo);
+  background: #fff;
+}
+
+.demoCardBtnGhost:hover,
+.demoCardBtnGhost:focus-visible {
+  background: var(--indigo);
+  color: #fff;
+}
+
+.demoCardBtn:focus-visible,
+.demoCardBtnGhost:focus-visible {
+  outline: 3px solid #005bd3;
+  outline-offset: 2px;
+}
+
+.demoCardNote {
+  margin-top: 0.9rem;
+  font-size: 0.85rem;
+  color: var(--sub);
+}
+
 .button:hover {
   background: var(--indigo-ink);
 }
@@ -321,6 +441,13 @@
   .list {
     grid-template-columns: 1fr;
     max-width: 26rem;
+  }
+
+  .demoCards {
+    grid-template-columns: 1fr;
+    max-width: 26rem;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .form {

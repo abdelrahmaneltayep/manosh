@@ -14,11 +14,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login), showDemo: isDemoEnabled() };
+  // The demo hub (buyer demo + merchant tour) is always reachable; the live
+  // buyer track needs a configured demo store.
+  return { showForm: Boolean(login), buyerLive: isDemoEnabled() };
 };
 
 export default function App() {
-  const { showForm, showDemo } = useLoaderData<typeof loader>();
+  const { showForm, buyerLive } = useLoaderData<typeof loader>();
 
   return (
     <div className={styles.index}>
@@ -70,17 +72,16 @@ export default function App() {
           </Form>
         )}
 
-        {showDemo && (
-          <p className={styles.demo}>
-            <a className={styles.buttonSecondary} href="/demo">
-              Try the demo
-            </a>
-            <span className={styles.demoHint}>
-              A live buyer portal on our demo store, plus a guided tour of the
-              merchant side. No install, no sign-up.
-            </span>
-          </p>
-        )}
+        <p className={styles.demo}>
+          <a className={styles.buttonSecondary} href="/demo">
+            Try the demo
+          </a>
+          <span className={styles.demoHint}>
+            {buyerLive
+              ? "A live buyer portal on our demo store, plus a guided tour of the merchant side. No install, no sign-up."
+              : "A guided tour of the merchant side, screen by screen. No install, no sign-up."}
+          </span>
+        </p>
 
         <ul className={styles.list}>
           <li className={styles.card}>
@@ -126,6 +127,44 @@ export default function App() {
             </span>
           </li>
         </ul>
+
+        <section className={styles.demoStrip} aria-labelledby="demo-strip-h">
+          <div className={styles.demoStripHead}>
+            <span className={styles.kicker}>Try before you install</span>
+            <h2 id="demo-strip-h" className={styles.demoStripTitle}>
+              See the whole workflow.{" "}
+              <span className={styles.hl}>No install, no sign-up.</span>
+            </h2>
+          </div>
+          <div className={styles.demoCards}>
+            <article className={styles.demoCard}>
+              <span className={styles.demoKicker}>Live · buyer side</span>
+              <strong>Open the buyer portal</strong>
+              <span className={styles.cardText}>
+                Be a sample buyer on our demo store: accept a countered quote,
+                request a new one, reorder in one tap, paste an order.
+              </span>
+              {buyerLive ? (
+                <a className={styles.demoCardBtn} href="/demo/buyer">
+                  Open the buyer demo
+                </a>
+              ) : (
+                <span className={styles.demoCardNote}>Coming back shortly</span>
+              )}
+            </article>
+            <article className={styles.demoCard}>
+              <span className={styles.demoKicker}>Guided tour · merchant side</span>
+              <strong>Walk through the admin</strong>
+              <span className={styles.cardText}>
+                Eleven real screens with sample data: quote inbox, Draft with
+                Claude, net terms, the AI Order Pad, analytics and credit.
+              </span>
+              <a className={styles.demoCardBtnGhost} href="/demo/tour">
+                Start the tour
+              </a>
+            </article>
+          </div>
+        </section>
       </div>
     </div>
   );
