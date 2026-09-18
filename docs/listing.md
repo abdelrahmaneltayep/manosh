@@ -4,8 +4,11 @@ Copy + asset plan for the Shopify App Store listing, mapped to the Partner
 Dashboard fields. Written to Shopify's content guidelines (plain language,
 benefit-first, honest about scope). Paste each block into the matching field.
 
-> **Status:** copy is final; screenshots are a shot-list (below) to capture on a
-> dev store before submission (S20). Placeholder URLs use `https://mannon.app`.
+> **Status: superseded.** The paste-ready listing copy, pricing (Shopify App
+> Pricing, four plans), screenshots, and reviewer instructions now live in
+> [`/SUBMISSION-KIT.md`](../SUBMISSION-KIT.md). This file is the original S18 plan
+> and is kept for history only; where the two differ, the submission kit wins.
+> Placeholder URLs below use `https://mannon.app`.
 
 ---
 

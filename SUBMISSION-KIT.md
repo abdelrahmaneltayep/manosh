@@ -1,152 +1,144 @@
 # Mannon — App Store submission kit
 
-Every Partner Dashboard listing field, filled and ready to paste, updated for the
-current app: **4-plan pricing ($0/$9/$29/$69)**, the **7-section tabbed nav**, the
-**dual-mode Claude suite** (15 AI features, all draft-only), and the live URLs on
-`manosh.fly.dev`. Screencast is being produced separately (Cowork).
+Every Partner Dashboard listing field, filled and ready to paste. Updated to the
+current app: **Shopify App Pricing (managed pricing) with four plans**, the
+**7-section tabbed nav**, the **dual-mode Claude suite** (draft-only), and the live URLs
+on `manosh.fly.dev`.
+
+Listing rules this copy follows (Shopify App Store requirements 4.x):
+
+- Pricing appears **only** in the Pricing section. No prices in the introduction,
+  details, features, card subtitle, web search copy, screenshots, or screencast.
+- No outcome guarantees ("always correct", "higher accept rates") and no comparisons
+  with other apps. Copy describes what Mannon does and who does what.
+- The one recurring line, used verbatim across the listing, screenshots, and
+  screencast: **Built on Shopify's native B2B — every price comes from Shopify.**
+
+Character limits are the Partner Dashboard's; counts are given per field.
 
 ---
 
 ## App name
+
 ```
 Mannon — B2B Quotes & Reorders
 ```
 
-## Subtitle / tagline  (≤ 62 chars)
+## App introduction  (≤ 100 characters · 100/100)
+
 ```
-Wholesale quotes & one-tap reorders on native B2B
+Quote, counter with Claude, and reorder in one tap. The B2B buying workflow your store is missing.
 ```
 
-## App card subtitle  (listing grid, ≤ 62 chars)
+## App details  (≤ 500 characters · plain text, no formatting)
+
 ```
-Turn quote-by-email into a clean inbox — priced on draft orders
+Mannon gives your wholesale and B2B buyers a real buying workflow, not just a cart.
+
+Buyers request a quote, you counter, they approve, and it becomes a native Shopify draft order. Built on Shopify's native B2B, so every price, tax and total comes from Shopify.
+
+Claude drafts your counters, replies and order carts, and flags win rates, credit risk and buyer summaries. You review and send; it never acts on its own.
+
+Buyers get a passwordless portal and one-tap reorder.
 ```
 
-## Categories & search terms
-- **Primary category:** Wholesale and B2B
+## Features  (5 × ≤ 80 characters)
+
+```
+Quote requests & counter-offers with a clear, trackable status trail
+Draft with Claude: it drafts counters, replies & carts, you send
+Passwordless buyer portal — no account, no password to accept or reorder
+One-tap reorder of anything a buyer has purchased before
+Native Shopify draft orders — Shopify handles prices, tax, totals & terms
+```
+
+## App card subtitle  (≤ 62 characters · 57/62)
+
+```
+B2B quotes and counters with Claude, plus one-tap reorder
+```
+
+## Web search content
+
+**Title tag** (≤ 60 · 55/60)
+
+```
+Mannon — AI B2B Quotes, Net Terms & Reorder for Shopify
+```
+
+**Meta description** (≤ 160 · 153/160)
+
+```
+Mannon adds the B2B buying workflow your store is missing: send branded quotes, counter with Claude, accept net terms, and let buyers reorder in one tap.
+```
+
+## Categories, search terms, languages
+
+- **Primary category:** Selling products → Wholesale and B2B
 - **Secondary category:** Store management → Orders
-- **Search terms:** `b2b, wholesale, quotes, request a quote, reorder, net terms, price list, draft order, purchase order, wholesale portal`
+- **Search terms** (no "Shopify" in this field):
+  `b2b, wholesale, quotes, request a quote, reorder, net terms, price list, draft order, customer accounts`
+- **Languages:** list only the languages the **admin UI** supports (English). The
+  Arabic/RTL support is on the buyer portal and is described in the details, not
+  declared as an admin language.
+- **Install requirements:** "Merchant must have an online store" (the app ships a
+  theme app extension). Note in the listing that Shopify's native B2B (companies +
+  a B2B catalog) must be enabled.
 
 ---
 
-## Key benefits  (Shopify format — 3 × title + one sentence)
+## Pricing details  (Shopify App Pricing — plans are configured in the Partner Dashboard)
 
-1. **Quote without the email grind**
-   A real quote inbox and passwordless buyer portal replace the back-and-forth — counter line-by-line, accept, and it becomes a Shopify draft order.
+Mannon uses **managed pricing**: the four plans below are created under App Pricing in
+the Partner Dashboard with the **lowercase handles** `free`, `starter`, `growth`,
+`scale`. The app never creates charges; the in-app **Pricing plans** page sends the
+merchant to Shopify's hosted plan-selection page and they return to the embedded app
+with the plan active. Set `SHOPIFY_APP_HANDLE` on the server if the app handle is
+not `mannon`.
 
-2. **Reorders in one tap**
-   Your best buyers reorder past purchases instantly, repriced to today's catalog, auto-approved inside a tolerance you control.
+| Plan | Price / mo | Trial | Highlights |
+|---|---|---|---|
+| **Free** | **$0** | — | Up to 10 quotes/mo · 1 company account · passwordless portal · one-tap reorder · quick order pad |
+| **Starter** | **$9** | 14 days | Everything in Free · unlimited quotes & requests · up to 5 company accounts · 1 custom price list · basic quote analytics |
+| **Growth** | **$29** | 14 days | Everything in Starter · ✦ Draft with Claude (counters & carts) · net terms & deposits · Make an Offer · 25 company accounts · 10 price lists · full analytics + Claude insights |
+| **Scale** | **$69** | 14 days | Everything in Growth · unlimited accounts & price lists · automated offers · sales-rep portal · accounting sync · white-label buyer portal · deal-level analytics |
 
-3. **Draft with Claude — you always confirm**
-   AI drafts counters, replies, insights, and suggestions across the app. It never sends, charges, accepts, or edits data on its own; a human clicks the final button.
+Paste-ready plan descriptions:
 
----
+**Free — $0/mo** (handle `free`)
+- Up to 10 quotes per month
+- Passwordless buyer portal
+- One-tap reorder of past orders
+- Priced on native Shopify draft orders
+- Quick order pad for buyers
 
-## App introduction  (≤ 100 words)
+**Starter — $9/mo · 14-day trial** (handle `starter`)
+- Everything in Free
+- Unlimited quotes & requests
+- Up to 5 company accounts
+- 1 custom price list
+- Basic quote analytics
 
-You turned on Shopify's native B2B — then hit the wall every merchant hits: quotes,
-per-account pricing, and reorders still run on email and spreadsheets. Mannon closes
-that gap without rebuilding what Shopify already owns. Buyers get a passwordless
-portal to request a quote or reorder in one tap; you get a Polaris inbox to counter
-and accept. Accept a quote and Mannon creates a real Shopify **draft order** — with
-Shopify's own totals, tax, terms, and PO. Add net terms, custom pricing, catalogs,
-analytics, and a dual-mode AI that only ever drafts. Flat monthly price, no per-order
-fees.
+**Growth — $29/mo · 14-day trial** (handle `growth`)
+- Everything in Starter
+- Draft with Claude: counters & carts
+- Net terms & deposits
+- Make an Offer (manual rules)
+- 25 company accounts, 10 price lists
+- Full analytics + Claude insights
 
----
+**Scale — $69/mo · 14-day trial** (handle `scale`)
+- Everything in Growth
+- Unlimited accounts & price lists
+- Automated offers & pay-what-you-want
+- Sales-rep portal
+- Accounting sync
+- White-label buyer portal
+- Deal-level analytics
 
-## Detailed description
-
-**Stop running wholesale out of your inbox.**
-
-You turned on Shopify's native B2B — then quotes, custom per-account pricing, and
-reorders all fell back to email. Mannon closes that gap without rebuilding anything
-Shopify already does. Buyers get a passwordless portal to request a quote or reorder a
-past order in one tap. You get a Polaris inbox to counter and accept. The moment a
-quote is accepted, Mannon creates a real Shopify **draft order** — with Shopify's own
-totals, tax, payment terms, and PO number. Mannon never invents pricing or tax; it
-orchestrates what Shopify already owns.
-
-**One tidy workspace.** Everything lives in seven sections — Quotes, Quote forms,
-Pricing & catalog, Buyers, Analytics, Settings, and Pricing plans — familiar Polaris,
-fast to learn.
-
-**What you can do**
-
-- **Quote loop.** Buyers build a basket and submit; you counter line-by-line; they
-  accept. Every quote has a clear status and a merchant-set expiry.
-- **One-tap reorder.** Buyers reprice and resend a past order in a tap. Small price
-  moves auto-convert within a tolerance you set; larger ones wait for your approval.
-- **Draft with Claude — dual-mode, everywhere.** On every screen that writes text or a
-  priced decision, a "✦ Draft with Claude" action pre-fills the manual controls: quote
-  counter-offers with a margin read, follow-up copy, quote-request replies, invoice
-  emails, wholesale decisions, plus **win-rate insights, buyer summaries,
-  reorder-timing nudges, complementary add-on suggestions, and an advisory credit-risk
-  read.** Every output is a draft you review — Claude never sends, accepts, charges, or
-  edits data. You can switch Claude on or off for the whole store in Settings, and
-  every screen works fully in Manual mode without it.
-- **Magic Order Pad.** Buyers paste a SKU list — or a whole PO or email — and Mannon
-  matches it to your catalog. Every match is shown for confirmation and every product
-  id is checked against your live catalog before anything is created.
-- **Negotiation analytics (Growth).** Win rate, average discount, time-to-close, open
-  pipeline, top accounts, most-discounted SKUs — 30/90-day trends and CSV export.
-- **Auto follow-ups & expiry.** Nudge buyers on a cadence with accept/counter links,
-  then auto-expire cold quotes. Accepting cancels the rest.
-- **Gated wholesale sign-up.** A branded apply-to-buy form screens buyers before they
-  see prices; approve in one click to provision the account and email a passwordless
-  link. Auto-approve trusted domains (Growth).
-- **Company accounts & approvals (Growth).** Up to 5 members per company with roles;
-  orders over a threshold route to an approver.
-- **Customer-specific pricing & custom catalogs.** Per-company price lists and product
-  visibility — hidden SKUs never leak via search, URL, or the quote picker.
-- **Net terms & credit control (Growth).** Credit limits, an aging dashboard, automatic
-  reminders, and downloadable invoices. Net terms + due dates on every plan.
-- **QuickBooks & Xero sync (Growth).** Invoices and payments post automatically,
-  idempotent, with a retryable log.
-- **Sales-rep portal (Growth).** Reps see only their accounts and order on behalf of
-  buyers, within each buyer's limits — every rep-placed order attributed and audited.
-- **Flexible payments (Growth).** Deposits, installments, or a secure pay-by-link — all
-  captured by Shopify checkout; Mannon never stores card data.
-- **Tax exemption & VAT/GST-correct invoices.** GCC VAT (KSA 15% / UAE 5%), EU VAT, US
-  resale; default-taxed until verified; certificates stored privately.
-- **ERP & inventory sync (Growth).** Real-time stock feeds an oversell guard; paid
-  orders export (webhook / SFTP / NetSuite / custom) with a two-way log.
-- **Multi-currency & Arabic/RTL portal.** Buyers see their language (Arabic is full RTL)
-  and currency; every quote locks its FX rate at issue.
-- **"Request a Quote" storefront button (no code).** A theme app block on any product or
-  cart page captures B2B leads straight into your pipeline.
-- **Installable buyer app.** Buyers add your portal to their home screen and reorder in
-  one tap; push "time to reorder?" reminders on Growth.
-- **Shareable wholesale catalog & agency mode (Growth).** Publish a branded catalog to
-  capture new buyers; run several stores from one org dashboard with per-store isolation.
-
-**Built the right way**
-- Rides Shopify's native B2B (companies, catalogs, payment terms).
-- Prices on draft orders — Shopify is the single source of truth for money.
-- Minimum OAuth scopes, every webhook HMAC-verified, buyer links passwordless and
-  single-use, GDPR webhooks handled.
-
-Start free, or take a 14-day trial on a paid plan. No pricing engine to configure, no
-data to migrate — install, invite a buyer, and send your first quote.
-
----
-
-## Pricing  (Billing API — plans defined in code, `MANNON_FF_PLAN_V3`)
-
-Flat monthly price, **no per-order fees, ever.** The core workflow — quote builder,
-buyer portal, native terms/PO, Magic Order Pad, reorder, and the ROI dashboard — is on
-every plan. Plans differ by volume/seat limits and premium capabilities.
-
-| Plan | Price / mo | Highlights |
-|---|---|---|
-| **Free** | **$0** | 10 quotes/mo · 1 company account · quick order + reorder |
-| **Starter** | **$9** | Unlimited quotes · 5 companies · 1 price list · storefront quote widget |
-| **Growth** | **$29** | Everything in Starter · ✦ Draft with Claude · net terms + deposits · analytics · offer rules · 25 companies · 10 price lists |
-| **Scale** | **$69** | Everything in Growth · sales-rep portal · accounting + ERP sync · white-label / agency · unlimited companies, price lists & offer rules |
-
-- **14-day free trial** on paid plans; Free plan needs no trial.
-- Billed through Shopify's Billing API — upgrade, downgrade, or cancel anytime from the
-  in-app **Pricing plans** page.
+Notes for the Pricing section only: flat monthly fee, no per-order fees. Annual
+billing, if offered, is 2 months free ($90 / $290 / $690). All Claude features are
+Growth and above; Free and Starter must not advertise AI.
 
 ---
 
@@ -155,84 +147,89 @@ every plan. Plans differ by volume/seat limits and premium capabilities.
 | Field | Value |
 |---|---|
 | App URL | `https://manosh.fly.dev` |
+| Welcome / landing link | `https://manosh.fly.dev/app` |
 | Privacy policy | `https://manosh.fly.dev/privacy` |
-| Support / contact email | *(fill in — e.g. support@yourdomain)* |
+| Support / contact email | *(fill in — must be a monitored address)* |
 | Demo store URL | *(fill in your dev/demo store)* |
 
 ---
 
-## Screenshots  (6 × 1600×900 — from `mannon-listing-screenshots.html`)
+## Screenshots  (7 × 1600×900, upload the 2× set at 3200×1800)
 
-| # | Frame | Caption |
-|---|---|---|
-| 1 | Quote inbox | Counter quotes line-by-line — Shopify makes the draft order |
-| 2 | 7-section nav / tabs | One tidy workspace — 7 sections, familiar Polaris |
-| 3 | Pricing plans | Simple pricing — flat monthly, no per-order fees |
-| 4 | Dual-mode Claude insight | Draft with Claude — every AI action is a draft you confirm |
-| 5 | Buyer one-tap reorder | Buyers reorder in one tap — passwordless portal |
-| 6 | Credit + AI risk read | Net terms, credit control, and an advisory AI risk read |
+Generated from `shots.html`; no pricing and no outcome claims in any frame.
 
-**App icon:** monogram "M" on indigo `#4F46E5` (or Shopify green `#008060`), high
-contrast, legible at 48px — produced as a 1200×1200 PNG.
+| # | File | Headline | Caption pill |
+|---|---|---|---|
+| 1 | `01-hero.png` | Turn B2B price questions into closed deals. | Built on Shopify's native B2B — every price comes from Shopify. |
+| 2 | `02-quote-inbox.png` | Counter quotes line-by-line — Shopify builds the draft. | Priced by Shopify · one source of truth |
+| 3 | `03-branded-quote.png` | Send a branded quote in under a minute. | Priced by Shopify · tax handled by Shopify |
+| 4 | `04-buyer-accept.png` | Buyers accept quotes with no login. | Passwordless · one tap to accept |
+| 5 | `05-ai-order-pad.png` | Paste any list. Get a ready cart. | AI drafts · you confirm every time |
+| 6 | `06-draft-with-claude.png` | Claude drafts the reply. You send it. | Claude drafts · you confirm every time |
+| 7 | `07-reorder.png` | Reorder a past order in one tap. | One tap · re-priced live by Shopify |
 
----
+Shopify's guidance is 3–6 screenshots; if trimming to 6, drop #2 (its story is
+covered by #3).
 
-## Requirements / install notes
-- Requires **Shopify's native B2B** enabled (companies + at least one B2B catalog).
-  Mannon rides these primitives; it does not replace them.
-- Admin app is embedded in Shopify Admin (Polaris + App Bridge); the buyer portal is a
-  standalone passwordless page. No theme changes required.
+**App icon:** monogram "M" on indigo `#4F46E5`, high contrast, legible at 48px,
+1200×1200 PNG.
 
-## First-use / onboarding
-1. Install and choose a plan (Free, or a 14-day trial on paid).
-2. Open **Buyers**, generate a secure sign-in link for a B2B buyer, and email it.
-3. The buyer requests a quote or reorders; you counter/accept from **Quotes**.
-4. Watch **Home** fill with the revenue Mannon made you.
+**Screencast:** `mannon-walkthrough.mp4` (1920×1080, ~2:42). Same wording as the
+screenshots: no pricing, reorder is "re-priced live by Shopify", and the feature tour
+closes on the native-B2B line. Script in `mannon-screencast-script.md`.
 
 ---
 
-## Testing instructions for the reviewer  (paste into the "additional information" box)
+## Testing instructions for the reviewer  (≤ 2800 characters)
 
 ```
-Mannon — B2B quotes & reorders on native B2B. Embedded admin (Polaris/App Bridge). Test store login is provided.
+Test store: a demo company and buyer are seeded on install, so you can create a quote immediately. Works on any plan — no Plus or extra setup needed. Shopify's native B2B (companies) is enabled on the test store.
 
-Getting started
-1. Install the app and open it from Apps. The left nav has 7 sections: Quotes, Quote forms, Pricing & catalog, Buyers, Analytics, Settings, Pricing plans. Click each — every page loads.
+STEPS
+1. Install the app on the provided test store. Open it and click through every left-nav section (Home, Quotes, Quote forms, Pricing & catalog, Buyers, Analytics, Settings, Pricing plans) — each loads a page.
+2. Quotes > New quote: add 2–3 products, set quantities.
+3. Click "✦ Draft with Claude". Claude drafts a counter-offer. Review it and click Apply — the AI only pre-fills; it never sends on its own. (Manual editing works too.)
+4. Pick a payment term (e.g. Net 30) and Send. Prices, tax and totals come from a Shopify draft order — the app never recomputes them.
+5. Open the buyer view via the magic link shown after sending — no login required. Click Accept; you must confirm on a dialog before anything is written.
+6. On confirm, the quote becomes a real Shopify draft order (see Orders > Drafts, source "Mannon").
+7. Quote forms > AI Order Pad: paste "20x <SKU>, 5x <SKU>" — Claude matches the lines; nothing is ordered until you click Confirm & build cart.
+8. Analytics: view the ✦ Claude insights (win-rate, credit-risk, buyer summary) — all advisory, shown on screen only.
+9. Reorder: from a past order, use one-tap reorder to clone it into a fresh draft, re-priced by Shopify.
+10. Pricing plans: click Choose plan. Shopify's plan-selection page opens (managed pricing); pick a plan and approve. You return to the embedded app with the plan active.
+11. Storefront: on the online store, open a product page with the "Request a Quote" block and submit the form — it confirms in place and the request appears under Quotes > Requests.
 
-Core quote → order flow
-2. Quotes → create a quote: add 2–3 products, set quantities, send it.
-3. Open the buyer view via the magic link shown after sending (no login needed).
-4. As the buyer, approve the quote — it converts to a draft order.
-5. AI Magic Order Pad: paste "20x <SKU>, 5x <SKU>" and confirm it builds a draft order (you confirm before anything is created).
-6. One-tap reorder on the completed order.
-
-Billing (Pricing plans)
-7. Open "Pricing plans" — four plans: Free $0, Starter $9, Growth $29, Scale $69. Choose a paid plan and approve on Shopify's screen. You return to the embedded app with the plan active.
-
-Claude AI — optional, all dual-mode
-Every AI action only DRAFTS; a human always confirms. Claude never sends, charges, accepts, or edits data on its own. Included on Growth/Scale and on a Starter trial (starts on first use). Try:
-8. Analytics → "✦ Explain with Claude"
-9. A quote → "✦ Suggest add-ons with Claude" (suggests catalog items only)
-10. Credit → pick a company → "✦ Assess risk with Claude"
-11. Buyers → Relationship insights → "✦ Summarize" / "✦ Predict reorder"
-Claude can be turned on/off for the whole store in Settings; every screen also works fully in Manual mode.
-
-Notes
-- Works on any plan — no Plus or extra setup needed.
-- GDPR webhooks (customers/data_request, customers/redact, shop/redact) are implemented and HMAC-verified.
+NOTES
+- AI is human-in-the-loop: temperature 0, every AI output lands on a confirm screen, and every AI-returned product id is validated against the live catalog before use. Claude never writes a quote, cart, or order on its own.
+- ✦ Draft with Claude and Claude insights are included on Growth and Scale (and a one-time trial). If you don't see the ✦ controls, select the Growth plan to enable them.
+- Pricing (managed by Shopify App Pricing): Free $0, Starter $9, Growth $29, Scale $69 per month; 14-day trial on paid plans. No per-order charges.
+- GDPR webhooks (customers/data_request, customers/redact, shop/redact) and app/uninstalled are implemented and HMAC-verified; bad signatures are rejected with 401.
 - Privacy policy: https://manosh.fly.dev/privacy
 ```
 
 ---
 
-## Reviewer resubmission note  (reply to rejection 126730)
+## Reviewer resubmission note  (reply to the 2.1.1 storefront rejection)
 
-> **1.2.3 (billing):** Fixed — plan approval now returns to the embedded app with the
-> subscription active. The billing return URL carries `shop` + `host` + `embedded=1`, so
-> the merchant lands back in-app instead of the OAuth "enter your store" screen. Test:
-> Pricing plans → choose a plan → approve.
-> **2.1.1 ("Something went wrong" on tabs):** Fixed — all feature routes are enabled and
-> the nav only links to reachable pages; a billing-API hiccup now degrades gracefully
-> instead of erroring the page. The admin nav was also consolidated from 22 items to 7
-> tabbed sections. Test: click every nav item and tab.
-> Test store: [dev store]. Both flows verified.
+> **2.1.1 ("Something went wrong" on the storefront Request a Quote form):** Fixed —
+> the public quote-request endpoint and every other storefront endpoint now return a
+> plain-language result instead of a server error, and the form confirms in place.
+> Test: open a product page with the Request a Quote block, submit, and check
+> Quotes > Requests.
+> **Billing:** the app now uses Shopify App Pricing. Pricing plans → Choose plan opens
+> Shopify's plan page and returns to the embedded app with the plan active.
+> **API version:** moved to a supported Admin API version (2026-04).
+> Test store: [dev store]. All flows verified.
+
+---
+
+## Pre-submission checklist (dashboard side)
+
+- [ ] Protected customer data access requested (Level 2, fields: email, name) —
+      required before resubmitting.
+- [ ] App Pricing plans created with handles `free` / `starter` / `growth` / `scale`
+      and the prices above; `SHOPIFY_APP_HANDLE` set if the handle isn't `mannon`.
+- [ ] Network access approved for the `customer-account-quotes` extension.
+- [ ] Support email filled in and monitored; privacy URL returns a page after deploy.
+- [ ] Screenshots replaced with the 7-slide set (or 6); icon uploaded at 1200×1200.
+- [ ] Languages = admin UI languages only; "Merchant must have online store" selected.
+- [ ] Dev-store click-through of steps 1–11 on the deployed build.
