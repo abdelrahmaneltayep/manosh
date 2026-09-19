@@ -155,7 +155,7 @@ Growth and above; Free and Starter must not advertise AI.
 
 ---
 
-## Screenshots  (8 × 1600×900, upload the 2× set at 3200×1800)
+## Screenshots  (9 × 1600×900, upload the 2× set at 3200×1800)
 
 Generated from `shots.html`; no pricing and no outcome claims in any frame.
 
@@ -169,15 +169,17 @@ Generated from `shots.html`; no pricing and no outcome claims in any frame.
 | 6 | `06-draft-with-claude.png` | Claude drafts the reply. You send it. | Claude drafts · you confirm every time |
 | 7 | `07-reorder.png` | Reorder a past order in one tap. | One tap · re-priced live by Shopify |
 | 8 | `08-try-the-demo.png` | See the whole workflow. No install, no sign-up. (the landing page's Try before you install strip: live buyer portal + merchant tour) | Try the demo · manosh.fly.dev |
+| 9 | `09-draft-order.png` | Accept becomes a real Shopify draft order. (Shopify admin, Orders → Drafts: #D205, PO-DEMO-1042, Net 30, tax and total from Shopify) | Priced by Shopify · a real draft order |
 
-Shopify's guidance is 3–6 screenshots; if trimming to 6, drop #2 (its story is
-covered by #3) and #5 (the order pad also appears in the screencast).
+Upload order: 1, 2, 3, 4, 9, 5, 6, 7, 8 — the draft order (#9) belongs right after the
+buyer accept (#4). Shopify's guidance is 3–6 screenshots; if trimming to 6, drop #2
+(its story is covered by #3), #5 (the order pad is in the screencast) and #7.
 
 **App icon:** monogram "M" on indigo `#4F46E5`, high contrast, legible at 48px,
 1200×1200 PNG.
 
-**Screencast:** `mannon-walkthrough.mp4` (1920×1080, ~3:12; ends on the demo hub
-and the live buyer demo). Same wording as the
+**Screencast:** `mannon-walkthrough.mp4` (1920×1080, ~3:25; ends on the demo hub,
+the live buyer demo, and the resulting Shopify draft order). Same wording as the
 screenshots: no pricing, reorder is "re-priced live by Shopify", and the feature tour
 closes on the native-B2B line. Script in `mannon-screencast-script.md`.
 
