@@ -151,6 +151,7 @@ Growth and above; Free and Starter must not advertise AI.
 | Privacy policy | `https://manosh.fly.dev/privacy` |
 | Support / contact email | *(fill in — must be a monitored address)* |
 | Demo store URL | *(fill in your dev/demo store)* |
+| Screencast link (listing "App demo video" field) | *(paste the unlisted YouTube URL here after uploading `mannon-walkthrough.mp4` — see "Uploading the screencast" below)* |
 | Public demo | The landing page `https://manosh.fly.dev` has a **Try before you install** strip with both entries; `/demo` is the hub. Live buyer demo at `/demo/buyer` (needs `MANNON_DEMO_SHOP` set on Fly); guided merchant tour at `/demo/tour` (sample screens, always on) |
 
 ---
@@ -177,6 +178,44 @@ buyer accept (#4). Shopify's guidance is 3–6 screenshots; if trimming to 6, dr
 
 **App icon:** monogram "M" on indigo `#4F46E5`, high contrast, legible at 48px,
 1200×1200 PNG.
+
+### Uploading the screencast
+
+Shopify's listing takes the demo video as a **YouTube or Vimeo link**, not a file. Upload
+`mannon-walkthrough.mp4` at studio.youtube.com with visibility **Unlisted**, then paste the
+URL into the "App demo video" field and into the Resources table above. Paste-ready:
+
+**YouTube title**
+```
+Mannon for Shopify — B2B quotes, Draft with Claude, one-tap reorder (4-minute walkthrough)
+```
+
+**YouTube description**
+```
+Mannon is a B2B wholesale quoting and reorder app for Shopify. Buyers request a quote, you counter (with ✦ Draft with Claude — you review and send), they accept from a passwordless portal, and it becomes a real Shopify draft order. Built on Shopify's native B2B — every price comes from Shopify.
+
+Try the demo, no install, no sign-up: https://manosh.fly.dev/demo
+
+0:00 Landing
+0:16 Embedded in Shopify Admin
+0:30 Dashboard
+0:47 Quote inbox
+1:00 New quote, priced by Shopify
+1:19 ✦ Draft with Claude
+1:40 Send with net terms
+1:50 Buyer portal and accept
+2:09 A real Shopify draft order
+2:24 One-tap reorder
+2:39 AI Order Pad
+2:56 Claude insights
+3:13 Beyond the core loop
+3:31 Try the demo
+3:44 A real draft order from the demo
+3:52 Close
+```
+
+Settings: Unlisted · not made for kids · comments off · no end-screen promos. Keep the
+video in the same Google account you use for the Partner Dashboard so the link stays yours.
 
 **Screencast:** `mannon-walkthrough.mp4` (1920×1080, 4:00, cut to the script's timing
 table; ends on the demo hub, the live buyer demo, and the resulting Shopify draft order). Same wording as the
