@@ -29,8 +29,8 @@ export default function DemoHub() {
           <span className="demo-card-kicker">Live · buyer side</span>
           <h2 id="buyer-demo-h">Open the buyer portal</h2>
           <p>
-            You become a sample buyer on our demo store, with a quote waiting for your
-            approval and past orders ready to reorder.
+            You become a sample buyer on our demo store, with a countered quote waiting
+            for your approval and a reorder card built from a real order.
           </p>
           <ul>
             <li>Accept a countered quote — it becomes a real Shopify draft order</li>

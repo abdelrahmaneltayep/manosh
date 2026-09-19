@@ -78,7 +78,7 @@ export default function App() {
           </a>
           <span className={styles.demoHint}>
             {buyerLive
-              ? "A live buyer portal on our demo store, plus a guided tour of the merchant side. No install, no sign-up."
+              ? "A live buyer portal on our demo store — a countered quote and a reorder card from a real order — plus a guided tour of the merchant side. No install, no sign-up."
               : "A guided tour of the merchant side, screen by screen. No install, no sign-up."}
           </span>
         </p>
@@ -142,7 +142,8 @@ export default function App() {
               <strong>Open the buyer portal</strong>
               <span className={styles.cardText}>
                 Be a sample buyer on our demo store: accept a countered quote,
-                request a new one, reorder in one tap, paste an order.
+                reorder a real past order in one tap, request a new quote, paste
+                an order.
               </span>
               {buyerLive ? (
                 <a className={styles.demoCardBtn} href="/demo/buyer">
