@@ -45,7 +45,7 @@ Buyers get a passwordless portal and one-tap reorder. Try the live demo before y
 ## Features  (5 × ≤ 80 characters)
 
 ```
-Quote requests & counter-offers with a clear, trackable status trail
+Quote requests & counters — accepting turns the quote into a Shopify draft order
 Draft with Claude: it drafts counters, replies & carts, you send
 Passwordless buyer portal — no account, no password to accept or reorder
 One-tap reorder of anything a buyer has purchased before
@@ -66,10 +66,10 @@ B2B quotes and counters with Claude, plus one-tap reorder
 Mannon — AI B2B Quotes, Net Terms & Reorder for Shopify
 ```
 
-**Meta description** (≤ 160 · 143/160)
+**Meta description** (≤ 160 · 159/160)
 
 ```
-The B2B buying workflow your store is missing: branded quotes, Claude-drafted counters, net terms and one-tap reorder. Try the live demo first.
+The B2B workflow your store is missing: quotes, Claude-drafted counters, net terms, one-tap reorder. Accepted quotes become Shopify draft orders. Try the demo.
 ```
 
 ## Categories, search terms, languages
