@@ -196,18 +196,18 @@ STEPS
 5. Open the buyer view via the magic link shown after sending — no login required. Click Accept; you must confirm on a dialog before anything is written.
 6. On confirm, the quote becomes a real Shopify draft order (see Orders > Drafts, source "Mannon").
 7. Quote forms > AI Order Pad: paste "20x <SKU>, 5x <SKU>" — Claude matches the lines; nothing is ordered until you click Confirm & build cart.
-8. Analytics: view the ✦ Claude insights (win-rate, credit-risk, buyer summary) — all advisory, shown on screen only.
+8. Analytics: view the ✦ Claude insights (win-rate, credit-risk, buyer summary) — advisory, on screen only.
 9. Reorder: from a past order, use one-tap reorder to clone it into a fresh draft, re-priced by Shopify.
 10. Pricing plans: click Choose plan. Shopify's plan-selection page opens (managed pricing); pick a plan and approve. You return to the embedded app with the plan active.
-11. Storefront: on the online store, open a product page with the "Request a Quote" block and submit the form — it confirms in place and the request appears under Quotes > Requests.
+11. Storefront: open a product page with the "Request a Quote" block and submit — it confirms in place and the request appears under Quotes > Requests.
 12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a quote marked Countered.
-13. Open that quote and click Accept & create order. The quote flips to Ordered, and a draft order with PO number PO-DEMO-1042 appears under Orders > Drafts on the demo store, with tax and total calculated by Shopify. Start the tour on the same page shows the merchant screens with sample data.
+13. Open that quote and click Accept & create order. It flips to Ordered and a draft order (PO PO-DEMO-1042, tax and total from Shopify) appears under Orders > Drafts on the demo store. Start the tour shows the merchant screens with sample data.
 
 NOTES
 - AI is human-in-the-loop: temperature 0, every AI output lands on a confirm screen, and every AI-returned product id is validated against the live catalog. Claude never writes a quote, cart, or order on its own.
-- ✦ Draft with Claude and Claude insights are included on Growth and Scale (and a one-time trial). If you don't see the ✦ controls, select the Growth plan to enable them.
+- ✦ Draft with Claude and Claude insights are on Growth and Scale (and a one-time trial). If you don't see the ✦ controls, select the Growth plan.
 - Pricing (managed by Shopify App Pricing): Free $0, Starter $9, Growth $29, Scale $69 per month; 14-day trial on paid plans. No per-order charges.
-- GDPR webhooks (customers/data_request, customers/redact, shop/redact) and app/uninstalled are implemented and HMAC-verified; bad signatures are rejected with 401.
+- GDPR webhooks (customers/data_request, customers/redact, shop/redact) and app/uninstalled are HMAC-verified; bad signatures get 401.
 - Privacy policy: https://manosh.fly.dev/privacy
 ```
 
