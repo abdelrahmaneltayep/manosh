@@ -168,7 +168,7 @@ Generated from `shots.html`; no pricing and no outcome claims in any frame.
 | 4 | `04-buyer-accept.png` | Buyers accept quotes with no login. | Passwordless · one tap to accept |
 | 5 | `05-ai-order-pad.png` | Paste any list. Get a ready cart. | AI drafts · you confirm every time |
 | 6 | `06-draft-with-claude.png` | Claude drafts the reply. You send it. | Claude drafts · you confirm every time |
-| 7 | `07-reorder.png` | Reorder a past order in one tap. | One tap · re-priced live by Shopify |
+| 7 | `07-reorder.png` | Reorder a past order in one tap. (the buyer portal's Reorder a past order cards — order number, date and total as Shopify reports them — plus a Countered quote) | One tap · re-priced live by Shopify |
 | 8 | `08-try-the-demo.png` | See the whole workflow. No install, no sign-up. (the landing page's Try before you install strip: live buyer portal + merchant tour) | Try the demo · manosh.fly.dev |
 | 9 | `09-draft-order.png` | Accept becomes a real Shopify draft order. (Shopify admin, Orders → Drafts: #D205, PO-DEMO-1042, Net 30, tax and total from Shopify) | Priced by Shopify · a real draft order |
 
