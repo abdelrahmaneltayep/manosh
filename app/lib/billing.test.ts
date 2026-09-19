@@ -4,9 +4,27 @@ import {
   PLAN_LIMITS,
   getPlanLimits,
   evaluateQuoteAllowance,
+  isPaidPlan,
+  quoteCaptureAllowed,
   STARTER_PLAN,
   GROWTH_PLAN,
 } from "./billing";
+
+describe("isPaidPlan (pure)", () => {
+  it("treats Starter, Growth and Scale as paid — enum or display name", () => {
+    for (const p of ["STARTER", "GROWTH", "SCALE", STARTER_PLAN, GROWTH_PLAN, "Scale"]) {
+      expect(isPaidPlan(p)).toBe(true);
+      expect(quoteCaptureAllowed(p)).toBe(true);
+    }
+  });
+
+  it("treats trial, free, cancelled, unknown and missing plans as unpaid", () => {
+    for (const p of ["TRIAL", "FREE", "CANCELLED", "starter", "", null, undefined]) {
+      expect(isPaidPlan(p)).toBe(false);
+      expect(quoteCaptureAllowed(p)).toBe(false);
+    }
+  });
+});
 
 describe("plan limits (pure)", () => {
   it("no feature is locked behind Growth", () => {

@@ -4,6 +4,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { listQuotesForBuyer, resolveCustomerEmail } from "../services/account-quotes.server";
 import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
+import { isPaidPlan } from "../lib/billing";
 import { captureException } from "../lib/sentry.server";
 
 /**
@@ -11,7 +12,7 @@ import { captureException } from "../lib/sentry.server";
  * Account UI extension). Authenticated via the customer-account session token
  * (`authenticate.public.customerAccount`), which proves a logged-in customer of
  * this shop and supplies the CORS wrapper for the extension origin. Gated to a
- * paid plan (Starter+). Read-only — the extension deep-links to the magic-link
+ * paid plan (Starter, Growth or Scale — `isPaidPlan`). Read-only — the extension deep-links to the magic-link
  * portal for anything that acts.
  *
  * Identity is taken ONLY from the verified token's subject (the Customer GID),
@@ -29,8 +30,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   try {
     const shop = shopDomain ? await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { plan: true } }) : null;
-    const paid = shop?.plan === "STARTER" || shop?.plan === "GROWTH";
-    if (!QUOTE_OPS_ENABLED() || !shop || !paid || !sub) {
+    // Any paid tier (Starter, Growth, Scale). Trial/Free/Cancelled → nothing renders.
+    if (!QUOTE_OPS_ENABLED() || !shop || !isPaidPlan(shop.plan) || !sub) {
       return cors(json({ quotes: [], portalBase, enabled: false }));
     }
 

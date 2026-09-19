@@ -359,9 +359,29 @@ export function quoteFormFeatures(plan: string | null | undefined): QuoteFormFea
   return { basicBuilder: true, conditionalLogic: isGrowth, multipleForms: isGrowth, multiLanguage: isGrowth };
 }
 
+/**
+ * Is this plan a paid one (Starter, Growth or Scale)? Accepts the Prisma `Plan`
+ * enum ("STARTER"/"GROWTH"/"SCALE") or a display name ("Starter"/"Growth"/"Scale").
+ * Trial, Free, Cancelled, unknown and null are all unpaid. Pure — the single
+ * "any paid plan" gate, so a new tier is never silently locked out.
+ */
+export function isPaidPlan(plan: string | null | undefined): boolean {
+  switch (plan) {
+    case "STARTER":
+    case STARTER_PLAN:
+    case "GROWTH":
+    case GROWTH_PLAN:
+    case "SCALE":
+    case "Scale":
+      return true;
+    default:
+      return false;
+  }
+}
+
 /** F24.3 — Add-to-Quote drawer + cart→quote are a paid feature (Starter+). Pure. */
 export function quoteCaptureAllowed(plan: string | null | undefined): boolean {
-  return plan === "STARTER" || plan === STARTER_PLAN || plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isPaidPlan(plan);
 }
 
 /** F25.3 — bulk CSV import is a Growth feature. Pure. */
