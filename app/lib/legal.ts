@@ -9,7 +9,7 @@ export interface LegalSection {
   body: string[];
 }
 
-export const PRIVACY_LAST_UPDATED = "2026-07-20";
+export const PRIVACY_LAST_UPDATED = "2026-09-19";
 export const SUPPORT_EMAIL = "support@mannon.app";
 
 export const PRIVACY_SECTIONS: LegalSection[] = [
@@ -28,6 +28,8 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
       "• B2B companies and locations (read) — to attach quotes and orders to the right account.",
       "• Payment terms (read) — to display and attach your existing terms to an order.",
       "• Draft orders (read and write) — to create the priced draft order when a quote is accepted.",
+      "• Product costs (read) — so the AI Quote Assistant can show you a margin read on a counter-offer. Costs are never shown to buyers.",
+      "• Customers (read and write) — to find the matching customer when you approve a wholesale application and add a single \"b2b-approved\" tag. Mannon never edits customer details.",
       "Shopify calculates every total, tax, and discount. Mannon never computes money itself — it only stores a snapshot of what Shopify returns.",
     ],
   },
@@ -37,7 +39,10 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
       "• Your store domain and app settings (quote expiry, reorder tolerance).",
       "• Companies and buyers, including a buyer's name and email, so they can sign in to the buyer portal.",
       "• Quotes, their line items, and the totals snapshot Shopify returned.",
+      "• Quote requests submitted through the storefront \"Request a Quote\" form (name, email, and the items asked about), and wholesale applications, so you can reply to them.",
+      "• When a buyer opens their quotes inside their Shopify customer account, Mannon identifies them only from Shopify's signed session token — nothing the browser sends is trusted.",
       "• An append-only activity log used for your dashboard and product analytics. These records contain only ids and numbers — never buyer names, emails, or other personal details.",
+      "• The public demo on our website creates temporary sample buyers on our own demo store with non-deliverable addresses. They hold no personal data and are deleted automatically after seven days.",
       "Buyer sign-in links are passwordless and single-use. We store only a hashed form of each link token, never the raw token.",
     ],
   },

@@ -3,38 +3,43 @@
 Surfaces the buyer's Mannon quotes + reorder **natively** inside Shopify's new
 customer account. Read-only; deep-links to the magic-link portal for actions.
 
+Built on **API 2026-07** with **Preact + Polaris web components** (`s-section`,
+`s-stack`, `s-text`, `s-badge`, `s-button`, `s-banner`, `s-spinner`). API 2025-07 was
+the last version to support the React component set, so this extension no longer
+uses `@shopify/ui-extensions-react`.
+
 ## How it works
 
 1. The block renders on `customer-account.order-index.block.render` (the account home).
-2. It reads the logged-in buyer (`authenticatedAccount.customer`) and signs a request
-   with the customer-account **session token**.
-3. It calls the Mannon backend `GET {APP_URL}/api/account/quotes?email=<buyer>` with
+2. It gets the customer-account **session token** via `useSessionToken()` from
+   `@shopify/ui-extensions/customer-account/preact`.
+3. It calls the Mannon backend `GET {APP_URL}/api/account/quotes` with
    `Authorization: Bearer <token>`. The backend authenticates the token via
-   `authenticate.public.customerAccount`, gates to a paid plan (Starter+), and
-   returns the buyer's quotes + the portal base URL.
+   `authenticate.public.customerAccount`, resolves the buyer **from the token's
+   subject** (nothing client-supplied is trusted), gates to a paid plan, and returns
+   the buyer's quotes + the portal base URL.
 4. Each quote shows status + an estimated total, with a **Reorder** (ordered quotes)
    or **Request similar** button that deep-links to the portal.
 
-## Build / verify (outside the app's Vite pipeline)
+## Build / verify
 
-This extension builds with the Shopify CLI, not the app's `tsc`/Vite (it's excluded
-from the root `tsconfig`). To run it:
+The Shopify CLI bundles this extension (it's excluded from the app's root `tsconfig`).
 
 ```sh
-# from the repo root
-shopify app dev            # serves the extension against your dev store
+# type-check against the exact web-component types for this target
+cd extensions/customer-account-quotes && npm install && npm run typecheck
+
+# run against the dev store
+shopify app dev
+
+# release a new app version that includes the extension
+npm run deploy
 ```
 
 Then, on the dev store's **new customer account** (Settings → Customer accounts →
 "New customer accounts"), open a logged-in buyer's account home and confirm the
 "Your quotes" block lists their quotes with the right status + buttons.
 
-Set `APP_URL` in `src/QuotesBlock.tsx` to your deployed app host, and confirm the
-exact `@shopify/ui-extensions-react/customer-account` component prop names against
-the version the CLI installs.
-
-## Hardening TODO
-
-The backend currently scopes by the `email` query param. Before GA, cross-check that
-email against the token's customer identity (the token proves *a* logged-in customer
-of the shop; the extra check proves it's *this* buyer's email).
+`APP_URL` in `src/QuotesBlock.tsx` must be the deployed app host. The extension's
+`network_access` capability needs approval in the Partner Dashboard before the
+fetch is allowed on a live store.

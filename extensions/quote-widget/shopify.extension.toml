@@ -7,7 +7,7 @@
 #   F21  Make an Offer        (make_offer_button.liquid)
 # Merchants add each block from the theme editor (Online Store → Customize) on any
 # product or cart section — no theme code editing.
-api_version = "2025-01"
+api_version = "2026-07"
 
 [[extensions]]
 name = "Mannon"

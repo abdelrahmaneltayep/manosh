@@ -275,6 +275,10 @@ NOTES
       required before resubmitting.
 - [ ] App Pricing plans created with handles `free` / `starter` / `growth` / `scale`
       and the prices above; `SHOPIFY_APP_HANDLE` set if the handle isn't `mannon`.
+- [ ] Release the extension update: run `npm run deploy` from the repo root so the
+      new app version carries the customer-account extension on API 2026-07 (Preact +
+      Polaris web components) and the theme extension on 2026-07. Versions on
+      2025-07 or older are retired and block submission.
 - [ ] Network access approved for the `customer-account-quotes` extension.
 - [ ] Support email filled in and monitored; privacy URL returns a page after deploy.
 - [ ] Screenshots replaced with the 7-slide set (or 6); icon uploaded at 1200×1200.
