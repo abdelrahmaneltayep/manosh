@@ -181,7 +181,8 @@ buyer accept (#4). Shopify's guidance is 3–6 screenshots; if trimming to 6, dr
 **Screencast:** `mannon-walkthrough.mp4` (1920×1080, ~3:25; ends on the demo hub,
 the live buyer demo, and the resulting Shopify draft order). Same wording as the
 screenshots: no pricing, reorder is "re-priced live by Shopify", and the feature tour
-closes on the native-B2B line. Script in `mannon-screencast-script.md`.
+closes on the native-B2B line, the demo, and the resulting draft order. Script in
+`mannon-screencast-script.md` (16 scenes, 4:00).
 
 ---
 
