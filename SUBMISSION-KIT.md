@@ -275,12 +275,14 @@ NOTES
       required before resubmitting.
 - [ ] App Pricing plans created with handles `free` / `starter` / `growth` / `scale`
       and the prices above; `SHOPIFY_APP_HANDLE` set if the handle isn't `mannon`.
-- [ ] Release the extension update: run `npm run deploy` from the repo root so the
-      new app version carries the customer-account extension on API 2026-07 (Preact +
-      Polaris web components) and the theme extension on 2026-07. Versions on
-      2025-07 or older are retired and block submission.
-- [ ] Network access approved for the `customer-account-quotes` extension.
+- [x] Release the extension update: `npm run deploy` released the app version carrying
+      the customer-account extension on API 2026-07 (Preact + Polaris web components)
+      and the theme extension on 2026-07. Verified 2026-09-19: the "Your quotes" block
+      renders on the dev store's new customer account.
+- [ ] Network access approved for the `customer-account-quotes` extension (works on
+      the dev store without it; production stores need the approval).
 - [ ] Support email filled in and monitored; privacy URL returns a page after deploy.
-- [ ] Screenshots replaced with the 7-slide set (or 6); icon uploaded at 1200×1200.
+- [ ] Screenshots replaced with the 9-slide set in the upload order above; icon
+      uploaded at 1200×1200.
 - [ ] Languages = admin UI languages only; "Merchant must have online store" selected.
-- [ ] Dev-store click-through of steps 1–11 on the deployed build.
+- [ ] Dev-store click-through of steps 1–13 on the deployed build.
