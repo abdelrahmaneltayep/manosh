@@ -228,10 +228,10 @@ closes on the native-B2B line, the demo, and the resulting draft order. Script i
 ## Testing instructions for the reviewer  (≤ 2800 characters)
 
 ```
-Test store: a demo company and buyer are seeded on install, so you can create a quote immediately. Works on any plan, no Plus needed. Shopify's native B2B (companies) is enabled on the test store.
+A demo company and buyer are seeded on install, so you can create a quote immediately. Works on any plan, no Plus needed. Native B2B (companies) is on for the test store.
 
 STEPS
-1. Install the app on the test store. Open it and click every left-nav section (Home, Quotes, Quote forms, Pricing & catalog, Buyers, Analytics, Settings, Pricing plans) — each loads a page.
+1. Install the app on the test store. Open it and click each left-nav section (Home through Pricing plans) — every page loads.
 2. Quotes > New quote: add 2–3 products, set quantities.
 3. Click "✦ Draft with Claude". Claude drafts a counter-offer. Review it and click Apply — the AI only pre-fills; it never sends on its own.
 4. Pick a payment term (e.g. Net 30) and Send. Prices, tax and totals come from a Shopify draft order — the app never recomputes them.
@@ -239,14 +239,15 @@ STEPS
 6. On confirm, the quote becomes a real Shopify draft order (see Orders > Drafts, source "Mannon").
 7. Quote forms > AI Order Pad: paste "20x <SKU>, 5x <SKU>" — Claude matches the lines; nothing is ordered until you click Confirm & build cart.
 8. Analytics: view the ✦ Claude insights (win-rate, credit-risk, buyer summary) — advisory, on screen only.
-9. Reorder: from a past order, use one-tap reorder to clone it into a fresh draft, re-priced by Shopify.
-10. Pricing plans: click Choose plan. Shopify's plan-selection page opens (managed pricing); pick a plan and approve. You return to the embedded app with the plan active.
+9. Reorder: one-tap reorder clones a past order into a fresh draft, re-priced by Shopify.
+10. Pricing plans: click Choose plan. Shopify's plan page opens (managed pricing); pick a plan and approve. You return with the plan active.
 11. Storefront: open a product page with the "Request a Quote" block and submit — it confirms in place and the request appears under Quotes > Requests.
-12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a quote marked Countered.
-13. Open that quote and click Accept & create order. It flips to Ordered and a draft order (PO PO-DEMO-1042, tax and total from Shopify) appears under Orders > Drafts on the demo store. Start the tour shows the merchant screens with sample data.
+12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a Countered quote and a reorder card from a real past order.
+13. Open that quote and click Accept & create order. It flips to Ordered and a draft order (PO PO-DEMO-1042, tax and total from Shopify) appears under Orders > Drafts on the demo store.
+14. Click Reorder on the card. Shopify re-prices it; within tolerance it becomes a draft order, otherwise it goes to the Quote Inbox. Start the tour walks the merchant screens.
 
 NOTES
-- AI is human-in-the-loop: temperature 0, every AI output lands on a confirm screen, and every AI-returned product id is validated against the live catalog. Claude never writes a quote, cart, or order on its own.
+- AI is human-in-the-loop: temperature 0, every output lands on a confirm screen, every returned product id is checked against the live catalog. Claude never writes a quote, cart or order on its own.
 - ✦ Draft with Claude and Claude insights are on Growth and Scale (and a one-time trial). If you don't see the ✦ controls, select the Growth plan.
 - Pricing (managed by Shopify App Pricing): Free $0, Starter $9, Growth $29, Scale $69 per month; 14-day trial on paid plans. No per-order charges.
 - GDPR webhooks (customers/data_request, customers/redact, shop/redact) and app/uninstalled are HMAC-verified; bad signatures get 401.
@@ -285,4 +286,4 @@ NOTES
 - [ ] Screenshots replaced with the 9-slide set in the upload order above; icon
       uploaded at 1200×1200.
 - [ ] Languages = admin UI languages only; "Merchant must have online store" selected.
-- [ ] Dev-store click-through of steps 1–13 on the deployed build.
+- [ ] Dev-store click-through of steps 1–14 on the deployed build.
