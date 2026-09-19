@@ -33,13 +33,13 @@ Quote, counter with Claude, and reorder in one tap. The B2B buying workflow your
 ## App details  (≤ 500 characters · plain text, no formatting, no links)
 
 ```
-Mannon gives your wholesale and B2B buyers a real buying workflow, not just a cart.
+Mannon gives your B2B buyers a real buying workflow, not just a cart.
 
 Buyers request a quote, you counter, they approve, and it becomes a native Shopify draft order. Built on Shopify's native B2B, so every price, tax and total comes from Shopify.
 
 Claude drafts counters, replies and order carts, and flags win rates and credit risk. You review and send; it never acts on its own.
 
-Buyers get a passwordless portal and one-tap reorder. Try the live demo before you install.
+Buyers get a passwordless portal where every past order is a one-tap reorder card. Try the live demo first.
 ```
 
 ## Features  (5 × ≤ 80 characters)
@@ -48,7 +48,7 @@ Buyers get a passwordless portal and one-tap reorder. Try the live demo before y
 Quote requests & counters — accepting turns the quote into a Shopify draft order
 Draft with Claude: it drafts counters, replies & carts, you send
 Passwordless buyer portal — no account, no password to accept or reorder
-One-tap reorder of anything a buyer has purchased before
+Every past order becomes a one-tap reorder card in the buyer's portal
 Native Shopify draft orders — Shopify handles prices, tax, totals & terms
 ```
 
@@ -194,7 +194,7 @@ Mannon for Shopify — B2B quotes, Draft with Claude, one-tap reorder (4-minute 
 ```
 Mannon is a B2B wholesale quoting and reorder app for Shopify. Buyers request a quote, you counter (with ✦ Draft with Claude — you review and send), they accept from a passwordless portal, and it becomes a real Shopify draft order. Built on Shopify's native B2B — every price comes from Shopify.
 
-Try the demo, no install, no sign-up: https://manosh.fly.dev/demo
+Try the demo, no install, no sign-up: https://manosh.fly.dev/demo — accept a countered quote, or reorder a real past order in one tap.
 
 0:00 Landing
 0:16 Embedded in Shopify Admin
@@ -218,8 +218,10 @@ Settings: Unlisted · not made for kids · comments off · no end-screen promos.
 video in the same Google account you use for the Partner Dashboard so the link stays yours.
 
 **Screencast:** `mannon-walkthrough.mp4` (1920×1080, 4:00, cut to the script's timing
-table; ends on the demo hub, the live buyer demo, and the resulting Shopify draft order). Same wording as the
-screenshots: no pricing, reorder is "re-priced live by Shopify", and the feature tour
+table; ends on the demo hub, the live buyer demo with its Countered quote and a reorder card
+from a real order, and the resulting Shopify draft order). Same wording as the
+screenshots: no pricing, reorder cards read "order number · date · total" exactly as the
+portal renders them and reorder is "re-priced live by Shopify", and the feature tour
 closes on the native-B2B line, the demo, and the resulting draft order. Script in
 `mannon-screencast-script.md` (16 scenes, 4:00).
 
