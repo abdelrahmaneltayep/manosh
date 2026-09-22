@@ -8,6 +8,7 @@ api_version = "2026-07"
 type = "ui_extension"
 name = "Mannon — Your quotes"
 handle = "customer-account-quotes"
+uid = "ef8ebba0-2163-45a6-8b7c-c0f2fafc939662f1d797"
 
   # Render as a block on the customer-account order index (the account home).
   [[extensions.targeting]]
