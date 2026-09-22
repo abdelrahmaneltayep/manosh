@@ -8,6 +8,9 @@ node_modules
 
 # Shopify CLI
 .shopify
+# Generated per extension by `shopify app deploy` / `shopify app dev`
+extensions/*/dist/
+extensions/*/shopify.d.ts
 
 # Prisma local artifacts
 prisma/dev.sqlite
