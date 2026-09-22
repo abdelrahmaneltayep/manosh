@@ -11,6 +11,7 @@ node_modules
 # Generated per extension by `shopify app deploy` / `shopify app dev`
 extensions/*/dist/
 extensions/*/shopify.d.ts
+extensions/*/manifest.json
 
 # Prisma local artifacts
 prisma/dev.sqlite
