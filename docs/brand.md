@@ -204,14 +204,77 @@ Reusable lines:
 
 ## 8. Motion and media
 
-- Transitions 150–250ms ease on hover and focus; nothing bounces.
-- Screencast: 1920×1080 30fps, 0.4–0.5s cross-fades, 2% slow zoom per scene, dark rounded lower-third captions, indigo click ripple, soft pad music around −22 LUFS under voice.
+- UI transitions 150–250ms ease on hover and focus; nothing bounces.
 - Screenshots: 1600×900 exported at 2× (3200×1800), one feature per slide, mark top-left, pill footer with a colored dot and the slide number, no pricing, no browser chrome from a real browser.
 - Photos and illustrations: none. The product UI is the imagery.
 
 ---
 
-## 9. Naming things in a new app
+## 9. Video: motion graphics and voice-over
+
+Every Mannon video (App Store walkthrough, feature clips, social cutdowns) is a **narrated screen
+walkthrough with light motion graphics**, never a talking head and never stock footage. The product
+UI is the star; motion exists to guide the eye.
+
+### Format
+
+| Item | Value |
+|---|---|
+| Frame | 1920×1080, 30fps, H.264 (crf 22–24), AAC 128k, faststart |
+| Length | Walkthrough 4:00 max; feature clip 0:45–1:30; teaser 0:30 |
+| Delivery | Unlisted YouTube link for the listing; mp4 under 30 MB for sharing |
+| Language | English narration; Arabic version gets Arabic VO and RTL UI, same cut |
+
+### Structure (the walkthrough template)
+
+1. **Cold open** on the landing page with the one-liner (≈16s).
+2. **Embedded in Shopify admin**: loading state, then the seven-section nav (≈14s).
+3. **Core loop**, one scene per step: dashboard → quote inbox → new quote priced by Shopify → ✦ Draft with Claude → send with terms → buyer portal + accept → real draft order → one-tap reorder → AI Order Pad → Claude insights.
+4. **Beyond the core loop** montage (≈18s).
+5. **Try the demo**: hub, then the live buyer portal (≈13s), then the draft order it creates (≈8s).
+6. **Close** on the logo card: *Quote → Accept → Reorder, on native Shopify draft orders* and *✦ Claude drafts · you stay in control* (≈8s).
+
+Every scene gets a fixed slot in a timing table; the table is the source of truth and the narration
+is paced to fit it. Cutdowns reuse the same scenes: 2:00 = open, new quote, Claude, portal, draft
+order, reorder, demo, close; 0:30 = open (5s), Claude (9s), accept (7s), reorder (4s), close (5s).
+
+### Motion graphics
+
+- **Scene changes**: 0.4–0.5s cross-fade. No wipes, slides or 3D flips.
+- **Ken Burns**: each scene scales from 100% to 102% over its slot, transform-origin center. Nothing else moves the frame.
+- **Cursor**: a soft black pointer that eases toward each target (lerp ≈ 8% per frame, never snaps). One target per scene, positioned on the control the narration names.
+- **Click ripple**: indigo `--indigo` circle at 35% opacity, 60px, expanding to 120px and fading over 650ms, fired at the moment the VO says the action.
+- **Captions**: lower-third pill, ink background `#1c1d2b`, white text, weight 800, 28px, radius 14px, padding 18×32, centered, bottom 60px. Fade and 8px rise over 250ms on entry. One line at a time, maximum two captions per scene, swapped at 52% of the slot. Sentence case with a full stop.
+- **Progress bar**: 8px `--indigo-2` bar along the bottom edge that fills left to right over the total runtime.
+- **Reveals inside a scene** (a Claude draft appearing, a toast, a status flipping to Sent or Ordered): opacity 0→1 with an 8px rise over 250ms, timed to the VO. No typewriter effects, no confetti.
+- **Mock chrome**: a dark browser bar with three dots, a lock and the URL for portal scenes; the real Shopify admin frame (dark top bar, left nav) for admin scenes; an "Incognito" tag on buyer scenes to signal no login.
+- **Logo card** (open and close): brand `--bg`, mark + wordmark centered, indigo accent phrase, 2% zoom like every other scene.
+
+### Voice-over
+
+- **Voice**: one male narrator, mid-register, calm and warm, the "product owner walking you through it" register, never a salesy announcer. Synthetic or recorded, the same voice across all Mannon videos so clips feel like one series.
+- **Pace**: target 155–160 words per minute; never exceed 215 even when a slot is tight. Each scene's VO must end at least 0.6s before its slot does. If it does not fit, cut words, not the pause.
+- **Delivery**: short declarative sentences, a beat before the guardrail line. The Claude rule is spoken every time Claude appears: *Claude drafts, but you review and send. It never acts on its own.*
+- **Wording**: the same vocabulary as the UI. Say "Shopify draft order", "net thirty", "one-tap reorder". Spell out URLs as "manosh dot fly dot dev". Read numbers as words when under ten.
+- **Never say**: prices, plan names, statistics, competitor names, "best", "only", "guaranteed".
+- **Script format**: per scene, *On screen* (what the viewer sees, including exact UI text), *VO* (the spoken line in quotes), *Caption A / B*. A voice-only section at the end for talent or TTS. Keep the total near 650 words for 4:00.
+
+### Audio mix
+
+- VO at −16 LUFS integrated, peaks under −1 dBTP.
+- Music: a soft synth pad cycling four warm chords every 8s, low-passed, sitting around −22 LUFS under the voice, no drums, no melody. It ducks nothing because it is already quiet.
+- No sound effects except the click ripple's silence. No whoosh on transitions.
+
+### Publishing
+
+- Title pattern: *Mannon for Shopify — B2B quotes, Draft with Claude, one-tap reorder (4-minute walkthrough)*.
+- Description opens with the one-liner and the native-B2B line, then the demo link, then chapter timestamps that match the timing table.
+- YouTube settings: Unlisted, not made for kids, comments off, no end-screen promos, uploaded from the same Google account as the Partner Dashboard.
+- Thumbnail: the close logo card, no text overlay.
+
+---
+
+## 10. Naming things in a new app
 
 - Package and repo names stay lowercase and short (`manosh` pattern). Customer-facing name gets the capital.
 - Feature names are plain nouns: Quote inbox, Order pad, Reorder cards, Price lists. No trademarks, no "Pro"/"AI" suffixes.
@@ -219,7 +282,7 @@ Reusable lines:
 
 ---
 
-## 10. Checklist for a new surface
+## 11. Checklist for a new surface
 
 - [ ] Mark + wordmark top-left, dot present, clear space respected.
 - [ ] `:root` tokens pasted, no hard-coded hex outside this file's list.
@@ -229,3 +292,4 @@ Reusable lines:
 - [ ] Copy in sentence case, Claude rule present wherever Claude is, money attributed to Shopify.
 - [ ] Focus rings visible, AA contrast, keyboard reachable, RTL checked if Arabic is offered.
 - [ ] Admin screens: Polaris only.
+- [ ] Video: male narrator at 155–160 wpm, VO ends 0.6s before each slot, cross-fades only, ink caption pills, indigo ripple, no prices or claims spoken.
