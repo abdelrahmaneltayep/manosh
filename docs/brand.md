@@ -1,200 +1,231 @@
-# Mannon — Brand Kit
+# Mannon brand guide
 
-> Portable brand reference for the **Mannon** product family. Paste this into a new
-> session when building an app, page, or asset that should look and sound like Mannon.
-> Last updated 2026-09.
+Portable branding for Mannon and any sibling app. Everything here is lifted from the shipped
+surfaces (landing page, buyer portal, public demo, App Store slides and screencast), so a new app
+that follows this file will look like it came from the same family.
 
-**What Mannon is:** a B2B wholesale **quoting + reorder** app for Shopify. The story is always
-**Quote → counter (with Claude) → accept → native Shopify draft order → reorder.** Mannon rides
-Shopify's native B2B (companies, catalogs, payment terms) and prices on draft orders — it never
-rebuilds tax, totals, or checkout.
-
-**One-liner:** *B2B quotes and counters with Claude, plus one-tap reorder.*
-**Tagline:** *Wholesale quoting, without the email grind.*   **Pill:** *B2B wholesale, done right.*
+Scope rule first: **inside the Shopify admin we use Polaris and nothing else.** The Mannon brand
+lives on the surfaces we own: landing page, buyer portal, demo hub, emails, listing assets. The
+embedded admin app carries only the app name and icon.
 
 ---
 
-## 1. Logo & wordmark
+## 1. Identity
 
-- **Mark:** a bold indigo **`M`** with a small **lime dot** at its lower-right → reads as `M●`.
-- **Wordmark:** **`mannon`**, all lowercase, in ink. Lockup: `M●  mannon`.
-- The dot is the one flourish — keep it lime, small, and bottom-right of the M.
-- **Do not** use a "Built for Shopify" badge in Mannon's own marketing (removed on purpose).
-- Favicon/emoji stand-in when needed: a simple `M` tile on indigo.
+| Item | Value |
+|---|---|
+| Name | **Mannon** (always capital M, never "MANNON" or "mannon" in prose; the wordmark is lowercase) |
+| Repo / host | `manosh` · `manosh.fly.dev` (infrastructure names, never customer-facing) |
+| One-liner | Quote, counter with Claude, and reorder in one tap. The B2B buying workflow your store is missing. |
+| Card subtitle | B2B quotes and counters with Claude, plus one-tap reorder |
+| Listing name | Mannon — B2B Quotes & Reorders |
+| Recurring line | Built on Shopify's native B2B — every price comes from Shopify. |
+| Portal tag | Wholesale portal · بوابة الجملة · Portail de gros |
+
+The recurring line appears once on every marketing surface (landing accent, last slide, screencast
+close, App details). It is the trust promise: we never compute money.
+
+---
+
+## 2. Logo
+
+### Wordmark
+
+Lowercase **mannon** in the system sans at weight 800, letter-spacing −0.02em, preceded by the
+mark. The mark is a capital **M** in indigo, weight 900, with a lime dot tucked at its bottom right.
+The dot is the brand's signature; never drop it, never recolor it.
 
 ```html
-<span class="mannon-logo">
-  <span class="mark">M<i class="dot"></i></span><span class="word">mannon</span>
-</span>
-<style>
-.mannon-logo{display:inline-flex;align-items:center;gap:.6rem;font-weight:800;
-  font-size:1.9rem;letter-spacing:-.02em;color:var(--ink)}
-.mannon-logo .mark{position:relative;color:var(--indigo);font-weight:900;font-size:2.1rem;line-height:1}
-.mannon-logo .mark .dot{position:absolute;right:-.5rem;bottom:.15rem;width:.5rem;height:.5rem;
-  border-radius:50%;background:var(--lime)}
-</style>
+<span class="brand"><span class="mark">M<span class="dot"></span></span>mannon</span>
 ```
+
+```css
+.brand { display:inline-flex; align-items:center; gap:.45em; font-weight:800; letter-spacing:-.02em; color:var(--ink); }
+.mark  { position:relative; color:var(--indigo); font-weight:900; font-size:1.2em; line-height:1; }
+.dot   { position:absolute; right:-.3em; bottom:.06em; width:.3em; height:.3em; border-radius:50%; background:var(--lime); }
+```
+
+Sizes in use: landing 1.9rem wordmark / 2.1rem mark; portal 1.2rem / 1.45rem; header bars 22px / 26px.
+
+### App icon (1200 × 1200)
+
+Rounded square (radius ≈ 18%) on a soft diagonal gradient from lavender `#ecebff` (top left) to a
+warm off-white `#fbf3ec` (bottom right). Centered rounded-stroke **M** in the indigo gradient
+`#5b4bf0 → #4f46e5`, stroke ≈ 12% of the canvas with round caps and joins. Lime dot `#a3e635 →
+#84cc16` at the M's bottom-right foot, diameter ≈ 13% of the canvas, slightly overlapping the
+stroke. Source file: `public/mannon-app-icon-1200.png`. Favicon is the same mark at 32 px.
+
+Drop-in SVG of the mark (scales to any size):
+
+```svg
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mannon">
+  <defs>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5b4bf0"/><stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="lime" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#a3e635"/><stop offset="1" stop-color="#84cc16"/>
+    </linearGradient>
+  </defs>
+  <path d="M32 92V40l28 32 28-32v52" fill="none" stroke="url(#ink)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="92" cy="86" r="10" fill="url(#lime)"/>
+</svg>
+```
+
+Rules: minimum clear space equals the dot's diameter on all sides; never place the mark on
+indigo (use the white wordmark variant instead: mark white, dot lime); never add a shadow,
+outline or gradient to the wordmark text.
 
 ---
 
-## 2. Color
+## 3. Color
 
-Indigo is the primary; **lime is an accent only** (the dot, a card's top-border, a success/CTA) —
-never a large fill. Neutrals are cool, biased very slightly toward indigo.
+### Core tokens
 
 | Token | Hex | Use |
 |---|---|---|
-| `--indigo` | `#4f46e5` | primary: buttons, links, active nav, accent headline phrase |
-| `--indigo-deep` | `#3d33c7` | hover / pressed indigo |
-| `--indigo-soft` | `#eef0ff` | chips, icon tiles, soft backgrounds |
-| `--lime` | `#84cc16` | the logo dot, feature-card top border, buyer "Accept" CTA, success |
-| `--lime-soft` | `#eef6df` | success background |
-| `--ink` | `#1c1d2b` | primary text |
-| `--sub` | `#6b7280` | secondary text (cool grey) |
-| `--line` | `#eceded` | borders / dividers |
-| `--purple` | `#5b4bf0` | **buyer portal** header only (distinct from admin indigo) |
+| `--indigo` | `#4f46e5` | Primary actions, mark, links on dark, focus rings |
+| `--indigo-ink` | `#4338ca` | Links on light backgrounds, hover state of indigo |
+| `--indigo-2` | `#5b4bf0` | Gradient top, purple header bars in white-label demos |
+| `--lime` | `#84cc16` | The dot, success actions ("Accept quote"), confirmations |
+| `--ink` | `#1c1d2b` | Body text, headings |
+| `--sub` | `#5b5f6e` | Secondary text (landing uses `#6b7280`) |
+| `--line` | `#e6e6ef` | Borders, dividers, table rules |
+| `--bg` | `#f6f5ff` | Page background on brand surfaces (portal, demo) |
+| `--surface` | `#ffffff` | Cards |
+| `--chip` | `#eef0ff` | Tinted chips, Net-terms badges, selected states |
+| `--danger` | `#8e1f0b` | Error text |
 
-**Signature background:** soft diagonal wash `linear-gradient(135deg,#eef0ff 0%,#f6f4ff 55%,#eefbe9 100%)`
-with two low-alpha "blobs" (indigo `rgba(124,110,240,.10)` top-right, lime `rgba(132,204,22,.12)` bottom-left).
-For multi-screen sets, tint each screen differently but keep it pale: lavender `#f4f5fc`, pink `#fff1f6`,
-green `#f4faea`, amber `#fff6ec`, violet `#f2efff`.
+### Status pills
 
-**Semantic status chips** (text on tint):
-| State | Text | Bg |
+| Status | Background | Text |
 |---|---|---|
-| Submitted / Sent | `#2f6bd6` | `#eaf1ff` |
-| Countered | `#b7791f` | `#fff2dd` |
-| Accepted / Ordered | `#1f8a53` | `#e7f7ee` |
-| Expiring / Error | `#d64545` | `#fdeaea` |
+| New / Submitted | `#fff1e3` | `#8a6116` |
+| Countered | `#eef0ff` | `#3730a3` |
+| Accepted / Ordered | `#e3f5ec` | `#0f6848` |
+| Expired / Cancelled | `#eeeeee` | `#616161` |
+
+### Slide tints (listing screenshots)
+
+Warm, low-saturation washes so the white product cards pop: lavender `#eef0ff`, pink `#fbeef0`,
+green `#eaf6ee`, violet `#f1ecff`, amber `#fff4e5`, and one hero slide on solid indigo with white
+type. Never more than one tint per slide, always with a large soft "blob" circle at 8% opacity.
+
+### Ready-to-paste `:root`
 
 ```css
-:root{
-  --indigo:#4f46e5; --indigo-deep:#3d33c7; --indigo-soft:#eef0ff;
-  --lime:#84cc16; --lime-soft:#eef6df;
-  --ink:#1c1d2b; --sub:#6b7280; --line:#eceded; --purple:#5b4bf0;
-  --radius:12px; --radius-lg:16px;
-  --shadow:0 16px 40px rgba(28,29,43,.08);
-  --shadow-sm:0 4px 14px rgba(28,29,43,.06);
+:root {
+  --indigo:#4f46e5; --indigo-ink:#4338ca; --indigo-2:#5b4bf0; --lime:#84cc16;
+  --ink:#1c1d2b; --sub:#5b5f6e; --line:#e6e6ef; --bg:#f6f5ff; --surface:#fff;
+  --chip:#eef0ff; --danger:#8e1f0b;
+  --accent:var(--indigo); --accent-text:#fff; --link:var(--indigo-ink);
 }
 ```
 
----
+White-label surfaces override only `--accent`, `--accent-text`, `--link` and `--lime` at runtime.
+Everything else stays.
 
-## 3. Typography
-
-- **App & marketing UI:** the system stack — `-apple-system, BlinkMacSystemFont, "Segoe UI",
-  Roboto, Inter, "Helvetica Neue", Arial, sans-serif`. Fast, native-feeling, no web-font load.
-- **Embedded Shopify admin:** use **Polaris** defaults — don't override Shopify's type there.
-- **Headlines:** weight **800**, tight tracking (`-0.02` to `-0.03em`), `text-wrap:balance`.
-  Signature move: **two-tone headline** — ink for the first half, `--indigo` for the key phrase.
-  e.g. "Wholesale quoting, **without the email grind**".
-- **Body:** `--sub` grey, 1.5 line-height, ~40–60rem measure.
-- **Editorial/brand documents** (not the app): pair **Sora** (display) + **Newsreader** (serif, for
-  quoted/spoken text) + **IBM Plex Mono** (labels, timecodes, data). Only for docs/artifacts.
+Contrast: ink on bg and surface passes AAA. Indigo on white passes AA for text. Lime is never used
+for text; it is a fill with ink (`#1c1d2b`) text on top.
 
 ---
 
-## 4. Voice & tone
+## 4. Typography
 
-Grade every line against Shopify's experience values: **Considerate · Empowering · Crafted ·
-Efficient · Trustworthy · Familiar.**
+System stack, no web font to load:
 
-- Plain language, **benefit-first**, honest about what the app does and doesn't do.
-- Active voice; a control says exactly what happens ("Send quote", then "Quote sent").
-- **No** generic marketing language, **no** keyword stuffing, **no** jargon.
-- Errors explain what went wrong and how to fix it — no apologies, no vagueness.
-- Product vocabulary (use consistently): *quote, counter, accept, reorder, draft order, net terms,
-  buyer portal, magic link (passwordless), AI Order Pad, Draft with Claude, Claude insights.*
-
----
-
-## 5. The Claude principle (brand signature)
-
-Mannon's AI is **human-in-the-loop, always**. This is both an engineering guardrail and a brand
-promise — surface it, don't hide it.
-
-- **Dual-mode:** every AI surface offers **Manual** + **`✦ Draft with Claude`**. Claude only
-  **pre-fills**; it never sends, prices, or writes anything on its own.
-- **`✦`** (sparkle) is the glyph that marks every Claude feature. Prefer "**Draft with Claude**"
-  over a generic "AI".
-- Every AI output lands on a **confirm screen**. Temperature 0. Every AI-returned id/SKU is
-  validated against the live catalog before use.
-- **Signature trust line** (use verbatim or close):
-  > ✦ Drafted by Claude · review before sending. **You send it, not the AI.**
-  Short form: **"Claude drafts, you send. It never acts on its own."**
-- This mirrors Anthropic's *Claude Commerce Agents* "human approval gate" + "no order placed by the
-  model" patterns — good alignment to cite for trust/review.
-
----
-
-## 6. UI components & patterns
-
-- **Buttons:** primary = `--indigo` bg, white, weight 800, `--radius` corners, `--shadow-sm`,
-  `--indigo-deep` on hover, visible `focus-visible` ring `0 0 0 3px rgba(79,70,229,.4)`.
-  Buyer-side **Accept** CTA = `--lime` bg with `--ink` text. Ghost = white + `--line` border.
-- **Feature card:** white, `--radius-lg`, `--shadow`; a **4px lime top-border** inset from the
-  edges; a 3rem pale-indigo (`--indigo-soft`) rounded icon tile holding a **line icon stroked
-  `--indigo`**; bold 2-line label + `--sub` description.
-- **Pills / badges:** `border-radius:999px`, `--indigo-soft` bg / `--indigo` text; status pills use
-  the semantic table above.
-- **Device mockups** (for screenshots/screencasts): browser chrome with 3 dots + a breadcrumb URL
-  `admin.shopify.com › apps › mannon › …`; phone frame for the buyer portal; purple `portal.mannon.app`
-  header for buyer views.
-- **Surfaces:** in the embedded admin, **Polaris only** — no custom UI where Polaris has a pattern.
-  Express the brand on **non-Polaris surfaces**: the landing page and the buyer portal.
-
-```html
-<!-- feature card -->
-<div class="fcard">
-  <span class="ic"><!-- inline SVG line icon, stroke var(--indigo) --></span>
-  <strong>Draft with Claude</strong>
-  <span class="sub">Claude drafts counters &amp; carts — you review and send.</span>
-</div>
-<style>
-.fcard{position:relative;background:#fff;border-radius:var(--radius-lg);padding:1.9rem 1.5rem 1.6rem;
-  box-shadow:var(--shadow)}
-.fcard::before{content:"";position:absolute;top:0;left:1rem;right:1rem;height:4px;
-  border-radius:0 0 4px 4px;background:var(--lime)}
-.fcard .ic{display:flex;align-items:center;justify-content:center;width:3rem;height:3rem;
-  border-radius:.85rem;background:var(--indigo-soft);margin-bottom:1rem}
-.fcard .ic svg{width:1.5rem;height:1.5rem;fill:none;stroke:var(--indigo);stroke-width:2}
-.fcard strong{display:block;font-size:1.2rem;font-weight:800;letter-spacing:-.01em}
-.fcard .sub{display:block;margin-top:.5rem;color:var(--sub);line-height:1.5}
-</style>
+```css
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif;
+-webkit-font-smoothing: antialiased;
 ```
 
----
+| Role | Size | Weight | Notes |
+|---|---|---|---|
+| Display (landing h1, slide h1) | 44–64px | 800 | letter-spacing −0.02em, line-height 1.05; highlight one phrase in indigo |
+| Page title (portal h1) | 28–30px | 800 | |
+| Section heading | 18–19px | 800 | |
+| Body | 16–17px | 400 | line-height 1.5 |
+| Meta / muted | 14–15px | 400–600 | `--sub` |
+| Kicker / eyebrow | 13px | 800 | uppercase, letter-spacing 0.06em, indigo |
+| Button | 15–17px | 800 | |
 
-## 7. Product facts (keep copy consistent)
-
-- **Plans (flat monthly, no per-order fees ever; annual = 2 months free; 14-day trial):**
-  **Free $0 · Starter $9 · Growth $29 · Scale $69.** Claude features unlock at **Growth+**.
-- **Built on native:** Shopify owns money, tax, terms, checkout. Accept → a real Shopify **draft order**.
-- **Never** stores card data. **Passwordless** buyer portal via hashed magic links. **HMAC-verified**
-  webhooks. Minimum OAuth scopes.
-
----
-
-## 8. Do / Don't
-
-**Do**
-- Lead with the benefit and the quote→counter→reorder story.
-- Two-tone headlines; indigo primary; lime as a small accent.
-- Mark Claude features with `✦` and keep the "you send it" trust line.
-- Polaris inside the admin; custom brand outside it.
-
-**Don't**
-- Use lime as a large fill, or as the primary. It's an accent.
-- Add a "Built for Shopify" badge to Mannon's own marketing.
-- Let AI act autonomously, or imply it does.
-- Keyword-stuff or use generic marketing language.
-- Recompute money/tax — always defer to Shopify's draft order.
+Arabic: same stack (system Arabic fonts), `dir="rtl"`, mirror paddings and the mark stays on the
+reading-start side.
 
 ---
 
-### Quick-start for a new app in the Mannon family
-1. Drop the `:root` tokens (§2) and the logo lockup (§1) in.
-2. System font stack; two-tone 800-weight headlines (§3).
-3. Indigo primary buttons, lime accents, feature cards with the lime top-border (§6).
-4. If it uses AI: dual-mode `✦ Draft with Claude`, confirm screen, the trust line (§5).
-5. Write copy against Shopify's six experience values (§4).
+## 5. Shape, space, elevation
+
+- Radius: buttons and inputs 9–12px, cards 16px, pills 999px, browser and phone mocks 20px+.
+- Spacing scale: 4 · 8 · 12 · 16 · 24 · 32 · 48.
+- Card: white surface, 1px `--line` border or shadow `0 20px 60px rgba(28,29,43,.10)`, padding 32–40px desktop and 20px mobile.
+- Content width: 900px portal card, 1100px landing.
+- Focus ring: 2px `--indigo` outline, 2px offset, on every interactive element.
+
+---
+
+## 6. Components (non-Polaris surfaces)
+
+**Primary button** — indigo fill, white text, weight 800, radius 9–12px, padding 10×18 (sm) or 14×24.
+**Secondary / ghost** — white fill, 1px `--line` border, ink text; on indigo backgrounds use a white 1px outline.
+**Success button** — lime fill, ink text (used for the single most important buyer action, e.g. Accept quote).
+**Text link** — `--link`, weight 800 on brand surfaces, underline with 3px offset.
+**List row** — flex, 14–15px vertical padding, 1px top rule except the first row, primary label bold, meta in `--sub`, action on the right.
+**Banner** — chip background `#eef2ff`, 1px `#c7d2fe` border, radius 10px, bold lead-in ("Demo portal.").
+**Toast** — ink background, white bold text, radius 10px, bottom center.
+**Header bar** — white with 1px bottom rule and the mark + wordmark; white-label portals may use a solid `--indigo-2` bar with white text.
+
+Inside the Shopify admin: Polaris only. Page, Card, Banner, Badge, IndexTable, Button. No brand colors.
+
+---
+
+## 7. Voice and copy
+
+Calm, confident product owner. Plain language, benefit first, honest about limits. Polaris content
+guidelines apply everywhere, not just in the admin.
+
+- Sentence case for everything, including buttons and headings.
+- Lead with the merchant's outcome, then the mechanism: "Accepting turns the quote into a Shopify draft order."
+- Say **Shopify draft order**, **net terms**, **buyer portal**, **one-tap reorder**, **quote request**. Avoid "leads", "deals", "checkout" for B2B flows.
+- The AI is **Claude**, always with the ✦ glyph on controls: "✦ Draft with Claude". The rule appears wherever Claude does: *Claude drafts, you review and send. It never acts on its own.*
+- No pricing outside the Pricing section. No statistics, guarantees, superlatives or testimonials in listing copy or images.
+- Money is never ours: write "priced by Shopify", "tax and total from Shopify", "re-priced live by Shopify".
+- Dates as "Sep 19, 2026". Money as the currency code and Shopify's amount: "USD 1286.40".
+- Punctuation: en dashes with spaces only in marketing copy, none in UI labels. The interpunct " · " separates meta items.
+
+Reusable lines:
+
+- Quote, counter with Claude, and reorder in one tap.
+- Wholesale quoting, without the email grind.
+- Try before you install. No install, no sign-up.
+- Passwordless buyer portal — no account, no password to accept or reorder.
+
+---
+
+## 8. Motion and media
+
+- Transitions 150–250ms ease on hover and focus; nothing bounces.
+- Screencast: 1920×1080 30fps, 0.4–0.5s cross-fades, 2% slow zoom per scene, dark rounded lower-third captions, indigo click ripple, soft pad music around −22 LUFS under voice.
+- Screenshots: 1600×900 exported at 2× (3200×1800), one feature per slide, mark top-left, pill footer with a colored dot and the slide number, no pricing, no browser chrome from a real browser.
+- Photos and illustrations: none. The product UI is the imagery.
+
+---
+
+## 9. Naming things in a new app
+
+- Package and repo names stay lowercase and short (`manosh` pattern). Customer-facing name gets the capital.
+- Feature names are plain nouns: Quote inbox, Order pad, Reorder cards, Price lists. No trademarks, no "Pro"/"AI" suffixes.
+- Environment flags are `MANNON_FF_<FEATURE>`; brand tokens are the CSS custom properties above; white-label overrides are `--accent`, `--accent-text`, `--link`, `--lime`.
+
+---
+
+## 10. Checklist for a new surface
+
+- [ ] Mark + wordmark top-left, dot present, clear space respected.
+- [ ] `:root` tokens pasted, no hard-coded hex outside this file's list.
+- [ ] System font stack, weights 400/600/800/900 only.
+- [ ] One indigo primary action per view, lime reserved for the single confirming action.
+- [ ] Status pills use the table above.
+- [ ] Copy in sentence case, Claude rule present wherever Claude is, money attributed to Shopify.
+- [ ] Focus rings visible, AA contrast, keyboard reachable, RTL checked if Arabic is offered.
+- [ ] Admin screens: Polaris only.
