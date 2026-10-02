@@ -6,9 +6,29 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../services/offers.server", () => ({ submitPublicOffer: vi.fn() }));
 vi.mock("../lib/sentry.server", () => ({ captureException: vi.fn() }));
 
-import { action } from "./api.offer";
+import { action, loader } from "./api.offer";
 import { submitPublicOffer } from "../services/offers.server";
 import { captureException } from "../lib/sentry.server";
+
+// Remix dispatches OPTIONS to the LOADER: the storefront's JSON POST preflight
+// must get 204 + CORS from it or the browser never sends the offer.
+describe("api.offer loader (preflight)", () => {
+  const load = (method: string) =>
+    loader({ request: new Request("https://app.test/api/offer", { method }), params: {}, context: {} } as never);
+
+  it("answers the browser preflight (OPTIONS) with 204 + CORS headers", async () => {
+    const res = await load("OPTIONS");
+    expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Headers")).toContain("Content-Type");
+  });
+
+  it("rejects GET with a CORS-bearing 405", async () => {
+    const res = await load("GET");
+    expect(res.status).toBe(405);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+  });
+});
 
 const post = (body: unknown) =>
   new Request("https://app.test/api/offer", {

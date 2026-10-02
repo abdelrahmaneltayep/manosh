@@ -6,9 +6,32 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("../services/quote-widget.server", () => ({ createQuoteRequest: vi.fn() }));
 vi.mock("../lib/sentry.server", () => ({ captureException: vi.fn() }));
 
-import { action } from "./api.quote-request";
+import { action, loader } from "./api.quote-request";
 import { createQuoteRequest } from "../services/quote-widget.server";
 import { captureException } from "../lib/sentry.server";
+
+// Remix dispatches OPTIONS to the LOADER, so the real browser preflight for the
+// widget's JSON POST lands here, not in the action. Found by the e2e API suite
+// against the served build: a 405 without CORS headers blocked every submission.
+describe("api.quote-request loader (preflight)", () => {
+  const load = (method: string) =>
+    loader({ request: new Request("https://app.test/api/quote-request", { method }), params: {}, context: {} } as never);
+
+  it("answers the browser preflight (OPTIONS) with 204 + CORS headers", async () => {
+    const res = await load("OPTIONS");
+    expect(res.status).toBe(204);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect(res.headers.get("Access-Control-Allow-Methods")).toContain("POST");
+    expect(res.headers.get("Access-Control-Allow-Headers")).toContain("Content-Type");
+  });
+
+  it("rejects GET with a CORS-bearing 405, never an HTML error page", async () => {
+    const res = await load("GET");
+    expect(res.status).toBe(405);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+    expect((await res.json()) as unknown).toMatchObject({ ok: false });
+  });
+});
 
 const post = (body: unknown) =>
   new Request("https://app.test/api/quote-request", {

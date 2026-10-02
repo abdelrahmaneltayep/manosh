@@ -1,4 +1,4 @@
-import type { ActionFunctionArgs } from "@remix-run/node";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import { createQuoteRequest } from "../services/quote-widget.server";
 import { captureException } from "../lib/sentry.server";
@@ -66,4 +66,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
-export const loader = () => new Response("Method not allowed", { status: 405 });
+// Remix routes OPTIONS (and GET) to the loader, not the action, so the browser's
+// CORS preflight for the storefront's JSON POST must be answered here — with the
+// CORS headers — or the widget's submission is blocked before it ever reaches
+// the action. Caught by the e2e API suite (tests/api.e2e.ts).
+export const loader = ({ request }: LoaderFunctionArgs) => {
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  return json({ ok: false, error: "Method not allowed" }, { status: 405, headers: CORS });
+};
