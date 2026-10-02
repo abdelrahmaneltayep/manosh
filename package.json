@@ -22,7 +22,9 @@
     "shopify": "shopify",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "remix vite:build && e2e run",
+    "test:e2e:live": "e2e run --config e2e.live.config.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",
@@ -46,9 +48,14 @@
     "vite-tsconfig-paths": "^5.0.1"
   },
   "devDependencies": {
+    "@ai-sdk/anthropic": "^4.0.71",
+    "@e2e-dev/web": "^0.11.1",
     "@types/node": "^22.2.0",
     "@types/react": "^18.2.31",
     "@types/react-dom": "^18.2.14",
+    "ai": "^7.0.127",
+    "e2e": "^0.15.2",
+    "playwright": "^1.63.0",
     "tsx": "^4.19.2",
     "typescript": "^5.2.2",
     "vite": "^6.2.2",

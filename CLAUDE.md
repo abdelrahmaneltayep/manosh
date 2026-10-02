@@ -50,7 +50,8 @@ A slice is not done until **all** of these hold:
 
 - [ ] Feature works on the dev store (or, where the container can't reach a store, the API path is
       covered by tests against a mocked Admin API and the manual verification steps are documented).
-- [ ] Tests written and green.
+- [ ] Tests written and green: Vitest, and an e2e check for every page or public endpoint the
+      slice adds or changes (`npm run test:e2e`).
 - [ ] Empty state **and** error state designed — never a blank table or raw stack trace.
 - [ ] p95 < 500ms for the primary interaction.
 - [ ] Accessible: keyboard-navigable end to end, screen-reader labels on every control, AA contrast.
@@ -136,7 +137,11 @@ service, render Polaris.
   ids are validated against the live catalog before use.
 - **Errors**: user-facing errors are plain-language Polaris `Banner`s. Internal errors go to Sentry.
 - **Tests**: colocate `*.test.ts` with services; integration tests for webhooks (signed + unsigned)
-  and for the draft-order path (mocked Admin API).
+  and for the draft-order path (mocked Admin API). End-to-end: **e2e** (tester-army/e2e) in
+  `tests/*.e2e.ts` against the served build (`npm run test:e2e`, no model needed) and agent-driven
+  live flows in `tests/live/` (`npm run test:e2e:live`). See `/docs/testing.md`. Anything the
+  browser calls cross-origin (storefront widgets, customer-account block) gets an e2e API check,
+  because unit tests that call the action directly miss Remix's OPTIONS routing.
 - **Settings, not constants**: expiry days, auto-approve tolerance, plan gates → merchant-editable
   or `/docs`-documented config, never magic numbers in handlers.
 - **Commits**: small, one slice's worth, descriptive. Branch `claude/mannon-feature-slices-w3epbf`.
