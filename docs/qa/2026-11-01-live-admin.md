@@ -198,3 +198,19 @@ Protected customer data access is saved in the Partner Dashboard (`93a05fc`).
 - **Status:** FAIL (no card, blocked by TC12)
 
 **Totals for TC12–TC14:** 1 pass, 2 fail. Next: check that the store has a completed order (Orders, not Drafts) placed within the last 60 days.
+
+## Fourth re-run of TC12–TC14, 19:17 UTC (v49, `82dab02`)
+
+#### TC12 (fourth re-run)
+- **Actual:** The log shows `[demo] … no orders the app can see in the last 60 days; seeding one (payment pending, never charged)` and then `seeded order #1001 (gid://shopify/Order/6343238811781)`. #1001 being the store's first order number suggests no completed order existed before this. The portal shows "Welcome, Demo buyer" (Snowdevil), **"Reorder a past order: #1001 · Nov 1, 2026 · USD 16980.9 · Reorder"**, and one Countered and one New quote (`rerun4-tc12-portal.png`). Minor: the card shows the total as `16980.9`, not `16,980.90`.
+- **Status:** PASS
+
+#### TC13 (fourth re-run)
+- **Actual:** After the confirm step, quote `cmvy7pogk0007r9h4l84yadvh` is **Ordered** with Subtotal $37,767.53, Tax $0.00, Total $37,767.53 (`rerun4-tc13-ordered.png`). The draft and its PO weren't checked in the admin (no sign-in).
+- **Status:** PASS
+
+#### TC14 (fourth re-run)
+- **Actual:** Reorder opens "Reorder #1001" with editable quantities and a PO field (`rerun4-tc14-reorder-page.png`). "Send reorder" creates quote `cmvy7pv570010r9h4kuxhxkwg`, marked **New**, with lines 12 × 949.95 and 6 × 885.95 (`rerun4-tc14-result.png`). The Minimal Snowboard was 930.25 on #1001 and is 885.95 now. With the shop's `autoApproveTolerance` at 0, `reorderNeedsApproval` holds the reorder for the merchant, so this is the "awaits approval" branch, working as designed. **But the page shows no note saying so**: the buyer only sees a "New" badge, while the plan expects "a note that it awaits the merchant's approval".
+- **Status:** FAIL (behaviour correct, the buyer-facing note is missing)
+
+**Totals for TC12–TC14:** 2 pass, 1 fail. Fix for TC14: when `createReorder` returns `needsApproval`, the quote page should say that the reorder's prices changed and the supplier will confirm.
