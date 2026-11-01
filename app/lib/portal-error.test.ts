@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { portalErrorContent } from "./portal-error";
+import { portalErrorContent, acceptFailureMessage } from "./portal-error";
 
 describe("portalErrorContent", () => {
   it("gives a 'not found' message for 404", () => {
@@ -31,5 +31,29 @@ describe("portalErrorContent", () => {
       expect(content.title.length).toBeGreaterThan(0);
       expect(content.body.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// Live QA (docs/qa/2026-11-01-live-admin.md) found the accept catch-all hid
+// every cause behind one retry line. The message now names a Shopify GraphQL
+// error so the buyer can tell the supplier what happened.
+describe("acceptFailureMessage (pure)", () => {
+  it("names a Shopify GraphQL error without echoing internals", () => {
+    const err = Object.assign(new Error("GraphQL Client: Access denied"), {
+      body: { errors: [{ message: "Access denied for draftOrderCreate field. Required access: `write_draft_orders`" }] },
+    });
+    const msg = acceptFailureMessage(err);
+    expect(msg).toContain("Shopify couldn’t create the order: Access denied for draftOrderCreate field");
+    expect(msg).toContain("contact your supplier");
+    expect(msg).not.toMatch(/at .* \(/);
+  });
+
+  it("explains an expired or missing store session", () => {
+    expect(acceptFailureMessage(new Error("Could not find an offline session for shop"))).toContain("store connection needs a refresh");
+  });
+
+  it("falls back to the generic retry line", () => {
+    expect(acceptFailureMessage(new TypeError("x is not a function"))).toBe("We couldn’t create your order just now. Please try again.");
+    expect(acceptFailureMessage(null)).toBe("We couldn’t create your order just now. Please try again.");
   });
 });

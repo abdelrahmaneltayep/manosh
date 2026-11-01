@@ -207,6 +207,21 @@ describe.skipIf(!hasDb)("startDemo (DB)", () => {
     expect(countered.company.shopId).toBe(shop.id);
   });
 
+  it("never seeds gift-card products into the demo quote (live QA: accept failed on gift-card lines)", async () => {
+    await prisma.shop.create({ data: { shopifyDomain: DOMAIN, defaultTermsDays: 30 } });
+    const withGiftCards = [
+      { variantId: "gid://shopify/ProductVariant/90", displayTitle: "Gift Card — $10", sku: null, price: "10.00", currencyCode: "USD", isGiftCard: true },
+      { variantId: "gid://shopify/ProductVariant/91", displayTitle: "Gift Card — $25", sku: null, price: "25.00", currencyCode: "USD", isGiftCard: true },
+      ...CATALOG,
+    ];
+    const r = await startDemo({ ip: "1.1.1.2", limiter: fresh(), adminFor: async () => admin, catalogFor: async () => withGiftCards });
+    expect(r.ok).toBe(true);
+    const lines = await prisma.quoteLine.findMany({ where: { quote: { buyerId: (r as { buyerId: string }).buyerId } } });
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.map((l) => l.variantId)).not.toContain("gid://shopify/ProductVariant/90");
+    expect(lines.map((l) => l.variantId)).not.toContain("gid://shopify/ProductVariant/91");
+  });
+
   it("does not seed quotes when the catalog is empty, and still opens the demo", async () => {
     await prisma.shop.create({ data: { shopifyDomain: DOMAIN } });
     const r = await startDemo({ ip: "1.1.1.1", limiter: fresh(), adminFor: async () => admin, catalogFor: async () => [] });

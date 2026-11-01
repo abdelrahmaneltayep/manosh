@@ -17,6 +17,8 @@ export interface CatalogItem {
   sku: string | null;
   price: string; // reference price, as a string
   currencyCode: string;
+  /** Gift-card products are never quoted (no B2B pricing, no draft-order line). */
+  isGiftCard?: boolean;
 }
 
 // Cache TTL. Short enough that catalog edits show quickly, long enough to
@@ -32,6 +34,7 @@ const CATALOG_QUERY = `#graphql
       nodes {
         id
         title
+        isGiftCard
         variants(first: 50) {
           nodes {
             id
@@ -53,7 +56,7 @@ interface RawVariant {
 }
 interface RawCatalogData {
   shop?: { currencyCode?: string };
-  products?: { nodes?: Array<{ id?: string; title: string; variants?: { nodes?: RawVariant[] } }> };
+  products?: { nodes?: Array<{ id?: string; title: string; isGiftCard?: boolean; variants?: { nodes?: RawVariant[] } }> };
 }
 
 /** Pure mapping from the Admin GraphQL response to flat catalog items. */
@@ -75,6 +78,7 @@ export function mapProductsToCatalog(data: RawCatalogData): CatalogItem[] {
         sku: variant.sku ?? null,
         price: variant.price,
         currencyCode,
+        isGiftCard: product.isGiftCard === true,
       });
     }
   }

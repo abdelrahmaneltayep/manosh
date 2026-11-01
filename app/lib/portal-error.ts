@@ -30,3 +30,22 @@ export function portalErrorContent(status: number | null): PortalErrorContent {
     body: "We hit an unexpected problem. Please refresh and try again — if it keeps happening, contact your supplier.",
   };
 }
+
+/**
+ * Buyer-facing copy for an accept that failed for a reason other than a
+ * DraftOrderError (those already carry a plain-language message). A GraphQL
+ * error from Shopify (`body.errors[]`, e.g. a missing scope or a rejected
+ * input) is named so the buyer and the merchant can act on it; anything else
+ * gets the generic retry line. Pure; never echoes a stack trace.
+ */
+export function acceptFailureMessage(error: unknown): string {
+  const generic = "We couldn’t create your order just now. Please try again.";
+  const graphqlErrors = (error as { body?: { errors?: Array<{ message?: string }> } } | null)?.body?.errors;
+  const first = Array.isArray(graphqlErrors) ? graphqlErrors.find((e) => e?.message)?.message : undefined;
+  if (first) return `Shopify couldn’t create the order: ${first.trim().replace(/\.?$/, ".")} Please contact your supplier.`;
+  const message = error instanceof Error ? error.message : "";
+  if (/not found|no session|offline session|access token|expired/i.test(message)) {
+    return "Your supplier’s store connection needs a refresh. Please try again in a moment or contact your supplier.";
+  }
+  return generic;
+}

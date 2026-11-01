@@ -32,6 +32,8 @@ test("Starter is blocked at the second member", async ({ page }) => {
 test("an over-threshold order waits for approval, then an approver unblocks it", async ({ page }) => {
   await page.goto(`${BASE_URL}/portal/quotes/${OVER_THRESHOLD_QUOTE}`);
   await page.getByRole("button", { name: /Accept & create order/ }).click();
+  // Nothing is written until the buyer confirms (guardrail 4).
+  await page.getByRole("button", { name: /Confirm & create order/ }).click();
   await expect(page.getByText(/Waiting for approval/)).toBeVisible();
 
   // As an approver (separate session in the real run):

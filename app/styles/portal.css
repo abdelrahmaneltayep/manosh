@@ -328,6 +328,23 @@ body {
   margin-top: 1rem;
 }
 
+/* Inline confirmation revealed by "Accept & create order" (guardrail 4:
+   nothing is written until the buyer confirms). */
+.accept-confirm {
+  border: 1px solid var(--border);
+  border-left: 4px solid #005bd3;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  background: var(--surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.accept-confirm p {
+  margin: 0;
+}
+
 .field {
   display: flex;
   flex-direction: column;

@@ -1,7 +1,10 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { useState } from "react";
 import prisma from "../db.server";
+import { captureException } from "../lib/sentry.server";
+import { acceptFailureMessage } from "../lib/portal-error";
 import { requireBuyerId } from "../services/buyer-session.server";
 import {
   applyAutoExpiry,
@@ -190,9 +193,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             : "This quote can no longer be accepted.",
       };
     }
-    return {
-      error: "We couldn’t create your order just now. Please try again.",
-    };
+    // Anything else is a real failure (Shopify GraphQL error, expired offline
+    // session, DB). Log it and send it to Sentry — the live QA run found this
+    // path swallowed the cause — and give the buyer a message that names it.
+    console.error("[portal.accept] order creation failed for quote", quoteId, error);
+    captureException(error);
+    return { error: acceptFailureMessage(error) };
   }
 };
 
@@ -202,6 +208,9 @@ export default function BuyerQuote() {
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
   const status = quoteStatusBadge(quote.status);
+  // Guardrail: nothing is written until the buyer confirms. The first click
+  // only reveals the confirmation; the form submits from the confirm button.
+  const [confirming, setConfirming] = useState(false);
 
   const actionError = actionData && "error" in actionData ? actionData.error : null;
   const actionMessage = actionData && "message" in actionData ? actionData.message : null;
@@ -303,10 +312,34 @@ export default function BuyerQuote() {
             </label>
           )}
 
-          <button type="submit" className="portal-button" disabled={submitting}>
-            {submitting ? "Creating order…" : "Accept & create order"}
-          </button>
+          {!confirming ? (
+            <button type="button" className="portal-button" onClick={() => setConfirming(true)}>
+              Accept &amp; create order
+            </button>
+          ) : (
+            <div className="accept-confirm" role="region" aria-live="polite" aria-label="Confirm your order">
+              <p>
+                <strong>Accept this quote?</strong> Your supplier’s store will create a draft order
+                with these lines and the PO reference above. Tax and the total are calculated by
+                Shopify. Nothing is written until you confirm.
+              </p>
+              <div className="portal-actions">
+                <button type="submit" className="portal-button portal-button-accept" disabled={submitting}>
+                  {submitting ? "Creating order…" : "Confirm & create order"}
+                </button>
+                <button type="button" className="portal-link-button" onClick={() => setConfirming(false)} disabled={submitting}>
+                  Go back
+                </button>
+              </div>
+            </div>
+          )}
         </Form>
+      )}
+
+      {quote.status === "COUNTERED" && !quote.totals && (
+        <p className="muted" role="note">
+          Tax and the order total are calculated by Shopify when you accept.
+        </p>
       )}
 
       {quote.totals && (

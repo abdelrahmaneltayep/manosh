@@ -158,12 +158,12 @@ export async function fetchDemoCompany(admin: AdminGraphql): Promise<DemoCompany
   };
 }
 
-/** The demo store's most recent orders, for real reorder cards. */
+/** The demo store's most recent orders (any status), for real reorder cards. */
 export async function fetchDemoOrders(admin: AdminGraphql, first = 3): Promise<DemoOrderRef[]> {
   const res = await admin.graphql(
     `#graphql
     query MannonDemoOrders($first: Int!) {
-      orders(first: $first, sortKey: CREATED_AT, reverse: true) {
+      orders(first: $first, query: "status:any", sortKey: CREATED_AT, reverse: true) {
         nodes { id name createdAt totalPriceSet { shopMoney { amount currencyCode } } }
       }
     }`,
@@ -180,7 +180,13 @@ export async function fetchDemoOrders(admin: AdminGraphql, first = 3): Promise<D
         }>;
       };
     };
+    errors?: Array<{ message?: string }>;
   };
+  if (body?.errors?.length) {
+    // Surface the reason a card is missing (scope, token, 60-day window) instead
+    // of a silent empty list; the caller treats a throw as best-effort.
+    throw new Error(`orders query failed: ${body.errors.map((e) => e.message).join("; ")}`);
+  }
   return (body?.data?.orders?.nodes ?? [])
     .filter((o) => o?.id && o.totalPriceSet?.shopMoney?.amount && o.totalPriceSet.shopMoney.currencyCode)
     .map((o) => ({
@@ -205,6 +211,7 @@ export interface DemoCatalogItem {
   sku: string | null;
   price: string;
   currencyCode: string;
+  isGiftCard?: boolean;
 }
 
 /**
@@ -237,7 +244,10 @@ export async function seedDemoBuyerData(input: {
   now?: Date;
 }): Promise<{ quotes: number; invoices: number }> {
   const now = input.now ?? new Date();
-  const items = input.catalog.filter((c) => Number(c.price) > 0).slice(0, 5);
+  // Real, priced, sellable products only: gift cards are not B2B goods and have
+  // no place on a draft order (the live demo once seeded two of them and the
+  // accept failed), so they never make it into a demo quote.
+  const items = input.catalog.filter((c) => Number(c.price) > 0 && !c.isGiftCard).slice(0, 5);
   let quotes = 0;
   let invoices = 0;
 
@@ -341,6 +351,7 @@ export async function startDemo(options: {
   let orders: DemoOrderRef[] = [];
   try {
     orders = await fetchDemoOrders(admin);
+    if (orders.length === 0) console.info("[demo] no orders returned for reorder cards on", domain);
     for (const o of orders) {
       await prisma.reorderSource.upsert({
         where: { companyId_shopifyOrderId: { companyId: companyRow.id, shopifyOrderId: o.id } },
@@ -356,6 +367,7 @@ export async function startDemo(options: {
       });
     }
   } catch (error) {
+    console.error("[demo] reorder cards could not be built from the store's orders:", error);
     const { captureException } = await import("../lib/sentry.server");
     captureException(error);
   }
@@ -393,6 +405,7 @@ export async function startDemo(options: {
       now,
     });
   } catch (error) {
+    console.error("[demo] seeding the demo buyer's quotes failed:", error);
     const { captureException } = await import("../lib/sentry.server");
     captureException(error);
   }

@@ -54,7 +54,7 @@ a step is blocked, say why and move on.
 12. `https://manosh.fly.dev` → Try the demo → Open the buyer demo, in a fresh private window. You
     land as "Demo buyer" with a quote marked Countered under "Your quotes" and a card under
     "Reorder a past order".
-13. Open the Countered quote, click "Accept & create order", confirm. It shows Ordered. On the dev
+13. Open the Countered quote, click "Accept & create order", then "Confirm & create order" in the panel that appears (nothing is written before that). It shows Ordered. On the dev
     store, Orders → Drafts has a draft with PO PO-DEMO-1042.
 14. Back in the demo portal, click Reorder on the card. Either a new quote marked Ordered appears
     or a note that it awaits the merchant's approval.
