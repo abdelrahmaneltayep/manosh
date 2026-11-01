@@ -121,12 +121,12 @@ export interface AdminGraphql {
   graphql: (query: string, opts?: { variables?: Record<string, unknown> }) => Promise<{ json: () => Promise<unknown> }>;
 }
 
-/** The demo store's first company (real ids — never fabricated). */
+/** The demo store's company to use (real ids — never fabricated). */
 export async function fetchDemoCompany(admin: AdminGraphql): Promise<DemoCompanyRef | null> {
   const res = await admin.graphql(
     `#graphql
     query MannonDemoCompany {
-      companies(first: 1, sortKey: CREATED_AT) {
+      companies(first: 10, sortKey: CREATED_AT) {
         nodes {
           id
           name
@@ -148,8 +148,16 @@ export async function fetchDemoCompany(admin: AdminGraphql): Promise<DemoCompany
       };
     };
   };
-  const c = body?.data?.companies?.nodes?.[0];
+  // A draft order's purchasingCompany needs a location AND a contact
+  // (companyContactId is a required ID), so prefer the first company that has
+  // both; fall back to the oldest so the portal still opens.
+  const nodes = body?.data?.companies?.nodes ?? [];
+  const c =
+    nodes.find((n) => n?.id && n.locations?.nodes?.[0]?.id && n.contacts?.nodes?.[0]?.id) ?? nodes[0];
   if (!c?.id) return null;
+  if (!c.contacts?.nodes?.[0]?.id) {
+    console.warn("[demo] company %s has no contact, so demo accepts can't create a draft order", c.id);
+  }
   return {
     id: c.id,
     name: c.name,

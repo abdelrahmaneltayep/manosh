@@ -67,6 +67,13 @@ export async function acceptAndOrder(
       "This buyer isn’t linked to a company location yet, so an order can’t be created.",
     );
   }
+  // Shopify requires a company contact on a B2B draft order (companyContactId is ID!).
+  const companyContactId = quote.buyer.shopifyContactId;
+  if (!companyContactId) {
+    throw new DraftOrderError(
+      "This buyer isn’t linked to a contact at their company yet, so an order can’t be created. Please contact your supplier.",
+    );
+  }
 
   // F9 — enforce order rules at conversion too, so a countered quote that no
   // longer meets MOQ/pack/min-value can't slip through. Round line quantities up
@@ -125,7 +132,7 @@ export async function acceptAndOrder(
     purchasingEntity: {
       companyId: quote.company.shopifyCompanyId,
       companyLocationId,
-      companyContactId: quote.buyer.shopifyContactId,
+      companyContactId,
     },
     lines: quote.lines.map((line) => ({
       variantId: line.variantId,

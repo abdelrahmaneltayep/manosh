@@ -127,6 +127,22 @@ describe("Shopify reads (stubbed admin)", () => {
     });
   });
 
+  it("skips a company with no contact, since Shopify needs one on a B2B draft order", async () => {
+    const noContact = {
+      id: "gid://shopify/Company/1",
+      name: "No Contact Co",
+      locations: { nodes: [{ id: "gid://shopify/CompanyLocation/1" }] },
+      contacts: { nodes: [] },
+    };
+    const both = { data: { companies: { nodes: [noContact, ...COMPANY_RESPONSE.data.companies.nodes] } } };
+    expect((await fetchDemoCompany(stubAdmin({ MannonDemoCompany: both })))?.id).toBe("gid://shopify/Company/77");
+    const only = { data: { companies: { nodes: [noContact] } } };
+    expect(await fetchDemoCompany(stubAdmin({ MannonDemoCompany: only }))).toMatchObject({
+      id: "gid://shopify/Company/1",
+      contactId: null,
+    });
+  });
+
   it("returns null when the store has no company (never fabricates one)", async () => {
     const c = await fetchDemoCompany(stubAdmin({ MannonDemoCompany: { data: { companies: { nodes: [] } } } }));
     expect(c).toBeNull();

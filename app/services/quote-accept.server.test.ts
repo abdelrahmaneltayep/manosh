@@ -58,7 +58,7 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     await prisma.$disconnect();
   });
 
-  async function counteredQuote(opts: { withLocation?: boolean; email?: string } = {}) {
+  async function counteredQuote(opts: { withLocation?: boolean; withContact?: boolean; email?: string } = {}) {
     const shop = await prisma.shop.create({
       data: { shopifyDomain: "s8.myshopify.com", quoteExpiryDays: 14 },
     });
@@ -69,7 +69,7 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
       data: {
         companyId: company.id,
         email: opts.email ?? "b@s8.example",
-        shopifyContactId: "gid://shopify/CompanyContact/8",
+        shopifyContactId: opts.withContact === false ? null : "gid://shopify/CompanyContact/8",
         shopifyCompanyLocationId:
           opts.withLocation === false ? null : "gid://shopify/CompanyLocation/8",
       },
@@ -166,6 +166,17 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     await expect(
       acceptAndOrder(quote.id, admin, { currencyCode: "USD" }),
     ).rejects.toBeInstanceOf(DraftOrderError);
+
+    expect(admin.calls).toEqual([]);
+    const stored = await prisma.quote.findUnique({ where: { id: quote.id } });
+    expect(stored!.status).toBe("COUNTERED");
+  });
+
+  it("fails cleanly when the buyer has no company contact (Shopify requires one)", async () => {
+    const { quote } = await counteredQuote({ withContact: false });
+    const admin = mockAdmin();
+
+    await expect(acceptAndOrder(quote.id, admin, { currencyCode: "USD" })).rejects.toThrow(/contact/);
 
     expect(admin.calls).toEqual([]);
     const stored = await prisma.quote.findUnique({ where: { id: quote.id } });
