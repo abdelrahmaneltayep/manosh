@@ -78,6 +78,24 @@ Agent goals use the words on screen and every goal is pinned by an `expect`
 or an `agent.assert` right after it, so passing `act` steps are recorded in
 `.e2e/cache/` and replay without model calls until the screens change.
 
+## QA harness (`npm run qa`)
+
+`scripts/qa-smoke.sh` follows the qa-tester protocol from oh-my-claudecode:
+prerequisites, the production build started in a uniquely named tmux session,
+a readiness poll, one captured response per case, a PASS/FAIL verdict with the
+command, expectation and actual output, and cleanup even on failure. It covers
+what a Shopify reviewer and a scanner hit without a store: public pages, the
+install hand-off, portal and rep sign-in walls, every mandatory webhook with a
+missing, wrong and valid HMAC, the storefront endpoints' CORS and error
+contracts, the internal cron and ERP secrets, and secret and stack-trace
+leakage in every body. 77 cases today; the report lands in the scratchpad
+(`report.md` plus one evidence file per case) and the latest is checked in
+under `docs/qa/`.
+
+Set `DATABASE_URL` to a scratch Postgres first. The harness supplies its own
+dummy Shopify keys and secrets, so nothing real is needed, and it never runs
+against the deployed app.
+
 ## Writing new tests
 
 - Locators by role and accessible name, in this order: `getByRole`,

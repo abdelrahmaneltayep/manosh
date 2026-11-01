@@ -23,12 +23,16 @@ describe("merchant tour", { tags: ["smoke", "public", "demo", "a11y"] }, () => {
   test("arrow keys move between steps", async ({ app, screen, browser }) => {
     await app.open("/demo/tour");
     const step = screen.getByText(/^Step \d+ of \d+$/);
-    await browser.keyboard.press("ArrowRight");
+    // The key handler is attached on hydration; a Next click that lands proves
+    // the page is interactive before the keys are sent.
+    await screen.getByRole("button", "Next →").tap();
     await expect(step).toHaveText(/^Step 2 of \d+$/);
     await browser.keyboard.press("ArrowRight");
     await expect(step).toHaveText(/^Step 3 of \d+$/);
     await browser.keyboard.press("ArrowLeft");
     await expect(step).toHaveText(/^Step 2 of \d+$/);
+    await browser.keyboard.press("ArrowLeft");
+    await expect(step).toHaveText(/^Step 1 of \d+$/);
   });
 
   test("the dots jump to a step and the last step disables Next", async ({ app, screen }) => {
