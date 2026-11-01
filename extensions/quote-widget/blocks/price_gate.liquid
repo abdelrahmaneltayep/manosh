@@ -22,7 +22,12 @@
   data-quote-url="{{ block.settings.quote_url }}"
   style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
 >
-  <button type="button" class="mannon-pg-cta" hidden data-mannon-pg-cta>Request a Quote</button>
+  <button type="button" class="mannon-pg-cta" {% unless request.design_mode %}hidden{% endunless %} data-mannon-pg-cta>Request a Quote</button>
+  {% if request.design_mode %}
+    <p class="mannon-editor-note" data-mannon-editor-note>
+      Mannon · Price / Add-to-Cart gate. On the live store this block stays invisible until price gating is on in Mannon → Pricing &amp; catalog; then it hides the price or Add to cart for visitors who aren't approved buyers and shows this call-to-action instead. Only you see this note.
+    </p>
+  {% endif %}
 </div>
 
 <script src="{{ 'price-gate.js' | asset_url }}" defer></script>

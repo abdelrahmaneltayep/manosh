@@ -5,7 +5,7 @@ import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
 import { submitRateOk } from "./wholesale.server";
 import { getVisibleCatalog } from "./catalogs.server";
 import { submitBuyerQuote } from "./portal-quote.server";
-import { quoteWidgetFeatures, quoteCaptureAllowed, type QuoteWidgetFeatures } from "../lib/billing";
+import { quoteWidgetFeatures, type QuoteWidgetFeatures } from "../lib/billing";
 import { validateQuoteRequest, type QuoteRequestInput, type CleanLine } from "../lib/quote-widget";
 import { formBelongsToShop, QUOTE_CAPTURE_ENABLED } from "./quote-form.server";
 
@@ -98,10 +98,12 @@ export async function createQuoteRequest(
   if (!shop) return { ok: false, error: "Quote requests aren’t available." };
   // Two entry channels share this path (same QuoteRequest + anti-spam + emails):
   //  · WIDGET (F17) — gated by the widget flag + the merchant's enable toggle.
-  //  · CAPTURE (F24.3 Add-to-Quote / cart→quote) — gated by the F24 flag + a paid plan.
+  //  · CAPTURE (F24.3 Add-to-Quote / cart→quote) — gated by the F24 flag + the
+  //    same merchant toggle. Not by plan: a storefront block that silently
+  //    renders nothing on Free/Starter fails App Store review 5.1.2.
   const channelOk =
     input.channel === "CAPTURE"
-      ? QUOTE_CAPTURE_ENABLED() && quoteCaptureAllowed(shop.plan)
+      ? QUOTE_CAPTURE_ENABLED() && shop.quoteWidgetEnabled
       : WIDGET_ENABLED() && shop.quoteWidgetEnabled;
   if (!channelOk) return { ok: false, error: "Quote requests aren’t available." };
 

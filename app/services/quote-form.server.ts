@@ -176,6 +176,9 @@ export async function formBelongsToShop(shopId: string, formId: string): Promise
  */
 export async function getQuoteCaptureConfig(shopDomain: string): Promise<{ enabled: boolean }> {
   if (!QUOTE_CAPTURE_ENABLED()) return { enabled: false };
-  const plan = await planFor(shopDomain);
-  return { enabled: quoteCaptureAllowed(plan) };
+  // Review 5.1.2: a theme block must show in the storefront as soon as it is
+  // added, on every plan. The only off switch is the merchant's own widget
+  // toggle (paid-plan extras are gated inside the admin, not by hiding the block).
+  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { quoteWidgetEnabled: true } });
+  return { enabled: Boolean(shop?.quoteWidgetEnabled) };
 }

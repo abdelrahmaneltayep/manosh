@@ -55,7 +55,7 @@ model Shop {
   supportedLocales      Json? // F16: enabled locales, e.g. ["en","ar"]
   supportedCurrencies   Json? // F16: enabled currencies (besides the store default), e.g. ["SAR"]
   i18nStrings           Json? // F16: custom UI string overrides, keyed by locale (Growth)
-  quoteWidgetEnabled    Boolean                @default(false) // F17: storefront Request-a-Quote widget on/off
+  quoteWidgetEnabled    Boolean                @default(true) // F17: storefront Request-a-Quote widget on/off (on by default so the theme block shows as soon as it's added — review 5.1.2)
   quoteWidgetLabel      String? // F17: button label (falls back to a default)
   quoteWidgetGated      Boolean                @default(false) // F17: only approved wholesale buyers see it (Growth)
   quoteWidgetCartEnabled Boolean               @default(false) // F17: cart-level requests (Growth)

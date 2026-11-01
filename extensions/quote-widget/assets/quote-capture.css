@@ -26,3 +26,6 @@
 .mannon-cap-hp { position: absolute !important; left: -9999px !important; width: 1px; height: 1px; opacity: 0; }
 .mannon-cap-btn { background: var(--mannon-accent, #4F46E5); color: #fff; border: 0; border-radius: 8px; padding: 10px 18px; font: inherit; font-weight: 600; cursor: pointer; width: 100%; }
 .mannon-cap-msg, .mannon-cap-flash { font-size: .85rem; color: #3730a3; margin: 8px 0 0; }
+
+/* Theme-editor-only note rendered by the block (request.design_mode); never on the live storefront. */
+.mannon-editor-note { margin: 6px 0 0; font: 500 12px/1.4 inherit; font-family: inherit; color: #5b5f6e; background: #eef0ff; border: 1px dashed #c7d2fe; border-radius: 8px; padding: 6px 10px; }

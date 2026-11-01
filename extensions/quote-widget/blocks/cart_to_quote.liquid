@@ -11,9 +11,14 @@
   data-app-url="{{ block.settings.app_url | default: 'https://manosh.fly.dev' }}"
   style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
 >
-  <button type="button" class="mannon-c2q-btn" hidden data-mannon-c2q-btn>
+  <button type="button" class="mannon-c2q-btn" data-mannon-c2q-btn>
     {{ block.settings.label | default: 'Request a quote for this cart' }}
   </button>
+  {% if request.design_mode %}
+    <p class="mannon-editor-note" data-mannon-editor-note>
+      Mannon · Convert Cart to Quote. Turns the cart into one quote request. Shown to shoppers while the widget is on in Mannon → Quote forms. Only you see this note.
+    </p>
+  {% endif %}
 </div>
 
 <script src="{{ 'quote-capture.js' | asset_url }}" defer></script>

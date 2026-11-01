@@ -9,3 +9,6 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+/* Theme-editor-only note rendered by the block (request.design_mode); never on the live storefront. */
+.mannon-editor-note { margin: 6px 0 0; font: 500 12px/1.4 inherit; font-family: inherit; color: #5b5f6e; background: #eef0ff; border: 1px dashed #c7d2fe; border-radius: 8px; padding: 6px 10px; }

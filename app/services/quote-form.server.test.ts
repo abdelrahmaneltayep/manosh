@@ -100,12 +100,20 @@ describe.skipIf(!hasDb)("quote-form.server (DB)", () => {
     expect(full?.translations).toEqual({}); // translations stripped (Growth)
   });
 
-  it("getQuoteCaptureConfig: on for paid + flag, off otherwise (F24.3)", async () => {
+  it("getQuoteCaptureConfig: on when the flag and the merchant toggle are on, on every plan (5.1.2)", async () => {
     await starter();
     vi.stubEnv("MANNON_FF_QUOTE_CAPTURE", "true");
     expect(await getQuoteCaptureConfig("qf.myshopify.com")).toEqual({ enabled: true });
+    // Free plan still renders the block — plan never hides a storefront surface.
+    await prisma.shop.update({ where: { shopifyDomain: "qf.myshopify.com" }, data: { plan: "FREE" } });
+    expect(await getQuoteCaptureConfig("qf.myshopify.com")).toEqual({ enabled: true });
+    // The merchant's own widget toggle is the one off switch.
+    await prisma.shop.update({ where: { shopifyDomain: "qf.myshopify.com" }, data: { quoteWidgetEnabled: false } });
+    expect(await getQuoteCaptureConfig("qf.myshopify.com")).toEqual({ enabled: false });
+    await prisma.shop.update({ where: { shopifyDomain: "qf.myshopify.com" }, data: { quoteWidgetEnabled: true } });
     vi.stubEnv("MANNON_FF_QUOTE_CAPTURE", "false");
     expect(await getQuoteCaptureConfig("qf.myshopify.com")).toEqual({ enabled: false });
+    expect(await getQuoteCaptureConfig("unknown.myshopify.com")).toEqual({ enabled: false });
     vi.unstubAllEnvs();
   });
 });

@@ -472,7 +472,9 @@ export async function getOfferPublicConfig(shopDomain: string): Promise<OfferPub
   const off: OfferPublicConfig = { enabled: false, label: "Make an offer", surfaces: { ...DEFAULT_SURFACES }, hideAtcUntilOffer: false, instant: false };
   if (!MAKE_AN_OFFER_ENABLED()) return off;
   const caps = await getShopCapabilities(shopDomain);
-  if (caps.makeAnOffer === "teaser") return off; // free/starter: no storefront surface
+  // Every plan renders the button (review 5.1.2: a block that shows nothing on
+  // Free/Starter reads as broken). Plan tiers change what happens AFTER the
+  // offer: rules and auto-answers are Growth/Scale, instant answers Scale only.
   const isScale = caps.makeAnOffer === "auto";
   const cfg = await getWidgetConfig(shopDomain);
   const s = (cfg?.surfaces as unknown as Partial<OfferSurfaces>) ?? {};
@@ -538,8 +540,9 @@ export async function submitPublicOffer(
   if (!submitRateOk(`offer:${ctx.rateKey}`, now)) return { ok: true, outcome: "pending", silent: true };
 
   if (!MAKE_AN_OFFER_ENABLED()) return { ok: false, error: "Offers aren’t available right now." };
-  const caps = await getShopCapabilities(shopDomain);
-  if (caps.makeAnOffer === "teaser") return { ok: false, error: "Offers aren’t available right now." };
+  // Accepted on every plan. On Free/Starter ("teaser") there are no offer rules
+  // and no auto-answer, so the offer simply lands in the merchant's inbox as
+  // pending — the same path Growth takes when a rule doesn't match.
 
   const email = (input.buyerEmail ?? "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: "Enter a valid email." };

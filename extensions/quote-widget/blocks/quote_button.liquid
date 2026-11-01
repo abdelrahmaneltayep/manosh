@@ -19,9 +19,14 @@
   {% if customer %}data-customer-email="{{ customer.email | escape }}"{% endif %}
   style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
 >
-  <button type="button" class="mannon-qw-btn" hidden data-mannon-qw-open>
+  <button type="button" class="mannon-qw-btn" data-mannon-qw-open>
     {{ block.settings.label | default: 'Request a Quote' }}
   </button>
+  {% if request.design_mode %}
+    <p class="mannon-editor-note" data-mannon-editor-note>
+      Mannon · Request a Quote. Shown to shoppers while the widget is on in Mannon → Quote forms. Only you see this note.
+    </p>
+  {% endif %}
 </div>
 
 <script src="{{ 'quote-widget.js' | asset_url }}" defer></script>

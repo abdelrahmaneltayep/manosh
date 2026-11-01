@@ -22,17 +22,33 @@
     .then(function (d) { if (d && d.form) customForm = d.form; })
     .catch(function () { /* no custom form → fall back to built-in fields */ });
 
+  // Review 5.1.2: the button is visible from first paint (the block never
+  // renders nothing). Config only refines it — label, cart surface, custom
+  // fields — or hides it when the merchant turned the widget off. In the theme
+  // editor it always stays visible so the merchant can place and style it.
+  var designMode = Boolean(window.Shopify && window.Shopify.designMode);
+  var btn = root.querySelector("[data-mannon-qw-open]");
+  var cfg = { enabled: true, label: btn ? btn.textContent.trim() : "Request a Quote", gated: false, cartEnabled: true, customFields: [] };
+  if (btn) btn.addEventListener("click", function () { openModal(cfg); });
+
+  function markOff(reason) {
+    if (designMode) {
+      var note = root.querySelector("[data-mannon-editor-note]");
+      if (note) note.textContent = "Mannon · Request a Quote is " + reason + ". Shoppers won't see this button until it's on. Only you see this note.";
+      return;
+    }
+    if (btn) btn.hidden = true;
+  }
+
   fetch(appUrl + "/api/quote-widget-config?shop=" + encodeURIComponent(shop))
     .then(function (r) { return r.json(); })
-    .then(function (cfg) {
-      if (!cfg || !cfg.enabled) return; // dark-launched off / gated
-      if (source === "CART" && !cfg.cartEnabled) return;
-      var btn = root.querySelector("[data-mannon-qw-open]");
-      btn.textContent = cfg.label || "Request a Quote";
-      btn.hidden = false;
-      btn.addEventListener("click", function () { openModal(cfg); });
+    .then(function (d) {
+      if (!d || !d.enabled) { markOff("off in Mannon → Quote forms"); return; }
+      if (source === "CART" && !d.cartEnabled) { markOff("not enabled for the cart page (Growth)"); return; }
+      cfg = d;
+      if (btn && d.label) btn.textContent = d.label;
     })
-    .catch(function () { /* fail closed: no button, no storefront impact */ });
+    .catch(function () { /* keep the default button working; the API accepts the submission */ });
 
   function esc(s) { return String(s == null ? "" : s); }
   function attr(s) { return esc(s).replace(/"/g, "&quot;"); }

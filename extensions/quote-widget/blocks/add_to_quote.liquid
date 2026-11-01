@@ -16,9 +16,14 @@
   {% endif %}
   style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
 >
-  <button type="button" class="mannon-atq-btn" hidden data-mannon-atq-add>
+  <button type="button" class="mannon-atq-btn" data-mannon-atq-add>
     {{ block.settings.label | default: 'Add to Quote' }}
   </button>
+  {% if request.design_mode %}
+    <p class="mannon-editor-note" data-mannon-editor-note>
+      Mannon · Add to Quote. Buyers collect products into one quote. Shown to shoppers while the widget is on in Mannon → Quote forms. Only you see this note.
+    </p>
+  {% endif %}
 </div>
 
 <script src="{{ 'quote-capture.js' | asset_url }}" defer></script>

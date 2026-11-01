@@ -139,30 +139,43 @@
   function flash(btn, text) { var p = btn.parentNode.querySelector(".mannon-cap-flash") || (function () { var el = document.createElement("p"); el.className = "mannon-cap-flash"; btn.parentNode.appendChild(el); return el; })(); p.textContent = text; }
 
   // --- init -----------------------------------------------------------------
-  fetch(appUrl + "/api/quote-capture-config?shop=" + encodeURIComponent(shop))
-    .then(function (r) { return r.json(); })
-    .then(function (cfg) {
-      if (!cfg || !cfg.enabled) return; // off / not a paid plan → buttons stay hidden
-      ensureLauncher();
-      alwaysShowLauncher = load().length > 0;
-      paint();
-
-      document.querySelectorAll("[data-mannon-atq-add]").forEach(function (btn) {
-        btn.hidden = false;
-        var host = btn.closest("[data-mannon-capture]") || base;
-        btn.addEventListener("click", function () {
-          addItem({
-            variantId: host.getAttribute("data-variant-id"),
-            sku: host.getAttribute("data-sku"),
-            title: host.getAttribute("data-title"),
-            quantity: 1
-          });
+  // Review 5.1.2: buttons are visible from first paint on every plan and work
+  // with defaults. Config can only hide them when the merchant turned the
+  // widget off — and never inside the theme editor.
+  var designMode = Boolean(window.Shopify && window.Shopify.designMode);
+  function wire() {
+    ensureLauncher();
+    alwaysShowLauncher = load().length > 0;
+    paint();
+    document.querySelectorAll("[data-mannon-atq-add]").forEach(function (btn) {
+      var host = btn.closest("[data-mannon-capture]") || base;
+      btn.addEventListener("click", function () {
+        addItem({
+          variantId: host.getAttribute("data-variant-id"),
+          sku: host.getAttribute("data-sku"),
+          title: host.getAttribute("data-title"),
+          quantity: 1
         });
       });
-      document.querySelectorAll("[data-mannon-c2q-btn]").forEach(function (btn) {
-        btn.hidden = false;
-        btn.addEventListener("click", function () { cartToQuote(btn); });
+    });
+    document.querySelectorAll("[data-mannon-c2q-btn]").forEach(function (btn) {
+      btn.addEventListener("click", function () { cartToQuote(btn); });
+    });
+  }
+  function markOff() {
+    if (designMode) {
+      document.querySelectorAll("[data-mannon-capture] [data-mannon-editor-note]").forEach(function (note) {
+        note.textContent = "Mannon · this block is off in Mannon → Quote forms. Shoppers won't see the button until the widget is on. Only you see this note.";
       });
-    })
-    .catch(function () { /* fail closed: no buttons, no storefront impact */ });
+      return;
+    }
+    document.querySelectorAll("[data-mannon-atq-add], [data-mannon-c2q-btn]").forEach(function (btn) { btn.hidden = true; });
+    if (launcher) launcher.hidden = true;
+  }
+  wire();
+
+  fetch(appUrl + "/api/quote-capture-config?shop=" + encodeURIComponent(shop))
+    .then(function (r) { return r.json(); })
+    .then(function (cfg) { if (!cfg || !cfg.enabled) markOff(); })
+    .catch(function () { /* keep the default buttons working; the API decides on submit */ });
 })();

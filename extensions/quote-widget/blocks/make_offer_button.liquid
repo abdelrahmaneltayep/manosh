@@ -20,9 +20,14 @@
   {% if customer %}data-customer-email="{{ customer.email | escape }}"{% endif %}
   style="--mannon-accent: {{ block.settings.accent | default: '#4F46E5' }};"
 >
-  <button type="button" class="mannon-mao-btn" hidden data-mannon-mao-open>
+  <button type="button" class="mannon-mao-btn" data-mannon-mao-open>
     {{ block.settings.label | default: 'Make an offer' }}
   </button>
+  {% if request.design_mode %}
+    <p class="mannon-editor-note" data-mannon-editor-note>
+      Mannon · Make an Offer. Offers land in Mannon → Quotes → Offers; rules and instant answers come with Growth and Scale. Only you see this note.
+    </p>
+  {% endif %}
 </div>
 
 <script src="{{ 'make-an-offer.js' | asset_url }}" defer></script>

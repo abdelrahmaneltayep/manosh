@@ -11,17 +11,32 @@
   var source = root.getAttribute("data-source") || "PRODUCT";
   var renderedAt = Date.now();
 
+  // Review 5.1.2: the button is visible from first paint on every plan. Config
+  // refines the label and surfaces (instant answers on Scale) or hides the
+  // button when the merchant turned the surface off — never in the theme editor.
+  var designMode = Boolean(window.Shopify && window.Shopify.designMode);
+  var btn = root.querySelector("[data-mannon-mao-open]");
+  var cfg = { enabled: true, label: btn ? btn.textContent.trim() : "Make an offer", surfaces: { button: true }, instant: false };
+  if (btn) btn.addEventListener("click", function () { openModal(cfg); });
+
+  function markOff(reason) {
+    if (designMode) {
+      var note = root.querySelector("[data-mannon-editor-note]");
+      if (note) note.textContent = "Mannon · Make an Offer is " + reason + ". Shoppers won't see this button until it's on. Only you see this note.";
+      return;
+    }
+    if (btn) btn.hidden = true;
+  }
+
   fetch(appUrl + "/api/offer-config?shop=" + encodeURIComponent(shop))
     .then(function (r) { return r.json(); })
-    .then(function (cfg) {
-      if (!cfg || !cfg.enabled) return; // dark-launched off / gated below Growth
-      if (!cfg.surfaces || !cfg.surfaces.button) return;
-      var btn = root.querySelector("[data-mannon-mao-open]");
-      btn.textContent = cfg.label || "Make an offer";
-      btn.hidden = false;
-      btn.addEventListener("click", function () { openModal(cfg); });
+    .then(function (d) {
+      if (!d || !d.enabled) { markOff("off in Mannon"); return; }
+      if (!d.surfaces || !d.surfaces.button) { markOff("off for the button surface in Mannon → Offers"); return; }
+      cfg = d;
+      if (btn && d.label) btn.textContent = d.label;
     })
-    .catch(function () { /* fail closed: no button, no storefront impact */ });
+    .catch(function () { /* keep the default button working; the API decides on submit */ });
 
   function esc(s) { return String(s == null ? "" : s); }
   function num(s) { var n = parseFloat(String(s).replace(/[^0-9.]/g, "")); return isFinite(n) ? n : 0; }
