@@ -12,6 +12,7 @@ import {
   QuoteNotFoundError,
 } from "../services/quote.server";
 import { acceptAndOrder, CreditBlockedError } from "../services/quote-accept.server";
+import { isReorderAwaitingApproval } from "../services/reorder.server";
 import { DraftOrderError } from "../services/draft-order.server";
 import { getCatalog } from "../services/catalog.server";
 import { getPaymentTerms, type PaymentTerm } from "../services/payment-terms.server";
@@ -79,6 +80,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const estimated = await estimateQuoteAmount(quoteId);
   const approvalRecord = accountsOn ? await getApprovalForQuote(quoteId) : null;
   const requiresApproval = threshold != null && needsApproval(estimated, threshold);
+  const reorderAwaitingApproval = await isReorderAwaitingApproval(quote);
 
   return {
     paymentTerms,
@@ -93,6 +95,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       canDecide:
         accountsOn && approvalRecord?.status === "PENDING" && canApprove(buyer.role as CompanyRole),
     },
+    reorderAwaitingApproval,
     quote: {
       status: quote.status,
       createdAt: quote.createdAt,
@@ -214,7 +217,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function BuyerQuote() {
-  const { quote, paymentTerms, approval } = useLoaderData<typeof loader>();
+  const { quote, paymentTerms, approval, reorderAwaitingApproval } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -238,6 +241,14 @@ export default function BuyerQuote() {
       <p className="muted">
         Sent {formatDate(quote.createdAt)} · Expires {formatDate(quote.expiresAt)}
       </p>
+
+      {reorderAwaitingApproval && (
+        <p className="muted" role="status">
+          <strong>Waiting for your supplier.</strong> Some prices have changed since your last
+          order, so your supplier will review this reorder before it’s placed. Nothing is ordered
+          until they do.
+        </p>
+      )}
 
       {actionError && (
         <p className="error" role="alert">

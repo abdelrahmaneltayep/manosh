@@ -162,6 +162,20 @@ export function reorderNeedsApproval(
   return lines.some((line) => relativeDelta(line.originalPrice, line.currentPrice) > tolerance);
 }
 
+/**
+ * True when this quote is a reorder the merchant still has to approve: its
+ * prices moved past the tolerance, so createReorder left it SUBMITTED. Read from
+ * the append-only REORDER_CREATED event, so the buyer sees why on every visit.
+ */
+export async function isReorderAwaitingApproval(quote: { id: string; status: string }): Promise<boolean> {
+  if (quote.status !== "SUBMITTED") return false;
+  const event = await prisma.event.findFirst({
+    where: { type: "REORDER_CREATED", entityType: "Quote", entityId: quote.id },
+    select: { payload: true },
+  });
+  return (event?.payload as { needsApproval?: unknown } | null)?.needsApproval === true;
+}
+
 export interface CreateReorderResult {
   quote: QuoteWithLines;
   autoApproved: boolean;

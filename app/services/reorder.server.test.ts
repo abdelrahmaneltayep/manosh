@@ -5,6 +5,7 @@ import type { AdminGraphqlClient } from "./draft-order.server";
 import {
   buildReorderLines,
   createReorder,
+  isReorderAwaitingApproval,
   listReorderCards,
   mapOrderLines,
   reorderNeedsApproval,
@@ -67,6 +68,14 @@ describe("reorderNeedsApproval (pure)", () => {
 
   it("tolerance 0 means any change needs approval", () => {
     expect(reorderNeedsApproval([line("9.00", "9.01")], 0)).toBe(true);
+  });
+});
+
+describe("isReorderAwaitingApproval (no DB for settled quotes)", () => {
+  it("is false for any quote that is no longer waiting, without a lookup", async () => {
+    for (const status of ["COUNTERED", "ACCEPTED", "ORDERED", "EXPIRED"]) {
+      expect(await isReorderAwaitingApproval({ id: "q1", status })).toBe(false);
+    }
   });
 });
 
@@ -179,5 +188,21 @@ describe.skipIf(!hasDb)("createReorder + listReorderCards (DB)", () => {
     ).map((e) => e.type);
     expect(types).toContain("REORDER_CREATED");
     expect(types).not.toContain("DRAFT_ORDER_CREATED");
+  });
+
+  it("flags a held reorder as awaiting approval, and not one inside tolerance or a plain quote", async () => {
+    const { company, buyer } = await setup(0.05);
+    const held = await createReorder({ companyId: company.id, buyerId: buyer.id, lines: movedLines, tolerance: 0.05 });
+    expect(held.needsApproval).toBe(true);
+    expect(await isReorderAwaitingApproval(held.quote)).toBe(true);
+
+    const within = await createReorder({ companyId: company.id, buyerId: buyer.id, lines: withinLines, tolerance: 0.05 });
+    expect(within.needsApproval).toBe(false);
+    expect(await isReorderAwaitingApproval(within.quote)).toBe(false);
+
+    const plain = await prisma.quote.create({
+      data: { companyId: company.id, buyerId: buyer.id, status: "SUBMITTED", expiresAt: new Date() },
+    });
+    expect(await isReorderAwaitingApproval(plain)).toBe(false);
   });
 });

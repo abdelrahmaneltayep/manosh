@@ -6,7 +6,7 @@ import { getBuyerId } from "../services/buyer-session.server";
 import { isExpired } from "../services/quote.server";
 import { listReorderCards } from "../services/reorder.server";
 import { quoteStatusBadge } from "../lib/quote-status";
-import { formatDate } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { PWA_ENABLED } from "../services/pwa.server";
 
 const ACCOUNTS_ENABLED = () => process.env.MANNON_FF_COMPANY_ACCOUNTS === "true";
@@ -98,7 +98,7 @@ export default function PortalHome() {
                   <strong>{card.orderName}</strong>
                   <span className="muted">
                     {" "}
-                    · {formatDate(card.orderedAt)} · {card.currency} {card.total}
+                    · {formatDate(card.orderedAt)} · {formatMoney(card.total, card.currency)}
                   </span>
                 </span>
                 <Link to={`/portal/reorder/${card.id}`} className="portal-link">
