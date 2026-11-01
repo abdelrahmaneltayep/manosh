@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { portalErrorContent, acceptFailureMessage } from "./portal-error";
+import { portalErrorContent, acceptFailureMessage, graphqlErrorMessages } from "./portal-error";
 
 describe("portalErrorContent", () => {
   it("gives a 'not found' message for 404", () => {
@@ -48,6 +48,20 @@ describe("acceptFailureMessage (pure)", () => {
     expect(msg).not.toMatch(/at .* \(/);
   });
 
+  it("reads the Admin client's nested graphQLErrors (the live demo failure's shape)", () => {
+    const err = Object.assign(new Error("GraphQL Client: An error occurred while fetching from the API."), {
+      body: {
+        errors: {
+          networkStatusCode: 200,
+          message: "GraphQL Client: An error occurred while fetching from the API. Review 'graphQLErrors' for details.",
+          graphQLErrors: [{ message: "Variable $input of type DraftOrderInput! was provided invalid value" }],
+        },
+      },
+    });
+    expect(graphqlErrorMessages(err)).toEqual(["Variable $input of type DraftOrderInput! was provided invalid value"]);
+    expect(acceptFailureMessage(err)).toContain("Shopify couldn’t create the order: Variable $input");
+  });
+
   it("explains an expired or missing store session", () => {
     expect(acceptFailureMessage(new Error("Could not find an offline session for shop"))).toContain("store connection needs a refresh");
   });
@@ -55,5 +69,13 @@ describe("acceptFailureMessage (pure)", () => {
   it("falls back to the generic retry line", () => {
     expect(acceptFailureMessage(new TypeError("x is not a function"))).toBe("We couldn’t create your order just now. Please try again.");
     expect(acceptFailureMessage(null)).toBe("We couldn’t create your order just now. Please try again.");
+  });
+});
+
+describe("graphqlErrorMessages (pure)", () => {
+  it("is empty for anything that is not a GraphQL error", () => {
+    expect(graphqlErrorMessages(new Error("boom"))).toEqual([]);
+    expect(graphqlErrorMessages(null)).toEqual([]);
+    expect(graphqlErrorMessages({ body: { errors: { message: "x" } } })).toEqual([]);
   });
 });

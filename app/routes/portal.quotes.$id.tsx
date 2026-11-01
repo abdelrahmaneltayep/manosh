@@ -199,7 +199,15 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     // Anything else is a real failure (Shopify GraphQL error, expired offline
     // session, DB). Log it and send it to Sentry — the live QA run found this
     // path swallowed the cause — and give the buyer a message that names it.
-    console.error("[portal.accept] order creation failed for quote", quoteId, error);
+    // Log Shopify's GraphQL errors whole (extensions.problems says which input
+    // was rejected); console.error alone truncates them to [Array].
+    const graphQLErrors = (error as { body?: { errors?: { graphQLErrors?: unknown } } } | null)?.body?.errors
+      ?.graphQLErrors;
+    console.error(
+      "[portal.accept] order creation failed for quote %s: %s",
+      quoteId,
+      graphQLErrors ? JSON.stringify(graphQLErrors) : String(error),
+    );
     captureException(error);
     return { error: acceptFailureMessage(error) };
   }

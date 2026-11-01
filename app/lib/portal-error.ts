@@ -40,12 +40,27 @@ export function portalErrorContent(status: number | null): PortalErrorContent {
  */
 export function acceptFailureMessage(error: unknown): string {
   const generic = "We couldn’t create your order just now. Please try again.";
-  const graphqlErrors = (error as { body?: { errors?: Array<{ message?: string }> } } | null)?.body?.errors;
-  const first = Array.isArray(graphqlErrors) ? graphqlErrors.find((e) => e?.message)?.message : undefined;
+  const first = graphqlErrorMessages(error)[0];
   if (first) return `Shopify couldn’t create the order: ${first.trim().replace(/\.?$/, ".")} Please contact your supplier.`;
   const message = error instanceof Error ? error.message : "";
   if (/not found|no session|offline session|access token|expired/i.test(message)) {
     return "Your supplier’s store connection needs a refresh. Please try again in a moment or contact your supplier.";
   }
   return generic;
+}
+
+/**
+ * The messages of a Shopify GraphQL error. The Admin client's GraphqlQueryError
+ * nests them as `body.errors.graphQLErrors[]`; a raw response body has
+ * `body.errors[]`. Empty when the error is not a GraphQL error.
+ */
+export function graphqlErrorMessages(error: unknown): string[] {
+  const errors = (error as { body?: { errors?: unknown } } | null)?.body?.errors;
+  const list = Array.isArray(errors)
+    ? errors
+    : (errors as { graphQLErrors?: unknown } | undefined)?.graphQLErrors;
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((e) => (e as { message?: unknown } | null)?.message)
+    .filter((m): m is string => typeof m === "string" && m.trim() !== "");
 }
