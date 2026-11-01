@@ -235,7 +235,7 @@ A demo company and buyer are seeded on install, so you can create a quote immedi
 STEPS
 1. Install the app on the test store. Open it and click each left-nav section (Home through Pricing plans) — every page loads.
 2. Quotes > New quote: add 2–3 products, set quantities.
-3. Click "✦ Draft with Claude". Claude drafts a counter-offer. Review it and click Apply — the AI only pre-fills; it never sends on its own.
+3. Click "✦ Draft with Claude". Claude drafts a counter-offer. Review it and click Apply — it only pre-fills; it never sends on its own.
 4. Pick a payment term (e.g. Net 30) and Send. Prices, tax and totals come from a Shopify draft order — the app never recomputes them.
 5. Open the buyer view via the magic link shown after sending — no login required. Click Accept; you must confirm on a dialog before anything is written.
 6. On confirm, the quote becomes a real Shopify draft order (see Orders > Drafts, source "Mannon").
@@ -244,7 +244,7 @@ STEPS
 9. Reorder: one-tap reorder clones a past order into a fresh draft, re-priced by Shopify.
 10. Pricing plans: click Choose plan. Shopify's plan page opens; pick a plan and approve. You return with the plan active.
 11. Storefront: add the "Request a Quote" block (or Add to Quote / Make an Offer) to a product page in the theme editor and save. The button shows at once; submit and the request appears under Quotes > Requests.
-12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a Countered quote and a reorder card from a real past order.
+12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a Countered quote and a reorder card from a real order.
 13. Open that quote and click Accept & create order. It flips to Ordered and a draft order (PO PO-DEMO-1042, tax and total from Shopify) appears under Orders > Drafts on the demo store.
 14. Click Reorder on the card. Shopify re-prices it; within tolerance it becomes a draft order, otherwise it goes to the Quote Inbox. Start the tour walks the merchant screens.
 
