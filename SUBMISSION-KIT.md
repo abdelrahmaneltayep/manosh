@@ -283,7 +283,8 @@ NOTES
 
 ## Pre-submission checklist (dashboard side)
 
-- [ ] Protected customer data access requested (Level 2, fields: email, name) —
+- [x] Protected customer data access requested (Level 2, fields: email, name) — saved 2026-11-01,
+      Data protection details answered (see docs/data-protection.md) —
       required before resubmitting. Until Shopify records it, every draft order
       (buyer accept, reorder, merchant convert, offer convert) fails with
       `ACCESS_DENIED … CalculatedDraftOrder`, and the orders list reads as empty, so
