@@ -214,3 +214,17 @@ Protected customer data access is saved in the Partner Dashboard (`93a05fc`).
 - **Status:** FAIL (behaviour correct, the buyer-facing note is missing)
 
 **Totals for TC12–TC14:** 2 pass, 1 fail. Fix for TC14: when `createReorder` returns `needsApproval`, the quote page should say that the reorder's prices changed and the supplier will confirm.
+
+## Fifth re-run of TC12 and TC14, v50 (`4ceb242`)
+
+TC13 was skipped this time, because it passed on v48 and v49 and each run leaves a draft order on the store.
+
+#### TC12 (fifth re-run)
+- **Actual:** Lands as Demo buyer (Snowdevil). "Reorder a past order" shows **#1001 · Nov 1, 2026 · $16,980.90 · Reorder**: the total is now formatted as money. The Countered quote is listed (`rerun5-tc12-portal.png`).
+- **Status:** PASS
+
+#### TC14 (fifth re-run)
+- **Actual:** Reorder → "Send reorder" creates quote `cmvy82h2x000mr9h5p563ddwo`, marked New, and the page says **"Waiting for your supplier. Some prices have changed since your last order, so your supplier will review this reorder before it's placed. Nothing is ordered until they do."** The note is still there after a reload (`rerun5-tc14-held-note.png`).
+- **Status:** PASS
+
+**Latest status of TC12–TC14:** TC12 PASS (v50), TC13 PASS (v48 and v49), TC14 PASS (v50). TC1–TC11 and the final check remain BLOCKED (no admin sign-in for this session).
