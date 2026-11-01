@@ -242,33 +242,42 @@ STEPS
 7. Quote forms > AI Order Pad: paste "20x <SKU>, 5x <SKU>" — Claude matches the lines; nothing is ordered until you click Confirm & build cart.
 8. Analytics: view the ✦ Claude insights (win-rate, credit-risk, buyer summary) — advisory, on screen only.
 9. Reorder: one-tap reorder clones a past order into a fresh draft, re-priced by Shopify.
-10. Pricing plans: click Choose plan. Shopify's plan page opens (managed pricing); pick a plan and approve. You return with the plan active.
-11. Storefront: open a product page with the "Request a Quote" block and submit — it confirms in place and the request appears under Quotes > Requests.
+10. Pricing plans: click Choose plan. Shopify's plan page opens; pick a plan and approve. You return with the plan active.
+11. Storefront: add the "Request a Quote" block (or Add to Quote / Make an Offer) to a product page in the theme editor and save. The button shows at once; submit and the request appears under Quotes > Requests.
 12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a Countered quote and a reorder card from a real past order.
 13. Open that quote and click Accept & create order. It flips to Ordered and a draft order (PO PO-DEMO-1042, tax and total from Shopify) appears under Orders > Drafts on the demo store.
 14. Click Reorder on the card. Shopify re-prices it; within tolerance it becomes a draft order, otherwise it goes to the Quote Inbox. Start the tour walks the merchant screens.
 
 NOTES
-- AI is human-in-the-loop: temperature 0, every output lands on a confirm screen, every returned product id is checked against the live catalog. Claude never writes a quote, cart or order on its own.
+- AI is human-in-the-loop: every output lands on a confirm screen, every returned product id is checked against the live catalog. Claude never writes a quote, cart or order on its own.
 - ✦ Draft with Claude and Claude insights are on Growth and Scale (and a one-time trial). If you don't see the ✦ controls, select the Growth plan.
-- Pricing (managed by Shopify App Pricing): Free $0, Starter $9, Growth $29, Scale $69 per month; 14-day trial on paid plans. No per-order charges.
+- Pricing via Shopify App Pricing: Free $0, Starter $9, Growth $29, Scale $69/month; 14-day trial on paid plans. No per-order charges.
 - GDPR webhooks (customers/data_request, customers/redact, shop/redact) and app/uninstalled are HMAC-verified; bad signatures get 401.
 - Privacy policy: https://manosh.fly.dev/privacy
 ```
 
 ---
 
-## Reviewer resubmission note  (reply to the 2.1.1 storefront rejection)
+## Reviewer resubmission note  (reply to the 5.1.2 + 1.2.2 suspension, ref 126730)
 
-> **2.1.1 ("Something went wrong" on the storefront Request a Quote form):** Fixed —
-> the public quote-request endpoint and every other storefront endpoint now return a
-> plain-language result instead of a server error, and the form confirms in place.
-> Test: open a product page with the Request a Quote block, submit, and check
-> Quotes > Requests.
-> **Billing:** the app now uses Shopify App Pricing. Pricing plans → Choose plan opens
-> Shopify's plan page and returns to the embedded app with the plan active.
-> **API version:** moved to a supported Admin API version (2026-04).
-> Test store: [dev store]. All flows verified.
+> **5.1.2 (theme app extension didn't show on the online store):** Fixed. Every
+> Mannon app block (Request a Quote, Add to Quote, Convert Cart to Quote, Make an
+> Offer, Price / ATC gate) now renders the moment it is added, in the theme editor
+> and on the live store, on every plan. Previously the buttons started hidden and
+> waited for a config call that was gated by plan and by a default-off toggle, so a
+> fresh install showed nothing. The toggle now defaults to on, plan never hides a
+> storefront block, and the editor shows a note explaining each block.
+> Test: Online Store → Customize → product page → Add block → "Add to Quote" (or any
+> Mannon block) → Save. The button is visible in the editor and on the product page;
+> submitting creates an entry under Quotes > Requests (or Quotes > Offers).
+> **1.2.2 (plan selection opened "There's no page at this address"):** Fixed. The
+> link to Shopify's plan page used a guessed app handle; the app now reads its own
+> handle from the Admin API (`currentAppInstallation.app.handle`) and builds the
+> managed-pricing URL from it. Test: Pricing plans → Choose Growth opens Shopify's
+> plan page for this app; approve or decline, and you return to the app with the
+> plan reflected. Uninstall and reinstall: the plan page is offered again.
+> Test store: [dev store]. All flows re-verified on the deployed build, including the
+> end-to-end suite (tests/*.e2e.ts) against the served app.
 
 ---
 
@@ -276,8 +285,15 @@ NOTES
 
 - [ ] Protected customer data access requested (Level 2, fields: email, name) —
       required before resubmitting.
-- [ ] App Pricing plans created with handles `free` / `starter` / `growth` / `scale`
-      and the prices above; `SHOPIFY_APP_HANDLE` set if the handle isn't `mannon`.
+- [ ] App Pricing plans created in the Partner Dashboard with handles `free` /
+      `starter` / `growth` / `scale` and the prices above. Without them Shopify's plan
+      page has nothing to show. The app now reads its own handle from the Admin API,
+      so `SHOPIFY_APP_HANDLE` is only a fallback; still, open
+      `https://admin.shopify.com/store/<dev-store>/charges/<app handle>/pricing_plans`
+      once by hand and confirm the four plans render (review 1.2.2).
+- [ ] Theme app extension re-verified after `npm run deploy`: in the theme editor add
+      each Mannon block to a product page and the cart page, save, then open the live
+      store — every button is visible before touching any Mannon setting (review 5.1.2).
 - [x] Release the extension update: `npm run deploy` released the app version carrying
       the customer-account extension on API 2026-07 (Preact + Polaris web components)
       and the theme extension on 2026-07. Verified 2026-09-19: the "Your quotes" block
