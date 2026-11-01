@@ -34,7 +34,7 @@ import {
   type TemplateKey,
 } from "../services/mailer.server";
 import prisma from "../db.server";
-import { requireBilling, reconcileShopPlan, managedPricingUrl } from "../services/billing.server";
+import { requireBilling, reconcileShopPlan, managedPricingUrlFor } from "../services/billing.server";
 import { NO_PER_ORDER_FEES_COPY } from "../lib/billing-v3";
 import { canCreateQuote } from "../services/plan-limits.server";
 import {
@@ -221,7 +221,7 @@ type ActionResult =
   | { ok: false; kind: "settings" | "billing" | "seat" | "template" | "claude"; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session, redirect } = await authenticate.admin(request);
+  const { session, admin, redirect } = await authenticate.admin(request);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "save-settings");
 
@@ -296,7 +296,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     // Shopify App Pricing (managed): the app never creates or cancels charges.
     // All plan changes happen on Shopify's hosted plan page — redirect there at
     // the top level (it lives on admin.shopify.com, outside the app iframe).
-    return redirect(managedPricingUrl(session.shop), { target: "_top" });
+    // The app handle comes from the Admin API, never a guess (review 1.2.2).
+    return redirect(await managedPricingUrlFor(admin, session.shop), { target: "_top" });
   }
 
   if (intent === "seat-invite" || intent === "seat-remove") {

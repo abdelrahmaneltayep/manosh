@@ -16,7 +16,7 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { requireBilling, reconcileShopPlan, managedPricingUrl } from "../services/billing.server";
+import { requireBilling, reconcileShopPlan, managedPricingUrlFor } from "../services/billing.server";
 import {
   PLAN_PRICING_V3,
   PLAN_DISPLAY_NAME,
@@ -69,8 +69,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // charge. Every plan action opens Shopify's hosted plan-selection page, which
   // handles approval, trial, proration and downgrade to Free. It's on
   // admin.shopify.com, so redirect at the top level (out of the app iframe).
-  const { session, redirect } = await authenticate.admin(request);
-  return redirect(managedPricingUrl(session.shop), { target: "_top" });
+  // The app handle in the URL is read from the Admin API, never guessed
+  // (review 1.2.2: a wrong handle 404s on Shopify's side).
+  const { session, admin, redirect } = await authenticate.admin(request);
+  return redirect(await managedPricingUrlFor(admin, session.shop), { target: "_top" });
 };
 
 function dollars(cents: number): string {

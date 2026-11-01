@@ -141,13 +141,64 @@ export function resolveV3PlanFromName(
  * The Shopify-hosted App Pricing plan-selection page for a shop. Under managed
  * pricing the app never creates charges — it sends the merchant here (top-level)
  * and Shopify handles the subscription, trial, proration and cancellation.
- * The app handle is not in shopify.app.toml, so it is configurable via env
- * (SHOPIFY_APP_HANDLE) with the app's slug as the default.
+ *
+ * The URL needs the app's HANDLE (the Partner Dashboard slug), which is not in
+ * shopify.app.toml. Guessing it is exactly what App Store review 1.2.2 caught:
+ * a wrong handle lands on Shopify's "There's no page at this address". So the
+ * handle is resolved from the Admin API (`currentAppInstallation.app.handle`)
+ * via `managedPricingUrlFor`; `SHOPIFY_APP_HANDLE` and the "mannon" default are
+ * only the fallback when the API can't be reached. Pure given a handle.
  */
-export function managedPricingUrl(shopDomain: string): string {
+export function managedPricingUrl(shopDomain: string, handle: string = fallbackAppHandle()): string {
   const store = shopDomain.replace(/\.myshopify\.com$/, "");
-  const handle = process.env.SHOPIFY_APP_HANDLE || "mannon";
   return `https://admin.shopify.com/store/${store}/charges/${handle}/pricing_plans`;
+}
+
+function fallbackAppHandle(): string {
+  return process.env.SHOPIFY_APP_HANDLE || "mannon";
+}
+
+/** Minimal Admin GraphQL client shape (what `authenticate.admin` returns as `admin`). */
+export interface AppHandleAdmin {
+  graphql: (query: string, options?: { variables?: Record<string, unknown> }) => Promise<Response>;
+}
+
+const appHandleCache = new Map<string, string>();
+
+/**
+ * The app's handle as Shopify knows it for this installation. Cached per shop
+ * for the process lifetime (a handle never changes for a released app). Falls
+ * back to the env/default handle when the API fails, so the plan page still
+ * opens rather than the action erroring.
+ */
+export async function resolveAppHandle(admin: AppHandleAdmin, shopDomain: string): Promise<string> {
+  const cached = appHandleCache.get(shopDomain);
+  if (cached) return cached;
+  try {
+    const res = await admin.graphql(
+      `#graphql
+      query MannonAppHandle { currentAppInstallation { app { handle } } }`,
+    );
+    const body = (await res.json()) as { data?: { currentAppInstallation?: { app?: { handle?: string | null } | null } | null } };
+    const handle = body?.data?.currentAppInstallation?.app?.handle?.trim();
+    if (handle) {
+      appHandleCache.set(shopDomain, handle);
+      return handle;
+    }
+  } catch (error) {
+    captureException(error);
+  }
+  return fallbackAppHandle();
+}
+
+/** `managedPricingUrl` with the handle resolved live. Use this from routes. */
+export async function managedPricingUrlFor(admin: AppHandleAdmin, shopDomain: string): Promise<string> {
+  return managedPricingUrl(shopDomain, await resolveAppHandle(admin, shopDomain));
+}
+
+/** Test seam: forget cached handles. */
+export function clearAppHandleCache(): void {
+  appHandleCache.clear();
 }
 
 interface SubscriptionLike {

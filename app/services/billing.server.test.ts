@@ -10,6 +10,9 @@ import {
   requirePlan,
   resolveActivePlan,
   managedPricingUrl,
+  managedPricingUrlFor,
+  resolveAppHandle,
+  clearAppHandleCache,
   planMeets,
   featureAccess,
   planEnumFor,
@@ -95,12 +98,55 @@ describe("managedPricingUrl", () => {
       "https://admin.shopify.com/store/mannon-9iu9ewku/charges/mannon/pricing_plans",
     );
   });
-  it("honors SHOPIFY_APP_HANDLE when set", () => {
+  it("takes an explicit handle", () => {
+    expect(managedPricingUrl("s.myshopify.com", "mannon-b2b")).toBe(
+      "https://admin.shopify.com/store/s/charges/mannon-b2b/pricing_plans",
+    );
+  });
+  it("honors SHOPIFY_APP_HANDLE as the fallback when no handle is given", () => {
     const prev = process.env.SHOPIFY_APP_HANDLE;
     process.env.SHOPIFY_APP_HANDLE = "custom-handle";
     expect(managedPricingUrl("s.myshopify.com")).toBe(
       "https://admin.shopify.com/store/s/charges/custom-handle/pricing_plans",
     );
+    if (prev === undefined) delete process.env.SHOPIFY_APP_HANDLE;
+    else process.env.SHOPIFY_APP_HANDLE = prev;
+  });
+});
+
+// Review 1.2.2: "Choose plan" 404'd because the handle in the pricing URL was
+// a guess. The handle must come from Shopify itself.
+describe("resolveAppHandle / managedPricingUrlFor", () => {
+  const adminWith = (body: unknown, fail = false) => ({
+    graphql: vi.fn(async () => {
+      if (fail) throw new Error("admin unreachable");
+      return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+    }),
+  });
+
+  beforeEach(() => clearAppHandleCache());
+
+  it("reads the installed app's handle from currentAppInstallation", async () => {
+    const admin = adminWith({ data: { currentAppInstallation: { app: { handle: "mannon-b2b-quotes" } } } });
+    expect(await resolveAppHandle(admin, "s.myshopify.com")).toBe("mannon-b2b-quotes");
+    expect(await managedPricingUrlFor(admin, "s.myshopify.com")).toBe(
+      "https://admin.shopify.com/store/s/charges/mannon-b2b-quotes/pricing_plans",
+    );
+    expect(admin.graphql).toHaveBeenCalledWith(expect.stringContaining("currentAppInstallation"));
+  });
+
+  it("caches the handle per shop so the plan page never waits on a second API call", async () => {
+    const admin = adminWith({ data: { currentAppInstallation: { app: { handle: "mannon-x" } } } });
+    await resolveAppHandle(admin, "a.myshopify.com");
+    await resolveAppHandle(admin, "a.myshopify.com");
+    expect(admin.graphql).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to the configured handle when the API fails or answers without one", async () => {
+    const prev = process.env.SHOPIFY_APP_HANDLE;
+    process.env.SHOPIFY_APP_HANDLE = "fallback-handle";
+    expect(await resolveAppHandle(adminWith(null, true), "b.myshopify.com")).toBe("fallback-handle");
+    expect(await resolveAppHandle(adminWith({ data: { currentAppInstallation: { app: { handle: "" } } } }), "c.myshopify.com")).toBe("fallback-handle");
     if (prev === undefined) delete process.env.SHOPIFY_APP_HANDLE;
     else process.env.SHOPIFY_APP_HANDLE = prev;
   });
