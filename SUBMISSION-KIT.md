@@ -284,7 +284,19 @@ NOTES
 ## Pre-submission checklist (dashboard side)
 
 - [ ] Protected customer data access requested (Level 2, fields: email, name) —
-      required before resubmitting.
+      required before resubmitting. Until Shopify records it, every draft order
+      (buyer accept, reorder, merchant convert, offer convert) fails with
+      `ACCESS_DENIED … CalculatedDraftOrder`, and the orders list reads as empty, so
+      the demo shows no reorder card. Partner Dashboard → Apps → Mannon → API access →
+      Protected customer data access:
+      1. Select **Protected customer data** itself (the Level 1 box), with a reason
+         such as "Creating B2B draft orders and reading past orders for reorder".
+      2. Then select **Name** and **Email** (Level 2), each with a reason.
+      3. Complete **Data protection details** (the questionnaire) and save — a
+         dev-store app gets access only after this step, and only once a
+         distribution method is chosen for the app.
+      4. Re-open the app in the dev store admin once, then run demo steps 12–14
+         again. The accept should reach Ordered and the reorder card should appear.
 - [ ] App Pricing plans created in the Partner Dashboard with handles `free` /
       `starter` / `growth` / `scale` and the prices above. Without them Shopify's plan
       page has nothing to show. The app now reads its own handle from the Admin API,
