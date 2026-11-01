@@ -246,7 +246,7 @@ STEPS
 11. Storefront: add the "Request a Quote" block (or Add to Quote / Make an Offer) to a product page in the theme editor and save. The button shows at once; submit and the request appears under Quotes > Requests.
 12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a Countered quote and a reorder card from a real order.
 13. Open that quote, click Accept & create order, then Confirm & create order. It flips to Ordered and a draft order (PO PO-DEMO-1042, tax and total from Shopify) appears under Orders > Drafts on the demo store.
-14. Click Reorder on the card. Shopify re-prices it; within tolerance it becomes a draft order, otherwise it goes to the Quote Inbox.
+14. Click Reorder, then Send reorder. Within the Settings tolerance it becomes a draft order; otherwise it waits in the Quote Inbox.
 
 NOTES
 - AI is human-in-the-loop: every output lands on a confirm screen, every returned product id is checked against the live catalog. Claude never writes a quote, cart or order on its own.
@@ -277,7 +277,8 @@ NOTES
 > plan page for this app; approve or decline, and you return to the app with the
 > plan reflected. Uninstall and reinstall: the plan page is offered again.
 > Test store: [dev store]. All flows re-verified on the deployed build, including the
-> end-to-end suite (tests/*.e2e.ts) against the served app.
+> end-to-end suite (tests/*.e2e.ts) against the served app and a live click-through of
+> the public buyer demo (accept → draft order, reorder) recorded in docs/qa.
 
 ---
 
