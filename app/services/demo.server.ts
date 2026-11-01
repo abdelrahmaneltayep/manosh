@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { buildDraftOrderInput, createDraftOrder } from "./draft-order.server";
 
 /**
  * Public "Try the demo" (landing page). Lets a visitor open the buyer portal on
@@ -212,6 +213,78 @@ export async function fetchDemoOrders(admin: AdminGraphql, first = 3): Promise<D
     }));
 }
 
+/**
+ * Seed one real order on the demo store when the app can see none (the
+ * reorder card is the feature reviewers look for). Builds a draft order for the
+ * demo company from the live catalog and completes it with `paymentPending:
+ * true`, so nothing is charged. Only runs on MANNON_DEMO_SHOP, and only when
+ * the company has no saved reorder source yet, so at most one order is seeded.
+ * Returns the created order straight from the mutation payload (no list query).
+ */
+export async function seedDemoOrder(
+  admin: AdminGraphql,
+  input: { company: DemoCompanyRef; catalog: DemoCatalogItem[] },
+): Promise<DemoOrderRef | null> {
+  const { company, catalog } = input;
+  if (!company.locationId || !company.contactId) return null;
+  const items = catalog.filter((c) => Number(c.price) > 0 && !c.isGiftCard).slice(0, 2);
+  if (items.length === 0) return null;
+
+  const draft = await createDraftOrder(
+    admin,
+    buildDraftOrderInput({
+      currencyCode: items[0].currencyCode,
+      poReference: "PO-DEMO-SEED",
+      purchasingEntity: {
+        companyId: company.id,
+        companyLocationId: company.locationId,
+        companyContactId: company.contactId,
+      },
+      lines: items.map((c, i) => ({ variantId: c.variantId, quantity: i === 0 ? 12 : 6, price: c.price })),
+    }),
+  );
+
+  const res = await admin.graphql(
+    `#graphql
+    mutation MannonDemoSeedOrder($id: ID!) {
+      draftOrderComplete(id: $id, paymentPending: true) {
+        draftOrder {
+          order { id name createdAt totalPriceSet { shopMoney { amount currencyCode } } }
+        }
+        userErrors { field message }
+      }
+    }`,
+    { variables: { id: draft.id } },
+  );
+  const body = (await res.json()) as {
+    data?: {
+      draftOrderComplete?: {
+        draftOrder?: {
+          order?: {
+            id?: string;
+            name?: string;
+            createdAt?: string;
+            totalPriceSet?: { shopMoney?: { amount?: string; currencyCode?: string } };
+          } | null;
+        } | null;
+        userErrors?: Array<{ message?: string }>;
+      };
+    };
+    errors?: Array<{ message?: string }>;
+  };
+  if (body?.errors?.length) {
+    throw new Error(`draftOrderComplete failed: ${body.errors.map((e) => e.message).join("; ")}`);
+  }
+  const payload = body?.data?.draftOrderComplete;
+  if (payload?.userErrors?.length) {
+    throw new Error(`draftOrderComplete failed: ${payload.userErrors.map((e) => e.message).join("; ")}`);
+  }
+  const o = payload?.draftOrder?.order;
+  const money = o?.totalPriceSet?.shopMoney;
+  if (!o?.id || !o.name || !o.createdAt || !money?.amount || !money.currencyCode) return null;
+  return { id: o.id, name: o.name, createdAt: o.createdAt, amount: money.amount, currencyCode: money.currencyCode };
+}
+
 /* ------------------------------------------------------------------- entry */
 
 export type StartDemoResult =
@@ -361,14 +434,39 @@ export async function startDemo(options: {
     select: { id: true },
   });
 
+  // The live catalog feeds both the seeded quotes and, if needed, the seeded
+  // order. Best-effort: an empty catalog just means an emptier demo.
+  const catalogFor = options.catalogFor ?? defaultCatalogFor;
+  let catalog: DemoCatalogItem[] = [];
+  try {
+    catalog = await catalogFor(domain);
+  } catch (error) {
+    console.error("[demo] reading the catalog failed:", error);
+    const { captureException } = await import("../lib/sentry.server");
+    captureException(error);
+  }
+
   // Reorder cards from real past orders — best-effort, never blocks the demo.
   let orders: DemoOrderRef[] = [];
   try {
     orders = await fetchDemoOrders(admin);
     if (orders.length === 0) {
-      // read_orders only sees the last 60 days, so an idle demo store has no
-      // reorder cards until it gets a new order.
-      console.warn("[demo] %s has no orders in the last 60 days; the portal shows no reorder card", domain);
+      // read_orders only sees the last 60 days. Keep any card already saved;
+      // otherwise seed one payment-pending order so the demo always has a card
+      // (and the log shows whether Shopify then lists it).
+      const saved = await prisma.reorderSource.count({ where: { companyId: companyRow.id } });
+      if (saved > 0) {
+        console.info("[demo] %s: the orders query returned nothing; keeping %d saved reorder card(s)", domain, saved);
+      } else {
+        console.warn("[demo] %s has no orders the app can see in the last 60 days; seeding one (payment pending, never charged)", domain);
+        const seeded = await seedDemoOrder(admin, { company, catalog });
+        if (seeded) {
+          orders = [seeded];
+          console.info("[demo] seeded order %s (%s) on %s for the reorder card", seeded.name, seeded.id, domain);
+        } else {
+          console.warn("[demo] could not seed an order on %s: the company needs a location and a contact, and the catalog a priced product", domain);
+        }
+      }
     }
     for (const o of orders) {
       await prisma.reorderSource.upsert({
@@ -411,8 +509,6 @@ export async function startDemo(options: {
 
   // Sample quotes + invoice so the portal isn't empty — best-effort.
   try {
-    const catalogFor = options.catalogFor ?? defaultCatalogFor;
-    const catalog = await catalogFor(domain);
     await seedDemoBuyerData({
       shopId: shop.id,
       companyId: companyRow.id,

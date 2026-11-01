@@ -29,6 +29,14 @@ what `e2e.config.ts` names to the server (`DATABASE_URL`, the Shopify keys,
 without `MANNON_DEMO_SHOP` the buyer demo shows its unavailable notice and the
 suite asserts that notice instead of the portal.
 
+Demo reorder card: on the demo store the app reads the last 60 days of orders
+(all `read_orders` allows). When it can see none and the demo company has no
+saved reorder source yet, `startDemo` seeds one real order itself — a draft
+order from the live catalog completed with `paymentPending: true`, never charged,
+PO `PO-DEMO-SEED` — and the card comes from that mutation's payload. This runs
+only on `MANNON_DEMO_SHOP`, at most once, and the Fly log says when it did
+(`[demo] seeded order …`).
+
 First run: `npx playwright install chromium` (CI: `--with-deps`).
 
 What is covered today:

@@ -9,6 +9,7 @@ import {
   demoShopDomain,
   fetchDemoCompany,
   fetchDemoOrders,
+  seedDemoOrder,
   isDemoEmail,
   isDemoEnabled,
   startDemo,
@@ -155,6 +156,47 @@ describe("Shopify reads (stubbed admin)", () => {
     expect(query).not.toMatch(/query:/);
   });
 
+  const SEED_COMPANY = { id: "gid://shopify/Company/77", name: "Reef Trading", locationId: "gid://shopify/CompanyLocation/701", contactId: "gid://shopify/CompanyContact/7001" };
+  const SEED_CATALOG = [
+    { variantId: "gid://shopify/ProductVariant/90", displayTitle: "Gift Card", sku: null, price: "10.00", currencyCode: "USD", isGiftCard: true },
+    { variantId: "gid://shopify/ProductVariant/1", displayTitle: "Gloves", sku: "GLV", price: "12.40", currencyCode: "USD" },
+    { variantId: "gid://shopify/ProductVariant/2", displayTitle: "Sanitizer", sku: "SAN", price: "4.20", currencyCode: "USD" },
+    { variantId: "gid://shopify/ProductVariant/3", displayTitle: "Masks", sku: "MSK", price: "9.00", currencyCode: "USD" },
+  ];
+  const SEED_ORDER = { id: "gid://shopify/Order/5001", name: "#1005", createdAt: "2026-11-01T19:00:00Z", totalPriceSet: { shopMoney: { amount: "174.00", currencyCode: "USD" } } };
+
+  it("seeds one payment-pending order from the demo company and two priced, non-gift-card products", async () => {
+    const calls: Array<{ query: string; variables?: Record<string, unknown> }> = [];
+    const admin: AdminGraphql = {
+      graphql: async (query, opts) => {
+        calls.push({ query, variables: opts?.variables });
+        if (query.includes("MannonDraftOrderCreate")) {
+          return { json: async () => ({ data: { draftOrderCreate: { draftOrder: { id: "gid://shopify/DraftOrder/9" }, userErrors: [] } } }) };
+        }
+        return { json: async () => ({ data: { draftOrderComplete: { draftOrder: { order: SEED_ORDER }, userErrors: [] } } }) };
+      },
+    };
+    const seeded = await seedDemoOrder(admin, { company: SEED_COMPANY, catalog: SEED_CATALOG });
+    expect(seeded).toEqual({ id: "gid://shopify/Order/5001", name: "#1005", createdAt: "2026-11-01T19:00:00Z", amount: "174.00", currencyCode: "USD" });
+    const input = calls[0].variables?.input as { lineItems: Array<{ variantId: string }>; purchasingEntity: { purchasingCompany: Record<string, string> }; poNumber?: string };
+    expect(input.lineItems.map((l) => l.variantId)).toEqual(["gid://shopify/ProductVariant/1", "gid://shopify/ProductVariant/2"]);
+    expect(input.purchasingEntity.purchasingCompany).toEqual({ companyId: SEED_COMPANY.id, companyLocationId: SEED_COMPANY.locationId, companyContactId: SEED_COMPANY.contactId });
+    expect(input.poNumber).toBe("PO-DEMO-SEED");
+    expect(calls[1].query).toMatch(/draftOrderComplete\(id: \$id, paymentPending: true\)/);
+    expect(calls[1].variables).toEqual({ id: "gid://shopify/DraftOrder/9" });
+  });
+
+  it("never seeds without a company contact or a priced product, and surfaces userErrors", async () => {
+    const admin = stubAdmin({});
+    expect(await seedDemoOrder(admin, { company: { ...SEED_COMPANY, contactId: null }, catalog: SEED_CATALOG })).toBeNull();
+    expect(await seedDemoOrder(admin, { company: SEED_COMPANY, catalog: [SEED_CATALOG[0]] })).toBeNull();
+    const failing = stubAdmin({
+      MannonDraftOrderCreate: { data: { draftOrderCreate: { draftOrder: { id: "gid://shopify/DraftOrder/9" }, userErrors: [] } } },
+      MannonDemoSeedOrder: { data: { draftOrderComplete: { draftOrder: null, userErrors: [{ message: "Draft order is already completed" }] } } },
+    });
+    await expect(seedDemoOrder(failing, { company: SEED_COMPANY, catalog: SEED_CATALOG })).rejects.toThrow(/already completed/);
+  });
+
   it("maps recent orders and drops ones without a total", async () => {
     const bad = { data: { orders: { nodes: [...ORDERS_RESPONSE.data.orders.nodes, { id: "gid://shopify/Order/1", name: "#1", createdAt: "2026-01-01T00:00:00Z" }] } } };
     const orders = await fetchDemoOrders(stubAdmin({ MannonDemoOrders: bad }));
@@ -243,6 +285,32 @@ describe.skipIf(!hasDb)("startDemo (DB)", () => {
     expect(lines.length).toBeGreaterThan(0);
     expect(lines.map((l) => l.variantId)).not.toContain("gid://shopify/ProductVariant/90");
     expect(lines.map((l) => l.variantId)).not.toContain("gid://shopify/ProductVariant/91");
+  });
+
+  it("seeds one order for the reorder card when the store has none, and never a second one", async () => {
+    await prisma.shop.create({ data: { shopifyDomain: DOMAIN } });
+    let creates = 0;
+    const noOrders: AdminGraphql = {
+      graphql: async (query) => {
+        if (query.includes("MannonDemoCompany")) return { json: async () => COMPANY_RESPONSE };
+        if (query.includes("MannonDemoOrders")) return { json: async () => ({ data: { orders: { nodes: [] } } }) };
+        if (query.includes("MannonDraftOrderCreate")) { creates++; return { json: async () => ({ data: { draftOrderCreate: { draftOrder: { id: "gid://shopify/DraftOrder/9" }, userErrors: [] } } }) }; }
+        if (query.includes("MannonDemoSeedOrder")) return { json: async () => ({ data: { draftOrderComplete: { draftOrder: { order: { id: "gid://shopify/Order/5001", name: "#1005", createdAt: "2026-11-01T19:00:00Z", totalPriceSet: { shopMoney: { amount: "174.00", currencyCode: "USD" } } } }, userErrors: [] } } }) };
+        return { json: async () => ({}) };
+      },
+    };
+    const first = await startDemo({ ip: "1.1.1.3", limiter: fresh(), adminFor: async () => noOrders, catalogFor: async () => CATALOG });
+    expect(first.ok).toBe(true);
+    const cards = await prisma.reorderSource.findMany();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ shopifyOrderId: "gid://shopify/Order/5001", orderName: "#1005", total: "174.00", currency: "USD" });
+    expect(creates).toBe(1);
+
+    // The next visitor finds the saved card and Shopify is not asked for another order.
+    const second = await startDemo({ ip: "1.1.1.4", limiter: fresh(), adminFor: async () => noOrders, catalogFor: async () => CATALOG });
+    expect(second.ok).toBe(true);
+    expect(await prisma.reorderSource.count()).toBe(1);
+    expect(creates).toBe(1);
   });
 
   it("does not seed quotes when the catalog is empty, and still opens the demo", async () => {
