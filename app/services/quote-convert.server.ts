@@ -59,6 +59,11 @@ export async function convertQuoteToOrder(
   if (!companyLocationId) {
     throw new QuoteConvertError("This buyer isn’t linked to a company location yet, so an order can’t be created.");
   }
+  // Shopify requires a company contact on a B2B draft order (companyContactId is ID!).
+  const companyContactId = quote.buyer.shopifyContactId;
+  if (!companyContactId) {
+    throw new QuoteConvertError("This buyer isn’t linked to a contact at their company yet, so an order can’t be created.");
+  }
 
   // Build from the quote's lines with the AGREED prices, verbatim. price.toString()
   // is the negotiated unit price — Shopify calculates tax + totals on top.
@@ -69,7 +74,7 @@ export async function convertQuoteToOrder(
     purchasingEntity: {
       companyId: quote.company.shopifyCompanyId,
       companyLocationId,
-      companyContactId: quote.buyer.shopifyContactId,
+      companyContactId,
     },
     lines: quote.lines.map((line) => ({
       variantId: line.variantId,

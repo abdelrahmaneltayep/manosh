@@ -320,6 +320,11 @@ export async function convertOffer(
   if (!company || !buyer?.shopifyCompanyLocationId) {
     return { error: "This buyer isn’t linked to a company location yet, so an order can’t be created." };
   }
+  // Shopify requires a company contact on a B2B draft order (companyContactId
+  // is ID!), so stop here with a plain message rather than a GraphQL error.
+  if (!buyer.shopifyContactId) {
+    return { error: "This buyer isn’t linked to a contact at their company yet, so an order can’t be created." };
+  }
   const purchasingEntity: PurchasingEntityRef = {
     companyId: company.shopifyCompanyId,
     companyLocationId: buyer.shopifyCompanyLocationId,

@@ -65,6 +65,15 @@ describe.skipIf(!hasDb)("quote-convert.server (DB)", () => {
     expect(await prisma.event.count({ where: { type: "QUOTE_CONVERTED" } })).toBe(1);
   });
 
+  it("refuses a buyer with no company contact before calling Shopify (companyContactId is ID!)", async () => {
+    const { quote } = await acceptedQuote();
+    await prisma.buyer.update({ where: { id: quote.buyerId }, data: { shopifyContactId: null } });
+    let called = false;
+    const admin = { graphql: async () => { called = true; return { json: async () => ({}) }; } };
+    await expect(convertQuoteToOrder(quote.id, admin as never, { currencyCode: "USD" })).rejects.toThrow(/contact at their company/);
+    expect(called).toBe(false);
+  });
+
   it("blocks a non-accepted or already-converted quote", async () => {
     const { quote } = await acceptedQuote();
     await convertQuoteToOrder(quote.id, fakeAdmin({}), { currencyCode: "USD" });

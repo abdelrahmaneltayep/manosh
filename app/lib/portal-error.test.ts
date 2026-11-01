@@ -62,6 +62,13 @@ describe("acceptFailureMessage (pure)", () => {
     expect(acceptFailureMessage(err)).toContain("Shopify couldn’t create the order: Variable $input");
   });
 
+  it("turns Shopify's protected-customer-data denial into plain language (no docs link)", () => {
+    const err = { body: { errors: { graphQLErrors: [{ message: "ACCESS_DENIED: This app is not approved to access the CalculatedDraftOrder object. See https://shopify.dev/docs/apps/launch/protected-customer-data for more details." }] } } };
+    const msg = acceptFailureMessage(err);
+    expect(msg).toMatch(/hasn’t finished approving this app/);
+    expect(msg).not.toMatch(/shopify\.dev|ACCESS_DENIED|CalculatedDraftOrder/);
+  });
+
   it("explains an expired or missing store session", () => {
     expect(acceptFailureMessage(new Error("Could not find an offline session for shop"))).toContain("store connection needs a refresh");
   });

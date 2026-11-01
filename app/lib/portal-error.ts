@@ -41,6 +41,11 @@ export function portalErrorContent(status: number | null): PortalErrorContent {
 export function acceptFailureMessage(error: unknown): string {
   const generic = "We couldn’t create your order just now. Please try again.";
   const first = graphqlErrorMessages(error)[0];
+  // Shopify's protected-customer-data denial reads as developer text with a
+  // docs link; the buyer needs the plain fact (the merchant acts on the logs).
+  if (first && /ACCESS_DENIED|not approved to access|protected customer data/i.test(first)) {
+    return "Your supplier’s store hasn’t finished approving this app to create orders yet. Please contact your supplier.";
+  }
   if (first) return `Shopify couldn’t create the order: ${first.trim().replace(/\.?$/, ".")} Please contact your supplier.`;
   const message = error instanceof Error ? error.message : "";
   if (/not found|no session|offline session|access token|expired/i.test(message)) {
