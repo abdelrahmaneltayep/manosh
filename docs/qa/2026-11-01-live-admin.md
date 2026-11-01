@@ -181,3 +181,20 @@ after the confirm step (quote `cmvy64ml90017r9h4tabqy5k8`, `rerun2-tc13-result.p
 **Status: FAIL, FAIL, FAIL.** Per shopify.dev/docs/apps/launch/protected-customer-data, a
 dev-store app can only read customer data once step 5, "Complete your Data protection details", is done,
 and only after a distribution method has been chosen.
+
+## Third re-run of TC12–TC14, 18:56 UTC (v47, `93a05fc`)
+
+Protected customer data access is saved in the Partner Dashboard (`93a05fc`).
+
+#### TC13 (third re-run)
+- **Actual:** The confirm step appears. After confirming, `POST /portal/quotes/cmvy6yayc0005r9h45qdoe9pj` returns 204 (a redirect) in 2.1 s, with no error logged. The quote shows **Ordered** with Shopify's totals: Subtotal USD 37767.53, Tax USD 0.0, Total USD 37767.53 (`rerun3-tc13-ordered.png`). The draft order and its PO (PO-DEMO-1042) weren't checked under Orders → Drafts, because there was no admin sign-in. Minor: tax shows as `0.0`, not `0.00`.
+- **Status:** PASS (admin-side draft check pending)
+
+#### TC12 (third re-run)
+- **Actual:** Lands as Demo buyer (Snowdevil) with a Countered quote. There's still no reorder card, and the log says `[demo] … no orders in the last 60 days` (`rerun3-tc12-portal.png`).
+- **Status:** FAIL
+
+#### TC14 (third re-run)
+- **Status:** FAIL (no card, blocked by TC12)
+
+**Totals for TC12–TC14:** 1 pass, 2 fail. Next: check that the store has a completed order (Orders, not Drafts) placed within the last 60 days.
