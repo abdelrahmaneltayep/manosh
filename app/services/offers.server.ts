@@ -476,7 +476,8 @@ export async function getOfferPublicConfig(shopDomain: string): Promise<OfferPub
   // Free/Starter reads as broken). Plan tiers change what happens AFTER the
   // offer: rules and auto-answers are Growth/Scale, instant answers Scale only.
   const isScale = caps.makeAnOffer === "auto";
-  const cfg = await getWidgetConfig(shopDomain);
+  if (!(await shopIdFor(shopDomain))) return off; // unknown shop (not installed): never render a button for it
+  const cfg = await getWidgetConfig(shopDomain); // null = installed shop with no saved widget config → defaults
   const s = (cfg?.surfaces as unknown as Partial<OfferSurfaces>) ?? {};
   return {
     enabled: true,

@@ -18,3 +18,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   return new Response(null, { status: 200 });
 };
+
+// Webhooks are POST-only. Without a loader Remix answers a GET with a 400
+// "Unexpected Server Error" JSON; a plain 405 is the honest answer.
+export const loader = () => new Response("Method not allowed", { status: 405 });

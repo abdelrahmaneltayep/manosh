@@ -1,10 +1,29 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from "vitest";
 import prisma from "../db.server";
 import { computeHmac } from "../lib/hmac.server";
-import { action as dataRequest } from "./webhooks.customers.data_request";
-import { action as customersRedact } from "./webhooks.customers.redact";
-import { action as shopRedact } from "./webhooks.shop.redact";
-import { action as appUninstalled } from "./webhooks.app.uninstalled";
+import { action as dataRequest, loader as dataRequestLoader } from "./webhooks.customers.data_request";
+import { action as customersRedact, loader as customersRedactLoader } from "./webhooks.customers.redact";
+import { action as shopRedact, loader as shopRedactLoader } from "./webhooks.shop.redact";
+import { action as appUninstalled, loader as appUninstalledLoader } from "./webhooks.app.uninstalled";
+import { loader as scopesUpdateLoader } from "./webhooks.app.scopes_update";
+
+// A GET on a webhook route (a browser, a scanner, a reviewer pasting the URL)
+// must get a plain 405 — without a loader Remix answers 400 "Unexpected Server
+// Error". Found by the QA harness (scripts/qa-smoke.sh).
+describe("webhook routes answer non-POST requests with 405", () => {
+  for (const [name, loader] of [
+    ["customers/data_request", dataRequestLoader],
+    ["customers/redact", customersRedactLoader],
+    ["shop/redact", shopRedactLoader],
+    ["app/uninstalled", appUninstalledLoader],
+    ["app/scopes_update", scopesUpdateLoader],
+  ] as const) {
+    it(`${name}: GET → 405`, () => {
+      const res = loader();
+      expect(res.status).toBe(405);
+    });
+  }
+});
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 const SECRET = "shpss_webhook_test_secret";

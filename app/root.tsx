@@ -5,6 +5,8 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  isRouteErrorResponse,
+  useRouteError,
 } from "@remix-run/react";
 
 // Default document title. Embedded admin pages set their own via App Bridge
@@ -39,13 +41,20 @@ export default function App() {
 // in app.tsx, the buyer-portal boundary in portal.tsx) handle their own
 // surfaces; this catches anything above them so a merchant or buyer never sees
 // a raw stack trace. It must render a full document because it replaces <App>.
+// A 404 gets its own copy: an unknown URL is not "something went wrong".
 export function ErrorBoundary() {
+  const error = useRouteError();
+  const notFound = isRouteErrorResponse(error) && error.status === 404;
+  const title = notFound ? "Page not found" : "Something went wrong";
+  const body = notFound
+    ? "The page you're looking for doesn't exist or has moved."
+    : "We hit an unexpected problem. Please refresh the page and try again.";
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <title>Something went wrong — Mannon</title>
+        <title>{title} — Mannon</title>
         <Meta />
         <Links />
       </head>
@@ -60,9 +69,12 @@ export function ErrorBoundary() {
             lineHeight: 1.5,
           }}
         >
-          <h1 style={{ fontSize: "1.5rem" }}>Something went wrong</h1>
-          <p style={{ color: "#4a4a4a" }}>
-            We hit an unexpected problem. Please refresh the page and try again.
+          <h1 style={{ fontSize: "1.5rem" }}>{title}</h1>
+          <p style={{ color: "#4a4a4a" }}>{body}</p>
+          <p>
+            <a href="/" style={{ color: "#4338ca" }}>
+              Go to the Mannon home page
+            </a>
           </p>
         </main>
         <Scripts />
