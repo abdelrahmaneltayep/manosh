@@ -147,3 +147,28 @@ each of the three blocks, both the theme editor and the live product page.
 - `docs/qa/2026-11-01-live-admin/tc13-confirm-dialog.png`
 - `docs/qa/2026-11-01-live-admin/tc13-retry.png`
 - `docs/qa/2026-11-01-live-admin/tc14-shortcuts.png`
+
+## Re-run of TC12–TC14, 18:29 UTC (release v45, `6c57c5c`)
+
+Fixes deployed since the first run: a confirm step before accept (`613c913`); Shopify's GraphQL
+errors shown to the buyer and logged in full (`849cf26`); the demo now picks a company that has a
+contact (`6c57c5c`). The new logs gave the root causes in order: first
+`companyContactId` was null (fixed in code), then `ACCESS_DENIED: This app is not approved to
+access the CalculatedDraftOrder object` (protected customer data). The owner reported the Partner
+Dashboard request as done before this re-run.
+
+#### TC12 (re-run)
+- **Actual:** Lands as "Welcome, Demo buyer" for company Snowdevil. One Countered and one New quote are listed. There's still no "Reorder a past order" section. The log says `[demo] mannon-9iu9ewku.myshopify.com has no orders in the last 60 days`, even though a test order was placed. `Order` is protected customer data too, so this probably has the same cause as TC13. (`rerun-tc12-portal.png`)
+- **Status:** FAIL (no reorder card)
+
+#### TC13 (re-run)
+- **Actual:** "Accept & create order" now opens a confirm step: "Accept this quote? … Nothing is written until you confirm." It offers "Confirm & create order" and "Go back" (`rerun-tc13-confirm.png`). After confirming, the page shows "Shopify couldn't create the order: This app is not approved to access the CalculatedDraftOrder object …", and the quote stays Countered (`rerun-tc13-result.png`). The log shows `[portal.accept] … ACCESS_DENIED` for quote `cmvy5zg1p000or9h4lyspw8y1`. The PO is pre-filled as PO-DEMO-1042.
+- **Status:** FAIL (protected customer data access not active for the app)
+
+#### TC14 (re-run)
+- **Actual:** There's no reorder card, so no reorder could be attempted.
+- **Status:** FAIL (blocked by TC12)
+
+**Still needed:** Shopify has to actually grant the app protected customer data access, at Level 2 with
+name and email, as in `SUBMISSION-KIT.md`. After that, re-run TC12–TC14. Expect the demo to find
+the new order (the card appears) and the accept to reach Ordered.
