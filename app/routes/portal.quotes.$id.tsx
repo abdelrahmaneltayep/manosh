@@ -23,7 +23,7 @@ import {
 } from "../services/approvals.server";
 import { needsApproval, canApprove, type CompanyRole } from "../lib/company-accounts";
 import { quoteStatusBadge } from "../lib/quote-status";
-import { formatDate } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 
 const ACCOUNTS_ENABLED = () => process.env.MANNON_FF_COMPANY_ACCOUNTS === "true";
 
@@ -357,21 +357,15 @@ export default function BuyerQuote() {
         <div className="totals" aria-label="Order totals">
           <div className="totals-row">
             <span>Subtotal</span>
-            <span>
-              {quote.totals.currencyCode} {quote.totals.subtotal}
-            </span>
+            <span>{formatMoney(quote.totals.subtotal, quote.totals.currencyCode)}</span>
           </div>
           <div className="totals-row">
             <span>Tax</span>
-            <span>
-              {quote.totals.currencyCode} {quote.totals.totalTax}
-            </span>
+            <span>{formatMoney(quote.totals.totalTax, quote.totals.currencyCode)}</span>
           </div>
           <div className="totals-row totals-total">
             <span>Total</span>
-            <span>
-              {quote.totals.currencyCode} {quote.totals.total}
-            </span>
+            <span>{formatMoney(quote.totals.total, quote.totals.currencyCode)}</span>
           </div>
         </div>
       )}

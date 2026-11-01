@@ -148,6 +148,13 @@ describe("Shopify reads (stubbed admin)", () => {
     expect(c).toBeNull();
   });
 
+  it("asks for orders without a search filter (REST's status:any matches nothing in GraphQL)", async () => {
+    let query = "";
+    await fetchDemoOrders({ graphql: async (q) => { query = q; return { json: async () => ORDERS_RESPONSE }; } });
+    expect(query).toMatch(/orders\(first: \$first, sortKey: CREATED_AT, reverse: true\)/);
+    expect(query).not.toMatch(/query:/);
+  });
+
   it("maps recent orders and drops ones without a total", async () => {
     const bad = { data: { orders: { nodes: [...ORDERS_RESPONSE.data.orders.nodes, { id: "gid://shopify/Order/1", name: "#1", createdAt: "2026-01-01T00:00:00Z" }] } } };
     const orders = await fetchDemoOrders(stubAdmin({ MannonDemoOrders: bad }));

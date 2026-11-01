@@ -166,12 +166,18 @@ export async function fetchDemoCompany(admin: AdminGraphql): Promise<DemoCompany
   };
 }
 
-/** The demo store's most recent orders (any status), for real reorder cards. */
+/**
+ * The demo store's most recent orders (every status), for real reorder cards.
+ * No `query:` filter: GraphQL's order search only knows status open/closed/
+ * cancelled/not_closed, and an unknown value such as the REST-only "status:any"
+ * matches nothing (that emptied the demo's reorder cards on 2026-11-01).
+ * Without read_all_orders the API returns the last 60 days, which is enough.
+ */
 export async function fetchDemoOrders(admin: AdminGraphql, first = 3): Promise<DemoOrderRef[]> {
   const res = await admin.graphql(
     `#graphql
     query MannonDemoOrders($first: Int!) {
-      orders(first: $first, query: "status:any", sortKey: CREATED_AT, reverse: true) {
+      orders(first: $first, sortKey: CREATED_AT, reverse: true) {
         nodes { id name createdAt totalPriceSet { shopMoney { amount currencyCode } } }
       }
     }`,
