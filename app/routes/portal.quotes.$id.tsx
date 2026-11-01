@@ -11,7 +11,7 @@ import {
   IllegalQuoteTransitionError,
   QuoteNotFoundError,
 } from "../services/quote.server";
-import { acceptAndOrder } from "../services/quote-accept.server";
+import { acceptAndOrder, CreditBlockedError } from "../services/quote-accept.server";
 import { DraftOrderError } from "../services/draft-order.server";
 import { getCatalog } from "../services/catalog.server";
 import { getPaymentTerms, type PaymentTerm } from "../services/payment-terms.server";
@@ -192,6 +192,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
             ? error.message
             : "This quote can no longer be accepted.",
       };
+    }
+    if (error instanceof CreditBlockedError) {
+      return { error: error.message };
     }
     // Anything else is a real failure (Shopify GraphQL error, expired offline
     // session, DB). Log it and send it to Sentry — the live QA run found this

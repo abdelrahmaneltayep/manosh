@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import prisma from "../db.server";
-import { acceptAndOrder } from "./quote-accept.server";
+import { acceptAndOrder, CreditBlockedError } from "./quote-accept.server";
+import { DEMO_EMAIL_DOMAIN } from "./demo.server";
 import {
   DraftOrderError,
   type AdminGraphqlClient,
@@ -57,7 +58,7 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     await prisma.$disconnect();
   });
 
-  async function counteredQuote(opts: { withLocation?: boolean } = {}) {
+  async function counteredQuote(opts: { withLocation?: boolean; email?: string } = {}) {
     const shop = await prisma.shop.create({
       data: { shopifyDomain: "s8.myshopify.com", quoteExpiryDays: 14 },
     });
@@ -67,7 +68,7 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     const buyer = await prisma.buyer.create({
       data: {
         companyId: company.id,
-        email: "b@s8.example",
+        email: opts.email ?? "b@s8.example",
         shopifyContactId: "gid://shopify/CompanyContact/8",
         shopifyCompanyLocationId:
           opts.withLocation === false ? null : "gid://shopify/CompanyLocation/8",
@@ -188,5 +189,44 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     ).map((e) => e.type);
     expect(types).not.toContain("QUOTE_ACCEPTED");
     expect(types).not.toContain("DRAFT_ORDER_CREATED");
+  });
+
+  describe("credit check", () => {
+    const prev = process.env.MANNON_FF_CREDIT;
+    beforeEach(() => {
+      process.env.MANNON_FF_CREDIT = "true";
+    });
+    afterAll(() => {
+      process.env.MANNON_FF_CREDIT = prev;
+    });
+
+    // Limit 300; another party already has 500 open on the company; this order is 205.20.
+    async function overLimitSetup(email: string) {
+      const setup = await counteredQuote({ email });
+      await prisma.creditProfile.create({ data: { companyId: setup.company.id, creditLimit: "300" } });
+      const other = await prisma.buyer.create({
+        data: { companyId: setup.company.id, email: `visitor-other@${DEMO_EMAIL_DOMAIN}` },
+      });
+      const otherQuote = await prisma.quote.create({
+        data: { companyId: setup.company.id, buyerId: other.id, status: "ORDERED", expiresAt: new Date() },
+      });
+      await prisma.invoice.create({
+        data: { companyId: setup.company.id, quoteId: otherQuote.id, amount: "500", currency: "USD", dueDate: new Date() },
+      });
+      return setup;
+    }
+
+    it("blocks a real buyer whose company is over its limit, before anything is created", async () => {
+      const { quote } = await overLimitSetup("b@s8.example");
+      const admin = mockAdmin();
+      await expect(acceptAndOrder(quote.id, admin, { currencyCode: "USD" })).rejects.toBeInstanceOf(CreditBlockedError);
+      expect(admin.calls).toEqual(["calculate"]);
+    });
+
+    it("does not charge one demo visitor's orders against another visitor", async () => {
+      const { quote } = await overLimitSetup(`visitor-me@${DEMO_EMAIL_DOMAIN}`);
+      const result = await acceptAndOrder(quote.id, mockAdmin(), { currencyCode: "USD" });
+      expect(result.quote.status).toBe("ORDERED");
+    });
   });
 });

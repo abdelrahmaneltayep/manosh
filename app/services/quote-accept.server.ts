@@ -17,6 +17,7 @@ import {
   type DraftOrderTotals,
 } from "./draft-order.server";
 import { evaluateCredit, getCreditProfile, outstandingForCompany, type CreditDecision } from "./credit.server";
+import { isDemoEmail } from "./demo.server";
 import { createInvoiceForOrder } from "./invoice.server";
 
 const CREDIT_ENABLED = () => process.env.MANNON_FF_CREDIT === "true";
@@ -143,7 +144,10 @@ export async function acceptAndOrder(
   if (CREDIT_ENABLED()) {
     const profile = await getCreditProfile(quote.companyId);
     if (profile) {
-      const outstanding = await outstandingForCompany(quote.companyId);
+      const outstanding = await outstandingForCompany(
+        quote.companyId,
+        isDemoEmail(quote.buyer.email) ? { onlyBuyerId: quote.buyerId } : {},
+      );
       const decision = evaluateCredit({
         status: profile.status,
         creditLimit: Number(profile.creditLimit),

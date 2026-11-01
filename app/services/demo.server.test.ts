@@ -271,4 +271,18 @@ describe.skipIf(!hasDb)("startDemo (DB)", () => {
     const left = (await prisma.buyer.findMany({ select: { email: true } })).map((b) => b.email).sort();
     expect(left).toEqual(["real@reef.example", `visitor-new@${DEMO_EMAIL_DOMAIN}`]);
   });
+
+  it("sweeps a stale visitor's invoices with them, keeping the shared seeded invoice", async () => {
+    const shop = await prisma.shop.create({ data: { shopifyDomain: DOMAIN } });
+    const company = await prisma.company.create({ data: { shopId: shop.id, shopifyCompanyId: "gid://shopify/Company/77", name: "Reef Trading" } });
+    const old = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    const visitor = await prisma.buyer.create({ data: { companyId: company.id, email: `visitor-old@${DEMO_EMAIL_DOMAIN}`, createdAt: old } });
+    const quote = await prisma.quote.create({ data: { companyId: company.id, buyerId: visitor.id, status: "ORDERED", expiresAt: new Date() } });
+    const due = new Date();
+    await prisma.invoice.create({ data: { companyId: company.id, quoteId: quote.id, amount: "500", currency: "USD", dueDate: due } });
+    await prisma.invoice.create({ data: { companyId: company.id, orderId: "gid://shopify/Order/1032", amount: "1840", currency: "USD", dueDate: due } });
+    expect(await sweepDemoBuyers(company.id)).toBe(1);
+    const left = await prisma.invoice.findMany({ select: { orderId: true } });
+    expect(left).toEqual([{ orderId: "gid://shopify/Order/1032" }]);
+  });
 });

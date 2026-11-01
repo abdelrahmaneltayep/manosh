@@ -48,10 +48,23 @@ export function creditBlockMessage(decision: CreditDecision): string | null {
   return `This order would put the company over its credit limit (${decision.projected.toFixed(2)} of ${decision.limit.toFixed(2)}). Override with a reason or raise the limit.`;
 }
 
-/** Sum of OPEN + OVERDUE invoice amounts for a company. */
-export async function outstandingForCompany(companyId: string): Promise<number> {
+/**
+ * Sum of OPEN + OVERDUE invoice amounts for a company. `onlyBuyerId` narrows it
+ * to invoices not raised from a quote plus that buyer's own quotes — the public
+ * demo shares one company across visitors, so one visitor's orders must not use
+ * up another's credit.
+ */
+export async function outstandingForCompany(
+  companyId: string,
+  options: { onlyBuyerId?: string } = {},
+): Promise<number> {
+  let quoteScope = {};
+  if (options.onlyBuyerId) {
+    const own = await prisma.quote.findMany({ where: { buyerId: options.onlyBuyerId }, select: { id: true } });
+    quoteScope = { OR: [{ quoteId: null }, { quoteId: { in: own.map((q) => q.id) } }] };
+  }
   const rows = await prisma.invoice.findMany({
-    where: { companyId, status: { in: ["OPEN", "OVERDUE"] } },
+    where: { companyId, status: { in: ["OPEN", "OVERDUE"] }, ...quoteScope },
     select: { amount: true },
   });
   return rows.reduce((sum, r) => sum + Number(r.amount), 0);

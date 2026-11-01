@@ -351,7 +351,11 @@ export async function startDemo(options: {
   let orders: DemoOrderRef[] = [];
   try {
     orders = await fetchDemoOrders(admin);
-    if (orders.length === 0) console.info("[demo] no orders returned for reorder cards on", domain);
+    if (orders.length === 0) {
+      // read_orders only sees the last 60 days, so an idle demo store has no
+      // reorder cards until it gets a new order.
+      console.warn("[demo] %s has no orders in the last 60 days; the portal shows no reorder card", domain);
+    }
     for (const o of orders) {
       await prisma.reorderSource.upsert({
         where: { companyId_shopifyOrderId: { companyId: companyRow.id, shopifyOrderId: o.id } },
@@ -421,9 +425,14 @@ async function defaultCatalogFor(shopDomain: string): Promise<DemoCatalogItem[]>
 /** Delete demo visitor buyers older than the TTL. Returns the count removed. */
 export async function sweepDemoBuyers(companyId: string, now: Date = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - DEMO_BUYER_TTL_DAYS * 24 * 60 * 60 * 1000);
-  const res = await prisma.buyer.deleteMany({
-    where: { companyId, email: { endsWith: `@${DEMO_EMAIL_DOMAIN}` }, createdAt: { lt: cutoff } },
-  });
+  const where = { companyId, email: { endsWith: `@${DEMO_EMAIL_DOMAIN}` }, createdAt: { lt: cutoff } };
+  // Invoice.quoteId is not a relation, so the quote cascade leaves a stale
+  // visitor's invoices OPEN on the shared demo company. Remove them first.
+  const quotes = await prisma.quote.findMany({ where: { buyer: where }, select: { id: true } });
+  if (quotes.length > 0) {
+    await prisma.invoice.deleteMany({ where: { companyId, quoteId: { in: quotes.map((q) => q.id) } } });
+  }
+  const res = await prisma.buyer.deleteMany({ where });
   return res.count;
 }
 
