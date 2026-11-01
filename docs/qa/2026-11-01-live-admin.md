@@ -172,3 +172,12 @@ Dashboard request as done before this re-run.
 **Still needed:** Shopify has to actually grant the app protected customer data access, at Level 2 with
 name and email, as in `SUBMISSION-KIT.md`. After that, re-run TC12–TC14. Expect the demo to find
 the new order (the card appears) and the accept to reach Ordered.
+
+## Second re-run of TC12–TC14, 18:33 UTC (v45)
+
+The owner reported protected customer data access as granted. The results are unchanged: TC12 has no
+reorder card (`[demo] … no orders in the last 60 days`), TC13 gets `ACCESS_DENIED … CalculatedDraftOrder`
+after the confirm step (quote `cmvy64ml90017r9h4tabqy5k8`, `rerun2-tc13-result.png`), and TC14 is blocked.
+**Status: FAIL, FAIL, FAIL.** Per shopify.dev/docs/apps/launch/protected-customer-data, a
+dev-store app can only read customer data once step 5, "Complete your Data protection details", is done,
+and only after a distribution method has been chosen.
