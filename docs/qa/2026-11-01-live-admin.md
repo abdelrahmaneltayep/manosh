@@ -228,3 +228,22 @@ TC13 was skipped this time, because it passed on v48 and v49 and each run leaves
 - **Status:** PASS
 
 **Latest status of TC12–TC14:** TC12 PASS (v50), TC13 PASS (v48 and v49), TC14 PASS (v50). TC1–TC11 and the final check remain BLOCKED (no admin sign-in for this session).
+
+## Re-run of TC14 with a 5% reorder tolerance, 2026-11-02 05:01 UTC (v50)
+
+The owner set the reorder tolerance on `mannon-9iu9ewku` to 5%. Since #1001 the line prices moved by
+0% (Inventory Not Tracked Snowboard, 949.95) and −4.8% (Minimal Snowboard, 930.25 → 885.95), so both
+are within tolerance.
+
+#### TC14 (tolerance 5%)
+- **Command:** Fresh buyer demo, then Reorder on the #1001 card, then Send reorder.
+- **Expected:** The prices are within tolerance, so the reorder converts straight to a Shopify draft order instead of waiting in the Quote Inbox.
+- **Actual:** "Reorder #1001" opens (`rerun6-tc14-reorder-page.png`). Send reorder (`POST /portal/reorder/cmvy7podx0003r9h4ck6llq9d` returned 204 in 2.4 s, with no error logged) lands on quote `cmvyskv7p001fr9h5srjhnha7`, marked **Ordered**: 12 × 949.95 and 6 × 885.95, Subtotal $16,971.62, Tax $0.00, Total $16,971.62. No "Waiting for your supplier" note appears (`rerun6-tc14-auto-ordered.png`). Ordered is only set after `draftOrderCreate` succeeds, so a draft order exists. Its id wasn't checked in the admin (no sign-in).
+- **Status:** PASS
+
+**Finding (needs a look):** Shopify's subtotal is not the sum of the quote's line prices. 12 × 949.95 +
+6 × 885.95 = 16,715.10, but Shopify returned 16,971.62 (+1.535%). The TC13 accept on v49 is off by the
+same factor: 37,195.98 of lines against a 37,767.53 total (+1.537%). The money is Shopify's (guardrail 1),
+but the buyer sees line prices that don't add up to it. Possible causes: a price adjustment on the company
+location's catalog or market, or the `priceOverride` currency. Next step: open the draft order in the
+admin and compare its line prices with the quote.
