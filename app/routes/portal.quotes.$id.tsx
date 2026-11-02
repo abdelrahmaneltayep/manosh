@@ -4,7 +4,7 @@ import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-
 import { useState } from "react";
 import prisma from "../db.server";
 import { captureException } from "../lib/sentry.server";
-import { acceptFailureMessage } from "../lib/portal-error";
+import { acceptFailureMessage, draftOrderFailureMessage } from "../lib/portal-error";
 import { requireBuyerId } from "../services/buyer-session.server";
 import {
   applyAutoExpiry,
@@ -65,7 +65,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   let paymentTerms: PaymentTerm[] = [];
   if (quote.status === "COUNTERED") {
     try {
-      paymentTerms = await getPaymentTerms(quote.company.shop.shopifyDomain);
+      // FIXED-date templates need a due date the buyer can't choose here, so
+      // only net / on-receipt / on-fulfillment terms are offered.
+      paymentTerms = (await getPaymentTerms(quote.company.shop.shopifyDomain)).filter(
+        (t) => t.paymentTermsType.toUpperCase() !== "FIXED",
+      );
     } catch {
       paymentTerms = [];
     }
@@ -181,7 +185,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     // Persist the PO reference so it flows onto the draft order as poNumber.
     await prisma.quote.update({ where: { id: quoteId }, data: { poReference } });
-    await acceptAndOrder(quoteId, admin, { currencyCode, paymentTermsTemplateId });
+    // Shopify needs the template's schedule (issue date for net terms), so
+    // look the chosen template up rather than sending the bare id.
+    let paymentTerm: { paymentTermsType: string; dueInDays: number | null } | null = null;
+    if (paymentTermsTemplateId) {
+      const terms = await getPaymentTerms(shopDomain);
+      const chosen = terms.find((t) => t.id === paymentTermsTemplateId);
+      if (!chosen) return { error: "Those payment terms are no longer available. Please pick again." };
+      paymentTerm = { paymentTermsType: chosen.paymentTermsType, dueInDays: chosen.dueInDays };
+    }
+    await acceptAndOrder(quoteId, admin, { currencyCode, paymentTermsTemplateId, paymentTerm });
     return redirect(`/portal/quotes/${quoteId}`);
   } catch (error) {
     if (
@@ -192,7 +205,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       return {
         error:
           error instanceof DraftOrderError
-            ? error.message
+            ? draftOrderFailureMessage(error.message)
             : "This quote can no longer be accepted.",
       };
     }

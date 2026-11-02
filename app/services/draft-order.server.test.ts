@@ -7,6 +7,7 @@ import {
   mapCalculatedTotals,
   mapCreatedDraftOrder,
   type AdminGraphqlClient,
+  paymentSchedulesFor,
 } from "./draft-order.server";
 
 describe("buildDraftOrderInput (pure)", () => {
@@ -151,5 +152,31 @@ describe("calculateDraftOrder / createDraftOrder (mocked admin)", () => {
       draftOrderCreate: { draftOrder: null, userErrors: [{ message: "Company location required" }] },
     });
     await expect(createDraftOrder(admin, input)).rejects.toBeInstanceOf(DraftOrderError);
+  });
+});
+
+// Live QA TC6: Shopify rejected NET terms sent as a bare template id ("An
+// issue date is required with net payment terms"). The schedule now travels
+// with the template.
+describe("paymentSchedulesFor + buildDraftOrderInput with terms", () => {
+  const now = new Date("2026-11-02T08:00:00.000Z");
+  const entity = { companyId: "gid://shopify/Company/1", companyLocationId: "gid://shopify/CompanyLocation/1", companyContactId: "gid://shopify/CompanyContact/1" };
+  const line = { variantId: "gid://shopify/ProductVariant/1", quantity: 1, price: "10.00" };
+
+  it("NET terms carry an issue date", () => {
+    expect(paymentSchedulesFor({ paymentTermsType: "NET", dueInDays: 30 }, now)).toEqual({ paymentSchedules: [{ issuedAt: "2026-11-02T08:00:00.000Z" }] });
+    const input = buildDraftOrderInput({ currencyCode: "USD", purchasingEntity: entity, lines: [line], paymentTermsTemplateId: "gid://shopify/PaymentTermsTemplate/3", paymentTerm: { paymentTermsType: "NET", dueInDays: 30 }, now });
+    expect(input.paymentTerms).toEqual({ paymentTermsTemplateId: "gid://shopify/PaymentTermsTemplate/3", paymentSchedules: [{ issuedAt: "2026-11-02T08:00:00.000Z" }] });
+  });
+
+  it("FIXED terms carry a due date from dueInDays, and refuse without one", () => {
+    expect(paymentSchedulesFor({ paymentTermsType: "FIXED", dueInDays: 10 }, now)).toEqual({ paymentSchedules: [{ dueAt: "2026-11-12T08:00:00.000Z" }] });
+    expect(() => paymentSchedulesFor({ paymentTermsType: "FIXED", dueInDays: null }, now)).toThrow(DraftOrderError);
+  });
+
+  it("on-receipt and on-fulfillment terms send only the template id", () => {
+    expect(paymentSchedulesFor({ paymentTermsType: "RECEIPT", dueInDays: null }, now)).toEqual({});
+    expect(paymentSchedulesFor({ paymentTermsType: "FULFILLMENT", dueInDays: null }, now)).toEqual({});
+    expect(paymentSchedulesFor(null, now)).toEqual({});
   });
 });

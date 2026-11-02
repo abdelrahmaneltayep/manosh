@@ -51,7 +51,15 @@ export interface DraftOrderInput {
     priceOverride: { amount: string; currencyCode: string };
   }>;
   poNumber?: string;
-  paymentTerms?: { paymentTermsTemplateId: string };
+  /**
+   * Native payment terms. Shopify needs a schedule with the template: NET
+   * terms take `issuedAt` (the invoice date the net days count from), FIXED
+   * terms take `dueAt`; on-receipt and on-fulfillment take none.
+   */
+  paymentTerms?: {
+    paymentTermsTemplateId: string;
+    paymentSchedules?: Array<{ issuedAt?: string; dueAt?: string }>;
+  };
   /** F14: when true, Shopify zeroes tax on the draft order (verified-exempt buyer). */
   taxExempt?: boolean;
 }
@@ -75,6 +83,14 @@ export function buildDraftOrderInput(params: {
   poReference?: string | null;
   /** Native payment terms template to attach (display + attach only). */
   paymentTermsTemplateId?: string | null;
+  /**
+   * The template's type and net days (from paymentTermsTemplates), so the
+   * schedule Shopify requires can be attached. Without it only the template id
+   * is sent, which Shopify rejects for NET terms ("An issue date is required").
+   */
+  paymentTerm?: { paymentTermsType: string; dueInDays: number | null } | null;
+  /** Issue date for NET terms; defaults to now. */
+  now?: Date;
   /** F14: pass true for a verified-exempt buyer — Shopify removes tax (we never compute it). */
   taxExempt?: boolean;
 }): DraftOrderInput {
@@ -98,12 +114,40 @@ export function buildDraftOrderInput(params: {
     input.poNumber = params.poReference;
   }
   if (params.paymentTermsTemplateId) {
-    input.paymentTerms = { paymentTermsTemplateId: params.paymentTermsTemplateId };
+    input.paymentTerms = {
+      paymentTermsTemplateId: params.paymentTermsTemplateId,
+      ...paymentSchedulesFor(params.paymentTerm, params.now ?? new Date()),
+    };
   }
   if (params.taxExempt) {
     input.taxExempt = true;
   }
   return input;
+}
+
+/**
+ * The payment schedule a template type needs. Pure. NET → issuedAt now; FIXED →
+ * dueAt now + dueInDays (a FIXED template without days can't be attached
+ * without a date the buyer never chose, so it throws a plain DraftOrderError);
+ * RECEIPT / FULFILLMENT / unknown → nothing beyond the template id.
+ */
+export function paymentSchedulesFor(
+  term: { paymentTermsType: string; dueInDays: number | null } | null | undefined,
+  now: Date,
+): { paymentSchedules?: Array<{ issuedAt?: string; dueAt?: string }> } {
+  if (!term) return {};
+  const type = term.paymentTermsType.toUpperCase();
+  if (type === "NET") return { paymentSchedules: [{ issuedAt: now.toISOString() }] };
+  if (type === "FIXED") {
+    if (term.dueInDays == null) {
+      throw new DraftOrderError(
+        "These payment terms need a fixed due date, which can't be set here. Please pick net or on-receipt terms, or leave the account default.",
+      );
+    }
+    const due = new Date(now.getTime() + term.dueInDays * 24 * 60 * 60 * 1000);
+    return { paymentSchedules: [{ dueAt: due.toISOString() }] };
+  }
+  return {};
 }
 
 interface MoneySet {

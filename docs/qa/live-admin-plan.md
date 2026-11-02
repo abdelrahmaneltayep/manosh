@@ -25,15 +25,21 @@ a step is blocked, say why and move on.
 1. Open the app from Apps. The dashboard loads inside the admin. Click each left-nav item (Home,
    Quotes, Quote forms, Pricing & catalog, Buyers, Analytics, Settings, Pricing plans). Every page
    renders: no "Something went wrong", no blank frame.
-2. Quotes → New quote: add two products, set quantities. Subtotal, tax and total appear, labelled
-   as coming from Shopify.
-3. Click "✦ Draft with Claude". A counter is drafted on screen, nothing is sent. Click Apply: it
-   only pre-fills the form. On Free or Starter the control may show an upgrade note; record that.
-4. Choose Net 30 and Send. A confirmation with the buyer's magic link appears. Copy the link.
-5. Open the magic link in a private window. The quote shows without any login. Click Accept: a
-   confirm dialog appears before anything is written.
-6. Confirm. The quote flips to Ordered. In the admin, Orders → Drafts has a new draft with source
-   Mannon and the same totals.
+2. Quotes → open a buyer's New quote (Import adds one if the inbox is empty). Each line shows
+   quantity and unit price; the page says tax and the total come from Shopify when the buyer
+   accepts. No totals are computed by the app.
+3. Click "✦ Draft all lines with Claude". A counter is drafted on screen, nothing is sent. "Use
+   this price" only pre-fills a line. On Free or Starter the control may show an upgrade note;
+   record that. Click Send counter: the banner says "Counter sent to the buyer" and the quote
+   shows Countered.
+4. Buyers → the buyer → Magic link. A "Magic link ready to send" card shows the link with a Copy
+   button. Copy it.
+5. Open the link in a private window. The portal opens without any login. Open the Countered
+   quote, choose Net 30, click "Accept & create order": a confirm panel appears before anything
+   is written.
+6. Click "Confirm & create order". The quote flips to Ordered with Shopify's subtotal, tax and
+   total. In the admin, Orders → Drafts has a new draft created by Mannon with the same totals
+   and Net 30 payment terms.
 7. Quote forms → AI Order Pad: paste two lines like `20x SKU-A, 5x SKU-B` using real SKUs from the
    store. Claude matches the lines; nothing is ordered until "Confirm & build cart".
 8. Analytics: the ✦ Claude insights section renders. On Free or Starter it may show an upgrade

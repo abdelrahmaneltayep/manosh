@@ -48,7 +48,13 @@ export class CreditBlockedError extends Error {
 export async function acceptAndOrder(
   quoteId: string,
   admin: AdminGraphqlClient,
-  options: { currencyCode: string; paymentTermsTemplateId?: string | null; now?: Date },
+  options: {
+    currencyCode: string;
+    paymentTermsTemplateId?: string | null;
+    /** The chosen template's type + net days, so Shopify gets the schedule it requires. */
+    paymentTerm?: { paymentTermsType: string; dueInDays: number | null } | null;
+    now?: Date;
+  },
 ): Promise<{ quote: QuoteWithLines; totals: DraftOrderTotals }> {
   const quote = await prisma.quote.findUnique({
     where: { id: quoteId },
@@ -128,6 +134,8 @@ export async function acceptAndOrder(
     currencyCode: options.currencyCode,
     poReference: quote.poReference,
     paymentTermsTemplateId: options.paymentTermsTemplateId,
+    paymentTerm: options.paymentTerm ?? null,
+    now: options.now,
     taxExempt,
     purchasingEntity: {
       companyId: quote.company.shopifyCompanyId,

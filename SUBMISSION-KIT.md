@@ -234,11 +234,11 @@ A demo company and buyer are seeded on install, so you can create a quote immedi
 
 STEPS
 1. Install the app on the test store. Open it and click each left-nav section (Home through Pricing plans) — every page loads.
-2. Quotes > New quote: add 2–3 products, set quantities.
-3. Click "✦ Draft with Claude". Claude drafts a counter-offer. Review it and click Apply — it only pre-fills; it never sends on its own.
-4. Pick a payment term (e.g. Net 30) and Send. Prices, tax and totals come from a Shopify draft order — the app never recomputes them.
-5. Open the buyer view via the magic link shown after sending — no login required. Click Accept; you must confirm on a dialog before anything is written.
-6. On confirm, the quote becomes a real Shopify draft order (see Orders > Drafts, source "Mannon").
+2. Quotes: open the demo buyer's New quote. Tax and the total come from Shopify when the buyer accepts; the app never recomputes.
+3. "✦ Draft all lines with Claude" drafts a counter on screen; "Use this price" only pre-fills. Click Send counter.
+4. Buyers > demo buyer > Magic link. Copy the link; there is no buyer login.
+5. Open it in a private window, pick Net 30, click Accept & create order, then Confirm & create order. Nothing is written before the confirm.
+6. The quote becomes Ordered; Orders > Drafts shows a draft created by Mannon with Shopify's tax, total and Net 30 terms.
 7. Quote forms > AI Order Pad: paste "20x <SKU>, 5x <SKU>" — Claude matches the lines; nothing is ordered until you click Confirm & build cart.
 8. Analytics: view the ✦ Claude insights (win-rate, credit-risk, buyer summary) — advisory, on screen only.
 9. Reorder: one-tap reorder clones a past order into a fresh draft, re-priced by Shopify.

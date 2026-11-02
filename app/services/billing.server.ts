@@ -118,23 +118,16 @@ export const ACTIVE_BILLING_CONFIG = PLAN_V3_ENABLED()
 export function resolveV3PlanFromName(
   name: string | null,
 ): { plan: Plan; legacyPlan: boolean; legacyPriceCents: number | null } {
-  const handle = (name ?? "").trim().toLowerCase();
+  // Shopify reports the App Pricing plan's display name (e.g. "Mannon Growth",
+  // "Growth (annual)"), not its handle, so match on the tier word anywhere in
+  // the name. Tiers are checked highest first so "scale" never reads as "free".
+  const words = new Set((name ?? "").toLowerCase().split(/[^a-z]+/).filter(Boolean));
   const none = { legacyPlan: false, legacyPriceCents: null };
-  switch (handle) {
-    case "scale":
-    case "scale-annual":
-      return { plan: "SCALE", ...none };
-    case "growth":
-    case "growth-annual":
-      return { plan: "GROWTH", ...none };
-    case "starter":
-    case "starter-annual":
-      return { plan: "STARTER", ...none };
-    case "free":
-      return { plan: "FREE", ...none };
-    default:
-      return { plan: "TRIAL", ...none };
-  }
+  if (words.has("scale")) return { plan: "SCALE", ...none };
+  if (words.has("growth")) return { plan: "GROWTH", ...none };
+  if (words.has("starter")) return { plan: "STARTER", ...none };
+  if (words.has("free")) return { plan: "FREE", ...none };
+  return { plan: "TRIAL", ...none };
 }
 
 /**

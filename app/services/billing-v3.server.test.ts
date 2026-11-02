@@ -16,6 +16,14 @@ describe("resolveV3PlanFromName — grandfathering at the billing boundary", () 
     expect(resolveV3PlanFromName("free")).toEqual({ plan: "FREE", legacyPlan: false, legacyPriceCents: null });
   });
 
+  it("reads the tier out of App Pricing display names (live QA: Shopify reports 'Mannon Growth')", () => {
+    expect(resolveV3PlanFromName("Mannon Growth").plan).toBe("GROWTH");
+    expect(resolveV3PlanFromName("Mannon Starter").plan).toBe("STARTER");
+    expect(resolveV3PlanFromName("Mannon Scale (annual)").plan).toBe("SCALE");
+    expect(resolveV3PlanFromName("Mannon Free").plan).toBe("FREE");
+    expect(resolveV3PlanFromName("mannon-starter").plan).toBe("STARTER");
+  });
+
   it("unknown / no subscription → TRIAL, no legacy", () => {
     expect(resolveV3PlanFromName(null)).toEqual({ plan: "TRIAL", legacyPlan: false, legacyPriceCents: null });
     expect(resolveV3PlanFromName("mystery")).toEqual({ plan: "TRIAL", legacyPlan: false, legacyPriceCents: null });

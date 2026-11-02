@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { portalErrorContent, acceptFailureMessage, graphqlErrorMessages } from "./portal-error";
+import { portalErrorContent, acceptFailureMessage, graphqlErrorMessages, draftOrderFailureMessage } from "./portal-error";
 
 describe("portalErrorContent", () => {
   it("gives a 'not found' message for 404", () => {
@@ -84,5 +84,23 @@ describe("graphqlErrorMessages (pure)", () => {
     expect(graphqlErrorMessages(new Error("boom"))).toEqual([]);
     expect(graphqlErrorMessages(null)).toEqual([]);
     expect(graphqlErrorMessages({ body: { errors: { message: "x" } } })).toEqual([]);
+  });
+});
+
+// Live QA TC6: the buyer saw "draftOrderCalculate failed: An issue date is
+// required with net payment terms." — Shopify's reason is useful, the
+// operation name is not.
+describe("draftOrderFailureMessage (pure)", () => {
+  it("drops the operation prefix and keeps Shopify's reason", () => {
+    expect(draftOrderFailureMessage("draftOrderCalculate failed: An issue date is required with net payment terms.")).toBe(
+      "Shopify couldn’t create the order: An issue date is required with net payment terms. Please contact your supplier.",
+    );
+  });
+  it("falls back to the retry line when there is no reason", () => {
+    expect(draftOrderFailureMessage("draftOrderCreate returned no draft order")).toBe("We couldn’t create your order just now. Please try again.");
+  });
+  it("leaves plain-language messages alone", () => {
+    const plain = "This buyer isn’t linked to a company location yet, so an order can’t be created.";
+    expect(draftOrderFailureMessage(plain)).toBe(plain);
   });
 });

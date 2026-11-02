@@ -69,3 +69,17 @@ export function graphqlErrorMessages(error: unknown): string[] {
     .map((e) => (e as { message?: unknown } | null)?.message)
     .filter((m): m is string => typeof m === "string" && m.trim() !== "");
 }
+
+/**
+ * A DraftOrderError carries Shopify's userError text, prefixed by the
+ * operation ("draftOrderCalculate failed: An issue date is required…"). The
+ * buyer gets the reason without the operation name, plus who to contact.
+ */
+export function draftOrderFailureMessage(message: string): string {
+  const generic = "We couldn’t create your order just now. Please try again.";
+  if (!/^draftOrder\w+/i.test(message)) return message; // already plain language
+  const match = /^draftOrder\w+[^:]*:\s*(.+)$/i.exec(message);
+  const reason = match?.[1]?.trim();
+  if (!reason) return generic;
+  return `Shopify couldn’t create the order: ${reason.replace(/\.?$/, ".")} Please contact your supplier.`;
+}
