@@ -387,3 +387,18 @@ Same setup: the owner's signed-in Chrome over CDP on port 9222, and a fresh demo
 
 **Updated admin-run totals:** PASS: TC1, TC3, TC5, TC7, TC8, TC9, TC10, TC11, TC14, final check (apps).
 FAIL: TC2, TC4, TC6. BLOCKED: final check (customer-account block).
+
+## Second re-run of TC10 and TC6, v52 (no new commits or scopes since the first re-run)
+
+Before the run: the branch is still at `4164687`, Fly is on v52, and `shopify.app.toml` still requests
+`read_payment_terms` only. Chrome 156 is signed in on port 9222.
+
+#### TC10 (Choose Scale)
+- **Command:** Pricing plans → Choose Scale → Shopify's page → browser Back (no approval).
+- **Actual:** Before: the app shows **Growth** as Current. Choose Scale opens `…/charges/mannon/pricing_plans` with no 404, listing **Free · Starter $9 · Growth $29 (Current) · Scale $69**, with Pay monthly and Pay yearly (`admin/rerun2-tc10-shopify-plans-from-scale.png`). Back returns to `…/apps/mannon/app/plans`, and the app **still shows Growth** (`admin/rerun2-tc10-app-still-growth.png`).
+- **Status:** PASS
+
+#### TC6 (Net 30 at accept)
+- **Command:** Fresh demo buyer → Countered quote `cmvyy15tj001xr9h3712tytpz` → Payment terms: Net 30 → Accept & create order → Confirm → Orders → Drafts.
+- **Actual:** After 2.2 s: **"Shopify couldn't create the order: The user must have access to set payment terms. Please contact your supplier."** The quote stays Countered (`admin/rerun2-tc06-net30-scope-error.png`). No draft was created: the newest in Orders → Drafts is still **#D18**, which has no PO and "Payment due later" off, not Net 30 (`admin/rerun2-tc06-admin-newest-draft-D18.png`).
+- **Status:** FAIL, unchanged. The app still lacks the `write_payment_terms` scope. It isn't in `shopify.app.toml`, and Shopify's response shows it hasn't been granted for this installation either.
