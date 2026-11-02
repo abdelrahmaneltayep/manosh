@@ -234,7 +234,7 @@ A demo company and buyer are seeded on install, so you can create a quote immedi
 
 STEPS
 1. Install the app on the test store. Open it and click each left-nav section (Home through Pricing plans) — every page loads.
-2. Quotes: open the demo buyer's New quote. The Totals from Shopify card shows subtotal, tax and total priced by Shopify for the buyer's company; the app never recomputes.
+2. Quotes: open the demo buyer's New quote. The Totals from Shopify card shows subtotal, tax and total priced by Shopify; the app never recomputes.
 3. "✦ Draft all lines with Claude" drafts a counter on screen; "Use this price" only pre-fills. Click Send counter.
 4. Buyers > demo buyer > Magic link. Copy the link; there is no buyer login.
 5. Open it in a private window, pick Net 30, click Accept & create order, then Confirm & create order. Nothing is written before the confirm.
