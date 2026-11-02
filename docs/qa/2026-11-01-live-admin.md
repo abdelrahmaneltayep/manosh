@@ -418,3 +418,20 @@ showed Shopify's update prompt, "Mannon needs access to: … Edit other data · 
 **Updated admin-run totals:** PASS: TC1, TC3, TC5, TC6, TC7, TC8, TC9, TC10, TC11, TC14, final check (apps).
 FAIL: TC2 (no Shopify totals on the merchant quote), TC4 (no magic link shown).
 BLOCKED: final check (customer-account block, needs a customer sign-in). Still open: the CAD/USD price gap.
+
+## Currency fix verified live (v54, `09e2adb`)
+
+**Before:** Snowdevil's location is in the Canada market, so Shopify converted the USD `priceOverride` to
+CAD and rounded it to whole dollars (949.95 → $1,349.00 CAD). The app showed the `shopMoney` USD
+estimate, so the buyer's lines (12 × 949.95 + 6 × 885.95 = 16,715.10) didn't add up to the
+shown total ($16,971.62 to $16,993.86 across runs).
+
+**Fix:** drafts are created with `presentmentCurrencyCode` set to the agreed (override) currency.
+Totals are snapshotted from `presentmentMoney`, which Shopify calls the source of truth for the charge,
+with `shopMoney` as the fallback. If a market refuses the currency, the app retries once without it, so
+an order is never blocked.
+
+#### TC14 with the fix
+- **Command:** Fresh demo buyer → Reorder #1001 → Send reorder → newest draft in the admin.
+- **Actual:** The buyer sees **Ordered**, 12 × 949.95, 6 × 885.95, **Subtotal $16,715.10, Total $16,715.10**: exactly the sum of the lines (`admin/currency-fix-buyer-ordered.png`). Draft **#D20**: market **Canada**, currency **US Dollar (USD $)**, line prices **$949.95** and **$885.95** at the agreed amounts, Subtotal $16,715.10, **Total $16,715.10 USD**, "Mannon created this draft order" (`admin/currency-fix-admin-draft-D20-usd.png`). No `[draft-order] … retrying` line in the Fly logs, so Shopify accepted the USD presentment currency for the Canada location.
+- **Status:** PASS. The CAD/USD price gap is closed.
