@@ -372,3 +372,18 @@ mismatch a reviewer will notice. 5.1.2 (blocks render immediately) is fixed.
 3. **Currency** (TC13/TC14). Send overrides in the company location's currency, or move the demo location to the US market.
 4. **Merchant quote page** (TC2). Show a Shopify-calculated subtotal, tax and total (`draftOrderCalculate`), as the buyer page does after accept.
 5. **The plan doc is out of date** for TC2 (New quote), TC4 (magic link) and TC7 (Order Pad location and button label).
+
+## Re-run of TC10 and TC6, v52 (`c9b6f12` + plans published `a3f99fc`)
+
+Same setup: the owner's signed-in Chrome over CDP on port 9222, and a fresh demo buyer in its own context.
+
+#### TC10 (re-run)
+- **Actual:** The app's Pricing plans page shows **Growth as Current** ($29), with "Downgrade to Free", "Switch to Starter" and "Choose Scale" (`admin/rerun-tc10-app-plans.png`). "Switch to Starter" opens `…/charges/mannon/pricing_plans` with no 404. Shopify's page now lists **Free, Starter $9, Growth $29 (Current), Scale $69**, with Pay monthly and Pay yearly (`admin/rerun-tc10-shopify-plans.png`). The plans, prices and current plan now match on both sides. Nothing was approved, because Growth is already current. The decline path was checked in the earlier run.
+- **Status:** PASS (1.2.2)
+
+#### TC6 with Net 30 (re-run)
+- **Actual:** Quote `cmvyxyf2l001cr9h3qxx57w1n`, Net 30, Accept, Confirm. After 2.6 s the buyer sees **"Shopify couldn't create the order: The user must have access to set payment terms. Please contact your supplier."** and the quote stays Countered (`admin/rerun-tc06-net30-scope-error.png`). The "issue date is required" error from the first run is gone, so the `paymentSchedules` fix works. Shopify now rejects the write itself: setting payment terms on a draft order needs the **`write_payment_terms`** scope (shopify.dev, `paymentTermsCreate` / DraftOrderInput), and `shopify.app.toml` requests only `read_payment_terms`. The newest draft, #D18, doesn't come from this accept: there's no PO-DEMO-1042, and the quote never left Countered.
+- **Status:** FAIL. To fix: add `write_payment_terms`, with its reason in `docs/compliance.md` (guardrail 2), run `shopify app deploy`, and approve the new scope on the store. Until then, a buyer choosing any payment terms can't place the order. "Use the account default" works.
+
+**Updated admin-run totals:** PASS: TC1, TC3, TC5, TC7, TC8, TC9, TC10, TC11, TC14, final check (apps).
+FAIL: TC2, TC4, TC6. BLOCKED: final check (customer-account block).
