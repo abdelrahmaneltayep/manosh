@@ -402,3 +402,19 @@ Before the run: the branch is still at `4164687`, Fly is on v52, and `shopify.ap
 - **Command:** Fresh demo buyer → Countered quote `cmvyy15tj001xr9h3712tytpz` → Payment terms: Net 30 → Accept & create order → Confirm → Orders → Drafts.
 - **Actual:** After 2.2 s: **"Shopify couldn't create the order: The user must have access to set payment terms. Please contact your supplier."** The quote stays Countered (`admin/rerun2-tc06-net30-scope-error.png`). No draft was created: the newest in Orders → Drafts is still **#D18**, which has no PO and "Payment due later" off, not Net 30 (`admin/rerun2-tc06-admin-newest-draft-D18.png`).
 - **Status:** FAIL, unchanged. The app still lacks the `write_payment_terms` scope. It isn't in `shopify.app.toml`, and Shopify's response shows it hasn't been granted for this installation either.
+
+## Third re-run of TC6 (Net 30), after the scope update (v53, app version mannon-12)
+
+`8b41eb0` replaced `read_payment_terms` with `write_payment_terms`. It was released with
+`shopify app deploy` (mannon-11, then mannon-12) and deployed to Fly as v53. Opening Mannon then
+showed Shopify's update prompt, "Mannon needs access to: … Edit other data · Payment terms"
+(`admin/rerun3-scope-update-prompt.png`), and the owner clicked **Update**.
+
+#### TC6 (Net 30 at accept)
+- **Command:** Fresh demo buyer → Countered quote `cmvyyjj5b0009r9h5lepzn6hg` → Payment terms: Net 30 → Accept & create order → Confirm → Orders → Drafts.
+- **Actual:** After 3.1 s the quote is **Ordered**, with Subtotal $37,757.81, Tax $0.00, Total $37,757.81 (`admin/rerun3-tc06-buyer-ordered-net30.png`). The newest draft is **#D19**: PO number **#PO-DEMO-1042**, company Snowdevil, created by Mannon, "Payment due later" on, **Payment terms: Within 30 days, Issue date November 2, 2026, "Payment due on December 2, 2026 (Net 30)."** (`admin/rerun3-tc06-admin-draft-D19-net30.png`). Like #D17, it's in the Canada market, in CAD ($52,782.00 CAD, about $37,789.43 USD). That's the currency finding from TC14, still open.
+- **Status:** PASS
+
+**Updated admin-run totals:** PASS: TC1, TC3, TC5, TC6, TC7, TC8, TC9, TC10, TC11, TC14, final check (apps).
+FAIL: TC2 (no Shopify totals on the merchant quote), TC4 (no magic link shown).
+BLOCKED: final check (customer-account block, needs a customer sign-in). Still open: the CAD/USD price gap.
