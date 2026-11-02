@@ -8,6 +8,7 @@ import {
   mapCreatedDraftOrder,
   type AdminGraphqlClient,
   paymentSchedulesFor,
+  rejectsPresentmentCurrency,
 } from "./draft-order.server";
 
 describe("buildDraftOrderInput (pure)", () => {
@@ -178,5 +179,89 @@ describe("paymentSchedulesFor + buildDraftOrderInput with terms", () => {
     expect(paymentSchedulesFor({ paymentTermsType: "RECEIPT", dueInDays: null }, now)).toEqual({});
     expect(paymentSchedulesFor({ paymentTermsType: "FULFILLMENT", dueInDays: null }, now)).toEqual({});
     expect(paymentSchedulesFor(null, now)).toEqual({});
+  });
+});
+
+describe("currency: agreed presentment currency and charged totals", () => {
+  const base = {
+    currencyCode: "USD",
+    purchasingEntity: {
+      companyId: "gid://shopify/Company/1",
+      companyLocationId: "gid://shopify/CompanyLocation/2",
+      companyContactId: "gid://shopify/CompanyContact/3",
+    },
+    lines: [{ variantId: "gid://v/1", quantity: 12, price: "949.95" }],
+  };
+  const money = (amount: string, currencyCode: string) => ({ amount, currencyCode });
+
+  it("asks Shopify to present the draft in the agreed (override) currency", () => {
+    expect(buildDraftOrderInput(base).presentmentCurrencyCode).toBe("USD");
+  });
+
+  it("snapshots presentment money (what is charged), not the shop-money estimate", () => {
+    const totals = mapCalculatedTotals({
+      calculatedDraftOrder: {
+        subtotalPriceSet: { shopMoney: money("16993.86", "USD"), presentmentMoney: money("23736.00", "CAD") },
+        totalTaxSet: { shopMoney: money("0.00", "USD"), presentmentMoney: money("0.00", "CAD") },
+        totalPriceSet: { shopMoney: money("16993.86", "USD"), presentmentMoney: money("23736.00", "CAD") },
+      },
+      userErrors: [],
+    });
+    expect(totals).toEqual({ subtotal: "23736.00", totalTax: "0.00", total: "23736.00", currencyCode: "CAD" });
+  });
+
+  it("falls back to shop money when Shopify returns no presentment money", () => {
+    const totals = mapCalculatedTotals({
+      calculatedDraftOrder: { totalPriceSet: { shopMoney: money("11399.40", "USD") } },
+      userErrors: [],
+    });
+    expect(totals).toMatchObject({ total: "11399.40", currencyCode: "USD" });
+  });
+
+  it("recognises a refused presentment currency, and nothing else", () => {
+    expect(rejectsPresentmentCurrency([{ field: ["presentmentCurrencyCode"], message: "is not supported" }])).toBe(true);
+    expect(rejectsPresentmentCurrency([{ field: null, message: "Presentment currency USD is not enabled for this market" }])).toBe(true);
+    expect(rejectsPresentmentCurrency([{ field: ["lineItems"], message: "Add at least 1 product" }])).toBe(false);
+    expect(rejectsPresentmentCurrency(undefined)).toBe(false);
+  });
+
+  function recordingAdmin(responses: unknown[]) {
+    const inputs: Array<Record<string, unknown>> = [];
+    const admin: AdminGraphqlClient = {
+      graphql: async (_query, options) => {
+        inputs.push(options?.variables?.input as Record<string, unknown>);
+        const next = responses.shift();
+        return { json: async () => next };
+      },
+    };
+    return { admin, inputs };
+  }
+  const calculated = (currency: string) => ({
+    data: {
+      draftOrderCalculate: {
+        calculatedDraftOrder: { totalPriceSet: { shopMoney: money("1.00", "USD"), presentmentMoney: money("1.00", currency) } },
+        userErrors: [],
+      },
+    },
+  });
+
+  it("retries once without the presentment currency when Shopify refuses it", async () => {
+    const { admin, inputs } = recordingAdmin([
+      { data: { draftOrderCalculate: { calculatedDraftOrder: null, userErrors: [{ field: ["presentmentCurrencyCode"], message: "not supported" }] } } },
+      calculated("CAD"),
+    ]);
+    const totals = await calculateDraftOrder(admin, buildDraftOrderInput(base));
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].presentmentCurrencyCode).toBe("USD");
+    expect(inputs[1]).not.toHaveProperty("presentmentCurrencyCode");
+    expect(totals.currencyCode).toBe("CAD");
+  });
+
+  it("does not retry other userErrors", async () => {
+    const { admin, inputs } = recordingAdmin([
+      { data: { draftOrderCalculate: { calculatedDraftOrder: null, userErrors: [{ field: ["lineItems"], message: "Add at least 1 product" }] } } },
+    ]);
+    await expect(calculateDraftOrder(admin, buildDraftOrderInput(base))).rejects.toBeInstanceOf(DraftOrderError);
+    expect(inputs).toHaveLength(1);
   });
 });

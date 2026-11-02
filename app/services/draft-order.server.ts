@@ -62,6 +62,13 @@ export interface DraftOrderInput {
   };
   /** F14: when true, Shopify zeroes tax on the draft order (verified-exempt buyer). */
   taxExempt?: boolean;
+  /**
+   * The currency the draft is priced and charged in. Set to the agreed
+   * (priceOverride) currency: otherwise a company location in another market
+   * (e.g. Canada) converts the override and applies the market's price
+   * rounding, so the buyer is charged more than the quoted unit prices.
+   */
+  presentmentCurrencyCode?: string;
 }
 
 export class DraftOrderError extends Error {
@@ -109,6 +116,7 @@ export function buildDraftOrderInput(params: {
       quantity: line.quantity,
       priceOverride: { amount: line.price, currencyCode: params.currencyCode },
     })),
+    presentmentCurrencyCode: params.currencyCode,
   };
   if (params.poReference) {
     input.poNumber = params.poReference;
@@ -152,6 +160,7 @@ export function paymentSchedulesFor(
 
 interface MoneySet {
   shopMoney?: { amount?: string; currencyCode?: string };
+  presentmentMoney?: { amount?: string; currencyCode?: string };
 }
 interface CalculatedShape {
   subtotalPriceSet?: MoneySet;
@@ -159,10 +168,16 @@ interface CalculatedShape {
   totalPriceSet?: MoneySet;
 }
 
+/**
+ * Snapshot the amounts the buyer is charged. For a multi-currency draft
+ * Shopify's presentment money is the source of truth and shop money only an
+ * estimate in the shop currency, so prefer presentment and fall back to shop.
+ */
 function readTotals(node: CalculatedShape): DraftOrderTotals {
-  const subtotal = node.subtotalPriceSet?.shopMoney;
-  const tax = node.totalTaxSet?.shopMoney;
-  const total = node.totalPriceSet?.shopMoney;
+  const pick = (set?: MoneySet) => (set?.presentmentMoney?.amount ? set.presentmentMoney : set?.shopMoney);
+  const subtotal = pick(node.subtotalPriceSet);
+  const tax = pick(node.totalTaxSet);
+  const total = pick(node.totalPriceSet);
   return {
     subtotal: subtotal?.amount ?? "0.00",
     totalTax: tax?.amount ?? "0.00",
@@ -212,9 +227,9 @@ const DRAFT_ORDER_CALCULATE = `#graphql
   mutation MannonDraftOrderCalculate($input: DraftOrderInput!) {
     draftOrderCalculate(input: $input) {
       calculatedDraftOrder {
-        subtotalPriceSet { shopMoney { amount currencyCode } }
-        totalTaxSet { shopMoney { amount currencyCode } }
-        totalPriceSet { shopMoney { amount currencyCode } }
+        subtotalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalTaxSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
       }
       userErrors { field message }
     }
@@ -226,9 +241,9 @@ const DRAFT_ORDER_CREATE = `#graphql
     draftOrderCreate(input: $input) {
       draftOrder {
         id
-        subtotalPriceSet { shopMoney { amount currencyCode } }
-        totalTaxSet { shopMoney { amount currencyCode } }
-        totalPriceSet { shopMoney { amount currencyCode } }
+        subtotalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalTaxSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
       }
       userErrors { field message }
     }
@@ -250,12 +265,41 @@ async function runMutation<T>(
   return payload;
 }
 
+/** True when Shopify rejected the requested presentment currency. Pure. */
+export function rejectsPresentmentCurrency(errors: UserError[] | undefined): boolean {
+  return (errors ?? []).some(
+    (e) =>
+      (e.field ?? []).some((f) => /presentmentCurrencyCode/i.test(f)) || /presentment currency/i.test(e.message),
+  );
+}
+
+/**
+ * Run a draft-order mutation asking for the agreed currency. If Shopify won't
+ * present the draft in it (the location's market doesn't allow it), retry once
+ * without, so the order still goes through and the snapshot shows the currency
+ * Shopify will actually charge.
+ */
+async function runWithPresentmentFallback<T extends { userErrors?: UserError[] }>(
+  admin: AdminGraphqlClient,
+  query: string,
+  input: DraftOrderInput,
+  key: "draftOrderCalculate" | "draftOrderCreate",
+): Promise<T> {
+  const payload = await runMutation<T>(admin, query, input, key);
+  if (input.presentmentCurrencyCode && rejectsPresentmentCurrency(payload.userErrors)) {
+    console.warn("[draft-order] %s refused presentment currency %s; retrying in the market currency", key, input.presentmentCurrencyCode);
+    const { presentmentCurrencyCode: _omit, ...rest } = input;
+    return runMutation<T>(admin, query, rest, key);
+  }
+  return payload;
+}
+
 /** Preview real tax/totals for a draft order (source of truth for money). */
 export async function calculateDraftOrder(
   admin: AdminGraphqlClient,
   input: DraftOrderInput,
 ): Promise<DraftOrderTotals> {
-  const payload = await runMutation<Parameters<typeof mapCalculatedTotals>[0]>(
+  const payload = await runWithPresentmentFallback<Parameters<typeof mapCalculatedTotals>[0]>(
     admin,
     DRAFT_ORDER_CALCULATE,
     input,
@@ -269,7 +313,7 @@ export async function createDraftOrder(
   admin: AdminGraphqlClient,
   input: DraftOrderInput,
 ): Promise<{ id: string; totals: DraftOrderTotals }> {
-  const payload = await runMutation<Parameters<typeof mapCreatedDraftOrder>[0]>(
+  const payload = await runWithPresentmentFallback<Parameters<typeof mapCreatedDraftOrder>[0]>(
     admin,
     DRAFT_ORDER_CREATE,
     input,
