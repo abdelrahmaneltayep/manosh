@@ -234,7 +234,7 @@ A demo company and buyer are seeded on install, so you can create a quote immedi
 
 STEPS
 1. Install the app on the test store. Open it and click each left-nav section (Home through Pricing plans) — every page loads.
-2. Quotes: open the demo buyer's New quote. Tax and the total come from Shopify when the buyer accepts; the app never recomputes.
+2. Quotes: open the demo buyer's New quote. The Totals from Shopify card shows subtotal, tax and total priced by Shopify for the buyer's company; the app never recomputes.
 3. "✦ Draft all lines with Claude" drafts a counter on screen; "Use this price" only pre-fills. Click Send counter.
 4. Buyers > demo buyer > Magic link. Copy the link; there is no buyer login.
 5. Open it in a private window, pick Net 30, click Accept & create order, then Confirm & create order. Nothing is written before the confirm.
@@ -276,9 +276,10 @@ NOTES
 > managed-pricing URL from it. Test: Pricing plans → Choose Growth opens Shopify's
 > plan page for this app; approve or decline, and you return to the app with the
 > plan reflected. Uninstall and reinstall: the plan page is offered again.
-> Test store: [dev store]. All flows re-verified on the deployed build, including the
-> end-to-end suite (tests/*.e2e.ts) against the served app and a live click-through of
-> the public buyer demo (accept → draft order, reorder) recorded in docs/qa.
+> Test store: [dev store]. Every step in the testing instructions was re-verified live
+> on the deployed build on 2026-11-02 (admin, storefront, buyer portal and the public
+> demo), with screenshots in docs/qa, alongside the end-to-end suite (tests/*.e2e.ts)
+> against the served app.
 
 ---
 
@@ -306,10 +307,10 @@ NOTES
       so `SHOPIFY_APP_HANDLE` is only a fallback; still, open
       `https://admin.shopify.com/store/<dev-store>/charges/<app handle>/pricing_plans`
       once by hand and confirm the four plans render (review 1.2.2).
-- [ ] Scope change released: `write_payment_terms` replaced `read_payment_terms`
-      (needed to attach Net terms to a draft order). Run `shopify app deploy` so the
-      new scope is in the released config, open the app on the dev store and approve
-      the updated permissions, then re-run reviewer step 5 with Net 30.
+- [x] Scope change released: `write_payment_terms` replaced `read_payment_terms`
+      (needed to attach Net terms to a draft order). Released as app version
+      mannon-12, approved on the dev store, and reviewer steps 5–6 re-verified with
+      Net 30 on 2026-11-02 (draft #D21 carries the terms).
 - [ ] Theme app extension re-verified after `npm run deploy`: in the theme editor add
       each Mannon block to a product page and the cart page, save, then open the live
       store — every button is visible before touching any Mannon setting (review 5.1.2).
