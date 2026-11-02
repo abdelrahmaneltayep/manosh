@@ -452,3 +452,29 @@ form's unsaved values. Nothing is created or saved, and no money is computed in 
 **Updated admin-run totals:** PASS: TC1, TC2, TC3, TC5, TC6, TC7, TC8, TC9, TC10, TC11, TC14, final check (apps).
 FAIL: TC4 (no magic link shown to the merchant; the plan's wording, not an app defect).
 BLOCKED: final check (customer-account block, needs a customer sign-in).
+
+## Correction: TC4 passes, and TC4–TC6 re-run through the merchant's magic link (v56)
+
+**Correction.** The admin run recorded TC4 as FAIL ("No magic link is shown to the merchant"). That
+was wrong. The tester only looked on the quote page. The app gives the merchant the link on
+**Buyers → the buyer's row → Generate link**, which is what the updated plan describes. TC4 is
+re-run below, and the plan now spells out the steps (`docs/qa/live-admin-plan.md` steps 2, 4, 5 and 7).
+
+#### TC4 — Magic link for the buyer
+- **Command:** Seed a fresh demo buyer (`visitor-91fdafed@demo.mannon.invalid`, with a Countered quote), then drop that session. In the admin: Buyers → that buyer's row → **Generate link**.
+- **Actual:** A **"Magic link ready to send"** banner: "Copy this link and email it to the buyer. It expires automatically and can be used once.", the link `https://manosh.fly.dev/portal/auth?token=<redacted>`, and a **Copy** button. A "Magic link generated" toast appears too. The screenshot shows the buyer's row while generating, with the banner scrolled off; the token is deliberately kept out of the repo (`admin/tc04-buyers-generate-link.png`).
+- **Status:** PASS
+
+#### TC5 — The link opens the portal without a login
+- **Command:** Open the link in a separate private browser context with no session.
+- **Actual:** A one-click page: "Sign in to your wholesale portal · You're signing in as visitor-91fdafed@demo.mannon.invalid · **Continue**". No password, code or other credential is asked for (`admin/tc05-magic-link-continue.png`). The portal opens. On the Countered quote, Net 30 → Accept & create order shows the confirm panel "Accept this quote? … Nothing is written until you confirm." (`admin/tc05-confirm-via-link.png`).
+- **Status:** PASS
+
+#### TC6 — Ordered, with Net 30 on the draft
+- **Command:** Confirm & create order, then Orders → Drafts.
+- **Actual:** The quote is **Ordered**, with Subtotal **$37,195.98**, Tax $0.00, Total $37,195.98. That's exactly 24 × 911.95 + 12 × 850.51 + 6 × 850.51, which confirms the currency fix on the accept path too (`admin/tc06-ordered-via-link.png`). Draft **#D21**: PO **#PO-DEMO-1042**, Snowdevil, **$37,195.98 USD**, "Payment due on December 2, 2026 (Net 30)", created by Mannon (`admin/tc06-admin-draft-D21-net30.png`).
+- **Status:** PASS
+
+**Final admin-run totals:** PASS: TC1, TC2, TC3, TC4, TC5, TC6, TC7, TC8, TC9, TC10, TC11, TC12, TC13, TC14,
+final check (apps). FAIL: none. BLOCKED: final check, customer-account "Your quotes" block (needs a
+customer sign-in, which the run's rules exclude).

@@ -26,22 +26,29 @@ a step is blocked, say why and move on.
    Quotes, Quote forms, Pricing & catalog, Buyers, Analytics, Settings, Pricing plans). Every page
    renders: no "Something went wrong", no blank frame.
 2. Quotes → open a buyer's New quote (Import adds one if the inbox is empty). Each line shows
-   quantity and unit price; the page says tax and the total come from Shopify when the buyer
-   accepts. No totals are computed by the app.
+   quantity and unit price, and a "Totals from Shopify" card fills in Subtotal, Tax and Total,
+   "Calculated by Shopify for this buyer's company location". Change a unit price and click
+   "Recalculate with these prices": the totals update, marked "Not saved until you send the
+   counter". No totals are computed by the app.
 3. Click "✦ Draft all lines with Claude". A counter is drafted on screen, nothing is sent. "Use
    this price" only pre-fills a line. On Free or Starter the control may show an upgrade note;
    record that. Click Send counter: the banner says "Counter sent to the buyer" and the quote
    shows Countered.
-4. Buyers → the buyer → Magic link. A "Magic link ready to send" card shows the link with a Copy
-   button. Copy it.
-5. Open the link in a private window. The portal opens without any login. Open the Countered
-   quote, choose Net 30, click "Accept & create order": a confirm panel appears before anything
-   is written.
+4. Buyers → the buyer's row → "Generate link" (the Magic link column). A "Magic link ready to
+   send" banner shows the link (`…/portal/auth?token=…`) with a Copy button and says it expires
+   and can be used once. Copy it. The quote page itself never shows a link: buyers reach the
+   portal through this link, sent by the merchant.
+5. Open the link in a private window. A one-click page says "You're signing in as <buyer email>"
+   with Continue; no password or code is asked for. Continue opens the portal. Open the
+   Countered quote, choose Net 30, click "Accept & create order": a confirm panel appears before
+   anything is written.
 6. Click "Confirm & create order". The quote flips to Ordered with Shopify's subtotal, tax and
    total. In the admin, Orders → Drafts has a new draft created by Mannon with the same totals
    and Net 30 payment terms.
-7. Quote forms → AI Order Pad: paste two lines like `20x SKU-A, 5x SKU-B` using real SKUs from the
-   store. Claude matches the lines; nothing is ordered until "Confirm & build cart".
+7. Buyer portal (same magic-link session) → "Open the order pad" → "Paste a PO or email": paste
+   two lines like `20x SKU-A, 5x SKU-B` using real SKUs from the store, then "Read my order".
+   Claude matches the lines into the order; nothing is ordered until "Request quote for these
+   items".
 8. Analytics: the ✦ Claude insights section renders. On Free or Starter it may show an upgrade
    note; record it.
 9. Buyer portal (same magic-link session): "Reorder a past order" lists a card if the store has an
