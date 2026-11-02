@@ -53,7 +53,7 @@ under existing installs as the core slices land:
 | `read_orders` | List a company's past orders for reorder cards. | S9 |
 | `write_draft_orders` | Create draft orders on quote-accept and reorder (also grants read for `draftOrderCalculate`). | S8, S9, S11 |
 | `read_companies` | Read native B2B companies, locations, contacts for the draft order `purchasingEntity`. | S8, S9 |
-| `read_payment_terms` | Read native payment terms templates to display on quote/reorder and attach to the draft order. | S11 |
+| `write_payment_terms` | Read the store's payment terms templates to offer them at accept, and attach the chosen one (with its schedule) to the draft order. Shopify requires the write scope to set `paymentTerms` on a draft order ("The user must have access to set payment terms", live QA 2026-11-02); write implies read, so it replaces `read_payment_terms`. We never create or edit templates. | S11 |
 | `read_inventory` | Read `ProductVariant.inventoryItem.unitCost` so the AI Quote Assistant computes real margins and enforces the floor. Cost is reference-only; we never write inventory. | F1 (AI Quote Assistant) |
 | `write_customers` | On wholesale approval, tag the matching customer `b2b-approved` so the storefront can gate trade pricing. Best-effort tags-add only; grants read to look the customer up by email. | F6 (Wholesale Registration) |
 

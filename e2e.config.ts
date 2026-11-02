@@ -42,7 +42,7 @@ export default {
             SHOPIFY_API_KEY: process.env.SHOPIFY_API_KEY ?? "",
             SHOPIFY_API_SECRET: process.env.SHOPIFY_API_SECRET ?? "",
             SHOPIFY_APP_URL: url,
-            SCOPES: process.env.SCOPES ?? "read_products,read_orders,write_draft_orders,read_companies,read_payment_terms,read_inventory,write_customers",
+            SCOPES: process.env.SCOPES ?? "read_products,read_orders,write_draft_orders,read_companies,write_payment_terms,read_inventory,write_customers",
             SESSION_SECRET: process.env.SESSION_SECRET ?? "",
             MANNON_DEMO_SHOP: process.env.MANNON_DEMO_SHOP ?? "",
             MANNON_FF_QUOTE_WIDGET: "true",

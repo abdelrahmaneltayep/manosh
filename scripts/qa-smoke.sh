@@ -46,7 +46,7 @@ if nc -z 127.0.0.1 "$PORT" 2>/dev/null; then echo "port $PORT busy"; exit 2; fi
 tmux new-session -d -s "$SESSION" -c "$ROOT" \
   "env NODE_ENV=production PORT=$PORT HOST=127.0.0.1 DATABASE_URL='$DATABASE_URL' \
    SHOPIFY_API_KEY=qa-dummy-key SHOPIFY_API_SECRET='$SECRET' SHOPIFY_APP_URL=$BASE \
-   SCOPES=read_products,read_orders,write_draft_orders,read_companies,read_payment_terms,read_inventory,write_customers \
+   SCOPES=read_products,read_orders,write_draft_orders,read_companies,write_payment_terms,read_inventory,write_customers \
    SESSION_SECRET=qa-session-secret-0123456789 CRON_SECRET='$CRON' MANNON_FF_CREDIT=true \
    MANNON_FF_QUOTE_WIDGET=true MANNON_FF_QUOTE_CAPTURE=true MANNON_FF_MAKE_AN_OFFER=true MANNON_FF_QUOTE_OPS=true \
    MANNON_FF_WHOLESALE_REG=true MANNON_FF_CATALOG_SHARE=true MANNON_FF_FLEX_PAY=true MANNON_FF_I18N=true MANNON_FF_BUYER_PWA=true \

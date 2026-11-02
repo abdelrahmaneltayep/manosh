@@ -10,10 +10,10 @@ const EXPECTED = [
   "read_companies",
   "read_inventory",
   "read_orders",
-  "read_payment_terms",
   "read_products",
   "write_customers",
   "write_draft_orders",
+  "write_payment_terms",
 ];
 
 describe("declared OAuth scopes", () => {

@@ -33,7 +33,7 @@ bundled CSS, not our code).
 ### 2. Minimum OAuth scopes, each documented — PASS
 
 - Requested scopes: `read_products, read_orders, write_draft_orders,
-  read_companies, read_payment_terms`.
+  read_companies, write_payment_terms, read_inventory, write_customers`.
 - `app/lib/scopes.test.ts` asserts `shopify.app.toml` matches the declared set.
 - `docs/compliance.md` documents every scope with its reason and consuming slice.
   No undocumented or unused scope. `write_draft_orders` intentionally covers read

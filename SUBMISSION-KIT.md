@@ -306,6 +306,10 @@ NOTES
       so `SHOPIFY_APP_HANDLE` is only a fallback; still, open
       `https://admin.shopify.com/store/<dev-store>/charges/<app handle>/pricing_plans`
       once by hand and confirm the four plans render (review 1.2.2).
+- [ ] Scope change released: `write_payment_terms` replaced `read_payment_terms`
+      (needed to attach Net terms to a draft order). Run `shopify app deploy` so the
+      new scope is in the released config, open the app on the dev store and approve
+      the updated permissions, then re-run reviewer step 5 with Net 30.
 - [ ] Theme app extension re-verified after `npm run deploy`: in the theme editor add
       each Mannon block to a product page and the cart page, save, then open the live
       store — every button is visible before touching any Mannon setting (review 5.1.2).

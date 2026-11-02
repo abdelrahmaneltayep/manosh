@@ -131,7 +131,7 @@ on. **Test buyer portal link:** use the magic link generated in step 2 (no passw
 - 3 GDPR webhooks + `app/uninstalled` respond and reject bad HMAC with 401
   (`docs/compliance.md`).
 - Minimum scopes only: `read_products, read_orders, write_draft_orders,
-  read_companies, read_payment_terms, read_inventory, write_customers` — each
+  read_companies, write_payment_terms, read_inventory, write_customers` — each
   justified in `docs/compliance.md`.
 - Live privacy policy at `https://manosh.fly.dev/privacy`.
 - Money is never computed by the app — all totals/tax come from Shopify's
