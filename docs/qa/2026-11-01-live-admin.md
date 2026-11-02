@@ -435,3 +435,20 @@ an order is never blocked.
 - **Command:** Fresh demo buyer → Reorder #1001 → Send reorder → newest draft in the admin.
 - **Actual:** The buyer sees **Ordered**, 12 × 949.95, 6 × 885.95, **Subtotal $16,715.10, Total $16,715.10**: exactly the sum of the lines (`admin/currency-fix-buyer-ordered.png`). Draft **#D20**: market **Canada**, currency **US Dollar (USD $)**, line prices **$949.95** and **$885.95** at the agreed amounts, Subtotal $16,715.10, **Total $16,715.10 USD**, "Mannon created this draft order" (`admin/currency-fix-admin-draft-D20-usd.png`). No `[draft-order] … retrying` line in the Fly logs, so Shopify accepted the USD presentment currency for the Canada location.
 - **Status:** PASS. The CAD/USD price gap is closed.
+
+## TC2 fixed: Totals from Shopify on the merchant quote page (v56, `9e83b3c` + `33f3e1b`)
+
+The merchant quote page now has a **Totals from Shopify** card. It loads after the page renders,
+through the read-only GET route `/app/quote-totals/:id` (`fetcher.load`, so the page loader isn't
+re-run). The amounts come from `draftOrderCalculate` for the buyer's company location; an ordered
+quote shows its stored Shopify snapshot instead. "Recalculate with these prices" re-prices the counter
+form's unsaved values. Nothing is created or saved, and no money is computed in the app.
+
+#### TC2 (re-run)
+- **Command:** Fresh demo buyer's New quote `cmvyzp6yu000gr9h4e2924t3j` → open in Quotes. Then change the first unit price to 700 → "Recalculate with these prices".
+- **Actual:** The page renders in 2.6 s (cold, including the admin frame). The card then shows **Subtotal $8,109.00 · Tax $0.00 · Total $8,109.00 USD**, "Calculated by Shopify for this buyer's company location. Shipping isn't included." That equals 10 × 785.95 + 10 × 24.95 (`admin/tc02-fix-totals-from-shopify.png`). After Recalculate: **$7,249.50**, "Calculated by Shopify for the prices above. Not saved until you send the counter." (`admin/tc02-fix-recalculated.png`). The buyer's portal still shows the quote as New, so nothing was sent. Fly logs: one `GET /app/quote-totals/…` per load, about 760 ms on the server (mostly the Shopify call), with no duplicate request and no page reload.
+- **Status:** PASS
+
+**Updated admin-run totals:** PASS: TC1, TC2, TC3, TC5, TC6, TC7, TC8, TC9, TC10, TC11, TC14, final check (apps).
+FAIL: TC4 (no magic link shown to the merchant; the plan's wording, not an app defect).
+BLOCKED: final check (customer-account block, needs a customer sign-in).
