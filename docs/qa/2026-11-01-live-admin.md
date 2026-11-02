@@ -247,3 +247,128 @@ same factor: 37,195.98 of lines against a 37,767.53 total (+1.537%). The money i
 but the buyer sees line prices that don't add up to it. Possible causes: a price adjustment on the company
 location's catalog or market, or the `priceOverride` currency. Next step: open the draft order in the
 admin and compare its line prices with the quote.
+
+---
+
+## Admin run, steps 1–11, 2026-11-02 (v50)
+
+**Environment.** Google Chrome 156, signed in to `mannon-9iu9ewku` by the owner, driven with
+Playwright `chromium.connectOverCDP("http://127.0.0.1:9222")`. Every step opened a new page in the
+existing context. Buyer-side steps used a separate browser context in the same Chrome and a fresh
+demo buyer. No credentials were typed. The storefront password page and the customer-account
+sign-in were not entered (see TC11 and the final check). Screenshots are in
+`docs/qa/2026-11-01-live-admin/admin/`.
+
+**Where the plan and the app differ.** There is no merchant "New quote" screen: quotes come from
+buyers. The merchant counters on `Quotes → <quote>`, and the app never shows the merchant a magic
+link ("Counter sent to the buyer."). So TC2–TC6 ran on the real path: a fresh demo buyer's New
+quote, countered in the admin, then accepted in that buyer's session. The AI Order Pad is in the
+buyer portal (`/portal/quick-order`), not under Quote forms.
+
+#### TC1 — Every left-nav page renders
+- **Command:** Click each Mannon item in the admin sidebar: Home (Mannon), Quotes, Quote forms, Pricing & catalog, Buyers, Analytics, Settings, Pricing plans.
+- **Expected:** Every page renders, with no "Something went wrong" and no blank frame.
+- **Actual:** All 8 render in the app iframe at the right path, in 323–645 ms from click to content. Analytics shows "Quote analytics is a Growth feature … Upgrade" (see the plan mismatch in TC10). Screenshots: `admin/tc01-*.png`.
+- **Status:** PASS
+
+#### TC2 — Quote priced by Shopify
+- **Command:** Open a buyer's New quote (`cmvytnate002ir9h5o5bksz5g`, 2 lines) in Quotes.
+- **Expected:** Subtotal, tax and total appear, labelled as coming from Shopify.
+- **Actual:** The merchant quote page shows editable quantity and unit price per line, but **no subtotal, tax or total**. The only money note is in Documents: "Taxes and the final total are calculated by Shopify at checkout." The page loaded in 4.7 s (cold). Screenshot: `admin/tc02-merchant-quote.png`.
+- **Status:** FAIL (no Shopify-calculated totals on the merchant quote)
+
+#### TC3 — ✦ Draft with Claude only pre-fills
+- **Command:** Click "✦ Draft all lines with Claude", then "Use this price" on each line.
+- **Expected:** A counter is drafted on screen and nothing is sent. Apply only pre-fills.
+- **Actual:** Two suggestions appeared in 6.4 s, each with a margin read, a floor, a draft message and "✦ Drafted by Claude · review before sending. You send it, not the AI." The buyer's portal still showed the quote as **New**, so nothing was sent. Claude suggested the list prices ($785.95 and $24.95) because no unit cost is on file, so "Use this price" left the inputs as they were. A "Claude trial · 7 days left" badge is shown, with no upgrade block. Screenshots: `admin/tc03-claude-drafted.png`, `admin/tc03-applied.png`.
+- **Status:** PASS
+
+#### TC4 — Send the counter
+- **Command:** "Send counter". (Net 30 is a buyer-side choice at accept here, so it was chosen in TC5.)
+- **Expected:** A confirmation with the buyer's magic link appears.
+- **Actual:** The banner says "Counter sent to the buyer." and the quote shows **Countered**, with "Internal note: a Claude draft was used". **No magic link is shown** to the merchant. Screenshot: `admin/tc04-counter-sent.png`.
+- **Status:** FAIL against the plan's wording (the counter works, but there's no magic link to copy)
+
+#### TC5 — Accept asks to confirm
+- **Command:** In the buyer's session, open the Countered quote, choose Net 30, then Accept & create order.
+- **Expected:** A confirm dialog appears before anything is written.
+- **Actual:** "Accept this quote? … Nothing is written until you confirm." with "Confirm & create order" and "Go back". (This used the demo session, not a magic link, because of TC4.) Screenshot: `admin/tc05-confirm.png`.
+- **Status:** PASS
+
+#### TC6 — Ordered, and a draft with source Mannon
+- **Command:** Confirm, then check Orders → Drafts.
+- **Expected:** The quote is Ordered, and a draft with source Mannon has the same totals.
+- **Actual:** With **Net 30** chosen, the accept fails: the buyer sees **"draftOrderCalculate failed: An issue date is required with net payment terms."** and the quote stays Countered (`admin/tc06-buyer-net30-error.png`). This is a real bug: `buildDraftOrderInput` sends `paymentTerms { paymentTermsTemplateId }` without the issue date that NET terms need (`paymentSchedules: [{ issuedAt }]`), and the raw Shopify error reaches the buyer. Without terms the path works: draft **#D15** has PO `PO-DEMO-1042`, is created by Mannon for Snowdevil, and comes from the TC13 accept on v49. Drafts list: `admin/tc06-admin-drafts.png`.
+- **Status:** FAIL (any NET payment terms break the accept)
+
+#### TC7 — AI Order Pad
+- **Command:** Buyer portal → Open the order pad → "Paste a PO or email": `Hi, please send / 20x sku-untracked-1 / 5x sku-managed-1 / Thanks`, then "Read my order".
+- **Expected:** Claude matches the lines, and nothing is ordered until the buyer confirms.
+- **Actual:** In 3.0 s the order shows The Inventory Not Tracked Snowboard (`sku-untracked-1`, 20) and The Multi-managed Snowboard (`sku-managed-1`, 5). The estimated subtotal is USD 22148.75, with "Final tax & totals are calculated by the store at checkout". The buyer's quote count stayed at 2. Nothing is placed until "Request quote for these items" (that's the label, not "Confirm & build cart"). Screenshot: `admin/tc07-order-pad-matched.png`.
+- **Status:** PASS
+
+#### TC8 — Analytics ✦ Claude insights
+- **Actual:** Analytics shows "Quote analytics is a Growth feature … Upgrade to Growth to unlock it." This is the upgrade note the plan allows for. The app believes the shop is on Starter (see TC10). Screenshot: `admin/tc01-analytics.png`.
+- **Status:** PASS (upgrade note recorded)
+
+#### TC9 — Reorder from the portal
+- **Actual:** Covered by TC14 below, with the same fresh buyer session: the #1001 card shows, and Reorder becomes **Ordered**.
+- **Status:** PASS
+
+#### TC10 — Pricing plans → Choose Growth (CRITICAL, 1.2.2)
+- **Command:** Pricing plans → Choose Growth. Then Starter → decline.
+- **Expected:** Shopify's plan page lists Free, Starter, Growth and Scale, with no 404. Approve gives Growth. Decline leaves the plan unchanged.
+- **Actual:**
+  - **No 404**: Choose Growth goes to `admin.shopify.com/store/mannon-9iu9ewku/charges/mannon/pricing_plans`, Shopify's "Select a plan" page (`admin/tc10-shopify-plan-page.png`). **Item 1.2.2 is fixed.**
+  - **The page doesn't match the app.** Shopify lists **two** plans: **Mannon Growth, $79/30 days, marked Current** (test, 13 trial days left) and **Mannon Starter, $29/30 days**. There's **no Free and no Scale**. The app's own page offers Free $0, Starter $9, Growth $29, Scale $69 (`admin/tc10-plans-before.png`).
+  - **The current plan disagrees.** Shopify says Growth. The app says Starter and gates Analytics as a Growth feature. Cause: `resolveV3PlanFromName` only maps `free/starter/growth/scale`, but Shopify's plans are named "Mannon Growth" / "Mannon Starter" (handle `mannon-starter`), so they don't map.
+  - **Approve** couldn't be run as written, because Growth is already current on Shopify.
+  - **Decline:** Starter → "Test with this plan" opens "Approve charge … This plan is free. You will not be billed." (`admin/tc10-starter-approval.png`). There's no Decline button, so going back is the decline. The app's plan was unchanged afterwards (`admin/tc10-plans-after-decline.png`).
+- **Status:** FAIL. The 404 (1.2.2) is fixed, but Shopify's plans (names, prices, Free and Scale missing) don't match the app or the listing, and the app misreads the current plan. A reviewer choosing a plan will see $79 and $29 where the app says $29 and $9.
+
+#### TC11 — Theme app blocks (CRITICAL, 5.1.2)
+- **Command:** Online Store → Themes → live theme "test-data" → Customize, product template → Product information → Add block → Apps → "Add to Quote" (Mannon) → Save. Repeat for "Make an Offer" and "Request a Quote". Then the live product page, Add to Quote, and submit with an email.
+- **Expected:** Each button is visible in the editor right away, with a small Mannon note. On the live page each is visible, with no note. The submitted quote confirms in place and appears under Quotes → Requests.
+- **Actual:**
+  - **Editor:** all three Mannon blocks were in the picker, and each rendered **immediately** after adding, each with its note. For example: "Mannon · Add to Quote. Buyers collect products into one quote. Shown to shoppers while the widget is on in Mannon → Quote forms. Only you see this note." Each was saved (Save went disabled). Screenshots: `admin/tc11-editor-add-to-quote.png`, `…-make-an-offer.png`, `…-request-a-quote.png`. **Item 5.1.2 is fixed.**
+  - **Storefront access:** the storefront is password-protected (`/password`). It was opened through the editor's own **View** link (a Shopify-issued admin preview bypass), not by entering the password.
+  - **Live page:** on `/products/the-inventory-not-tracked-snowboard`, "Request a Quote", "Make an offer" and "Add to Quote" are all visible, with **no merchant note** (`admin/tc11-live-product.png`). The editor's sample product, The Minimal Snowboard, is a Draft, so an active product was used.
+  - **Submit:** Add to Quote opens "Your quote" with the product, Email, Note and "Request quote" (`admin/tc11-add-to-quote-open.png`). The spam honeypot field is off-screen, `aria-hidden`, with tabindex −1. Submitting with `qa-tester@example.com` confirms in place: "Thanks — we got your quote and will reply with pricing." (`admin/tc11-quote-submitted.png`).
+  - **Requests:** Mannon → Quotes → Requests lists `qa-tester@example.com · WIDGET · 1 + note · NEW`, with Convert to quote and Decline (`admin/tc11-admin-requests.png`).
+- **Status:** PASS. Side effect on the store: the three Mannon blocks are now saved on the live theme's product template, and one storefront request from `qa-tester@example.com` exists.
+
+#### TC14 — Reorder with the 5% tolerance (again, with the admin check)
+- **Command:** Fresh buyer demo → Reorder on #1001 → Send reorder.
+- **Expected:** It converts straight to a Shopify draft order.
+- **Actual:** The quote is **Ordered** in 3.8 s: 12 × 949.95, 6 × 885.95, Subtotal $16,972.24, Tax $0.00 (`admin/tc14-reorder-result.png`). In the admin, draft **#D17** says "Mannon created this draft order", for Snowdevil (Karine Ruby) (`admin/tc14-admin-draft-D17.png`).
+- **Status:** PASS
+
+**The +1.5% price gap explained (TC13/TC14).** #D17 is in the **Canada market, currency CAD**. The
+USD line prices (949.95, 885.95) became **$1,349.00 and $1,258.00 CAD**: converted, then rounded to
+whole dollars by the market's price rounding. The total is $23,736.00 CAD ("approximately
+$16,993.86 USD"). The app sends `priceOverride` in USD while Snowdevil's company location buys in
+CAD, so Shopify converts and rounds, and the buyer's USD lines no longer add up to the total. Fix
+options: send the override in the location's currency (and show it), or put the demo company's
+location in the US market.
+
+#### Final check
+- **Settings → Apps and sales channels:** Mannon is listed under Installed ("Free trial") (`admin/final-apps-installed.png`). PASS.
+- **Customer-account "Your quotes" block:** BLOCKED. It needs a logged-in customer account, and per the run's rule no sign-in was attempted.
+
+### Summary of the admin run
+
+| Status | Steps |
+|---|---|
+| PASS | TC1, TC3, TC5, TC7, TC8, TC9, TC11, TC14, final check (apps) |
+| FAIL | TC2 (no totals on the merchant quote), TC4 (no magic link), TC6 (NET terms break the accept), TC10 (Shopify plans don't match, app misreads the plan) |
+| BLOCKED | Final check (customer-account block, needs a customer sign-in) |
+
+**The two App Store items:** 1.2.2 (plan page 404) is fixed, but the plan page now shows a pricing
+mismatch a reviewer will notice. 5.1.2 (blocks render immediately) is fixed.
+
+**Bugs to fix, in order:**
+1. **NET payment terms break every accept** (TC6). `buildDraftOrderInput` needs `paymentSchedules: [{ issuedAt }]` for NET templates. Also map Shopify's raw `draftOrderCalculate failed:` text to plain language.
+2. **Partner Dashboard plans vs the app** (TC10). Recreate the plans as `free/starter/growth/scale` at the app's prices, or update the app and listing to match "Mannon Growth/Starter". Also make `resolveV3PlanFromName` accept the `mannon-` prefix, so the current plan reads correctly.
+3. **Currency** (TC13/TC14). Send overrides in the company location's currency, or move the demo location to the US market.
+4. **Merchant quote page** (TC2). Show a Shopify-calculated subtotal, tax and total (`draftOrderCalculate`), as the buyer page does after accept.
+5. **The plan doc is out of date** for TC2 (New quote), TC4 (magic link) and TC7 (Order Pad location and button label).
