@@ -58,7 +58,6 @@ import { duplicateQuote, QuoteNotFoundForShopError } from "../services/quote-dup
 import { sendEmail } from "../services/mailer.server";
 import { appendEvent } from "../services/events.server";
 import { getCatalog } from "../services/catalog.server";
-import { previewQuoteTotals } from "../services/quote-totals.server";
 import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
 import {
   generateSuggestionForLine,
@@ -70,6 +69,7 @@ import {
 } from "../services/quote-ai.server";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate, formatMoney } from "../lib/format";
+import type { loader as totalsLoader } from "./app.quote-totals.$id";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 // Dark-launch flag for Feature 1. AI UI + action are inert unless this is on.
@@ -133,26 +133,6 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   const quoteId = params.id!;
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-
-  // TC2 — Shopify's subtotal/tax/total for this quote (draftOrderCalculate, never
-  // computed here). "edits" prices the counter form's unsaved values; nothing is saved.
-  if (intent === "preview-totals") {
-    let edits;
-    if (form.get("edits") === "1") {
-      const parsed = parseCounterForm(form);
-      if (!parsed.ok) return { ok: true as const, kind: "totals" as const, preview: { ok: false as const, message: parsed.error } };
-      edits = parsed.lines;
-    }
-    const catalog = await getCatalog(session.shop);
-    const preview = await previewQuoteTotals({
-      shopDomain: session.shop,
-      quoteId,
-      admin,
-      currencyCode: catalog[0]?.currencyCode ?? "USD",
-      edits,
-    });
-    return { ok: true as const, kind: "totals" as const, preview };
-  }
 
   // F25 Quote Ops (convert / PDF email / duplicate) is dark-launched behind its flag.
   if ((intent === "convert" || intent === "pdf-email" || intent === "duplicate") && !QUOTE_OPS_ENABLED()) {
@@ -784,29 +764,27 @@ function ShopifyTotals({
   editable: boolean;
   lines: Array<{ id: string; price: string; quantity: string }>;
 }) {
-  const fetcher = useFetcher<typeof action>();
+  const fetcher = useFetcher<typeof totalsLoader>();
   const [previewingEdits, setPreviewingEdits] = useState(false);
 
   useEffect(() => {
-    fetcher.submit({ intent: "preview-totals" }, { method: "post", action: `/app/quotes/${quoteId}` });
+    fetcher.load(`/app/quote-totals/${quoteId}`);
     // Load once per quote; "Recalculate" re-prices the edited values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteId]);
 
   const recalculate = () => {
-    const fd = new FormData();
-    fd.set("intent", "preview-totals");
-    fd.set("edits", "1");
+    const qs = new URLSearchParams({ edits: "1" });
     for (const line of lines) {
-      fd.append("lineId", line.id);
-      fd.set(`price_${line.id}`, line.price);
-      fd.set(`quantity_${line.id}`, line.quantity);
+      qs.append("lineId", line.id);
+      qs.set(`price_${line.id}`, line.price);
+      qs.set(`quantity_${line.id}`, line.quantity);
     }
     setPreviewingEdits(true);
-    fetcher.submit(fd, { method: "post", action: `/app/quotes/${quoteId}` });
+    fetcher.load(`/app/quote-totals/${quoteId}?${qs.toString()}`);
   };
 
-  const data = fetcher.data && "kind" in fetcher.data && fetcher.data.kind === "totals" ? fetcher.data.preview : null;
+  const data = fetcher.data ?? null;
   const loading = fetcher.state !== "idle" || !data;
 
   return (
