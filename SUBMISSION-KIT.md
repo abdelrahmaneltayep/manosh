@@ -299,9 +299,10 @@ NOTES
          distribution method is chosen for the app.
       4. Re-open the app in the dev store admin once, then run demo steps 12–14
          again. The accept should reach Ordered and the reorder card should appear.
-- [ ] App Pricing plans created in the Partner Dashboard with handles `free` /
-      `starter` / `growth` / `scale` and the prices above. Without them Shopify's plan
-      page has nothing to show. The app now reads its own handle from the Admin API,
+- [x] App Pricing plans created in the Partner Dashboard with handles `free` /
+      `starter` / `growth` / `scale` and the prices above, and **Shopify App Pricing
+      enabled** (2026-11-02). Shopify's plan page on the dev store lists the four
+      plans at $0 / $9 / $29 / $69; the app reads the active plan as Growth. The app now reads its own handle from the Admin API,
       so `SHOPIFY_APP_HANDLE` is only a fallback; still, open
       `https://admin.shopify.com/store/<dev-store>/charges/<app handle>/pricing_plans`
       once by hand and confirm the four plans render (review 1.2.2).
