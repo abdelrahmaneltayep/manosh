@@ -90,8 +90,12 @@ function cutScene(scene, assets) {
     f.push(`[${v}][r${i}]overlay=x=${num(c.x - 60)}:y=${num(c.y - 60)}:eof_action=pass[vr${i}]`);
     v = `vr${i}`;
   });
-  f.push(`[${v}][2:v]overlay=0:H-h-60:enable='lt(t,${num(swap)})'[vca]`);
-  f.push(`[vca][3:v]overlay=0:H-h-60:enable='gte(t,${num(swap)})'[v]`);
+  // Captions sit inside the scene, clear of the cross-fades: A appears once the
+  // incoming fade is over, B leaves before the outgoing fade starts.
+  const capIn = scene.n === cfg.scenes[0].n ? 0.3 : FADE;
+  const capOut = last ? scene.slot : scene.slot - FADE;
+  f.push(`[${v}][2:v]overlay=0:H-h-60:enable='between(t,${num(capIn)},${num(swap)})'[vca]`);
+  f.push(`[vca][3:v]overlay=0:H-h-60:enable='between(t,${num(swap)},${num(capOut)})'[v]`);
 
   const mix = ["[voice]"];
   f.push(`[1:a]apad[voice]`);
@@ -123,7 +127,13 @@ function join(cuts) {
   console.log(`wrote ${path.relative(repo, OUT)} (${total}s)`);
 }
 
+//   node scripts/video/assemble.mjs 6 9       re-cut only scenes 6 and 9, then re-join all
+const only = new Set(process.argv.slice(2).map(Number).filter(Boolean));
 const assets = await ensureAssets();
 execFileSync("node", [path.join(here, "captions.mjs")], { stdio: "inherit" });
-const cuts = cfg.scenes.map((s) => cutScene(s, assets));
+const cuts = cfg.scenes.map((s) => {
+  const existing = path.join(CUT, `${nn(s.n)}.mp4`);
+  if (only.size && !only.has(s.n) && existsSync(existing)) return existing;
+  return cutScene(s, assets);
+});
 join(cuts);

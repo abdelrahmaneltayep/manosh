@@ -114,7 +114,7 @@ record() {
 assemble() {
   need ffmpeg; need node
   rm -f "$RAW"/page@*.webm
-  node scripts/video/assemble.mjs
+  node scripts/video/assemble.mjs "$@"
 }
 
 case "${1:-all}" in
@@ -123,7 +123,7 @@ case "${1:-all}" in
   record) shift; record "$@" ;;
   profiles) profiles ;;
   import-profile) import_profile ;;
-  assemble) assemble ;;
+  assemble) shift; assemble "$@" ;;
   all) download; normalise; record; assemble ;;
   *) echo "usage: $0 {download|normalise|record [--from-chrome] [N…]|profiles|import-profile|assemble|all}" >&2; exit 2 ;;
 esac
