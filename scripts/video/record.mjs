@@ -26,7 +26,7 @@
 //   MANNON_VIDEO_SKUS         two lines for the order pad, e.g. "20x sku-a\n5x sku-b"
 
 import { chromium } from "playwright";
-import { readFileSync, mkdirSync, renameSync, existsSync, writeFileSync, rmSync, readdirSync } from "node:fs";
+import { readFileSync, mkdirSync, renameSync, existsSync, writeFileSync, rmSync, readdirSync, symlinkSync } from "node:fs";
 import { homedir } from "node:os";
 import { execFileSync } from "node:child_process";
 import path from "node:path";
@@ -112,15 +112,31 @@ async function startScreencast(page, n) {
     try { await cdp.send("Page.stopScreencast"); } catch {}
     await sleep(300);
     if (frames.length < 2) throw new Error("screencast produced no frames (was the tab in front?)");
-    const list = frames.map((f, i) => {
+    // Resample the variable-rate frames to a fixed 30 fps image sequence. This
+    // needs only the image2 demuxer, which every ffmpeg build has, including
+    // Playwright's small one (which lacks the concat demuxer and libx264).
+    const FPS = 30;
+    const seq = path.join(dir, "seq");
+    mkdirSync(seq, { recursive: true });
+    let idx = 0;
+    frames.forEach((f, i) => {
       const next = frames[i + 1];
-      const d = next ? Math.max(0.01, next.t - f.t) : 0.5;
-      return `file '${f.file}'\nduration ${d.toFixed(3)}`;
-    }).join("\n") + `\nfile '${frames[frames.length - 1].file}'\n`;
-    const listFile = path.join(dir, "frames.txt");
-    writeFileSync(listFile, list);
-    const out = path.join(RAW, `${String(n).padStart(2, "0")}.mp4`);
-    execFileSync(ffmpegBin(), ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", listFile, "-vf", "fps=30,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", out], { stdio: "inherit" });
+      const d = next ? Math.max(1 / FPS, next.t - f.t) : 0.5;
+      const copies = Math.max(1, Math.round(d * FPS));
+      for (let k = 0; k < copies; k++) symlinkSync(f.file, path.join(seq, `s${String(idx++).padStart(6, "0")}.jpg`));
+    });
+    const bin = ffmpegBin();
+    const system = bin === "ffmpeg";
+    const out = path.join(RAW, `${String(n).padStart(2, "0")}.${system ? "mp4" : "webm"}`);
+    const vf = "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2";
+    const codec = system ? ["-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p"] : ["-c:v", "libvpx", "-b:v", "6M", "-pix_fmt", "yuv420p"];
+    const input = ["-v", "error", "-y", "-framerate", String(FPS), "-i", path.join(seq, "s%06d.jpg")];
+    try {
+      execFileSync(bin, [...input, "-vf", vf, ...codec, out], { stdio: "inherit" });
+    } catch {
+      log("  ffmpeg could not scale; writing the frames as they are");
+      execFileSync(bin, [...input, ...codec, out], { stdio: "inherit" });
+    }
     rmSync(dir, { recursive: true, force: true });
     return out;
   };
