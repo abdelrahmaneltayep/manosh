@@ -23,3 +23,9 @@ Or step by step: `npm run video:download`, then `bash scripts/video/menna-video.
 that window on the first run (someone with access to the store, never by typing credentials
 into a script). Scenes 8 and 9 must run together, because 9 opens the link 8 generates.
 Captions, slots and the scene order live in `scripts/video/scenes.json`.
+
+To reuse the Chrome you are already signed in to, run the recorder with `--from-chrome`:
+`npm run video:record -- --from-chrome 1`. It copies the last-used Chrome profile (cookies,
+no caches) into `~/mannon-chrome` and records from that copy; your real Chrome is not
+touched. `bash scripts/video/menna-video.sh profiles` lists the profiles; pick one with
+`MANNON_VIDEO_CHROME_PROFILE="Profile 1"`.

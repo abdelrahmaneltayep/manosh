@@ -4,6 +4,9 @@
 #   scripts/video/menna-video.sh download     fetch the 16 chosen takes from ElevenLabs
 #   scripts/video/menna-video.sh normalise    -16 LUFS wavs next to them
 #   scripts/video/menna-video.sh record [N…]  record the scenes (all, or the ones given)
+#   scripts/video/menna-video.sh record --from-chrome [N…]
+#                                             same, after copying your signed-in Chrome profile
+#   scripts/video/menna-video.sh profiles     list the Chrome profiles on this Mac
 #   scripts/video/menna-video.sh assemble     trim, captions, voice, concat → mp4
 #   scripts/video/menna-video.sh all          the four in order
 #
@@ -45,8 +48,39 @@ normalise() {
   done
 }
 
+CHROME_DIR="$HOME/Library/Application Support/Google/Chrome"
+PROFILE_DIR="$HOME/mannon-chrome"
+
+# List the profiles in the Mac's own Chrome, with the name shown in Chrome's menu.
+profiles() {
+  need jq
+  [ -f "$CHROME_DIR/Local State" ] || { echo "no Google Chrome profiles found in $CHROME_DIR" >&2; exit 1; }
+  jq -r '.profile.info_cache | to_entries[] | "\(.key)\t\(.value.name)\t\(.value.user_name // "")"' "$CHROME_DIR/Local State" | column -t -s $'\t'
+}
+
+# Copy a signed-in Chrome profile into the recorder's own profile folder, so the
+# Shopify sign-in comes along. Caches are skipped; nothing in Chrome is changed.
+import_profile() {
+  need rsync; need jq
+  local prof="${MANNON_VIDEO_CHROME_PROFILE:-}"
+  if [ -z "$prof" ]; then
+    prof=$(jq -r '.profile.last_used // "Default"' "$CHROME_DIR/Local State")
+  fi
+  [ -d "$CHROME_DIR/$prof" ] || { echo "no Chrome profile folder '$prof'. Profiles here:" >&2; profiles >&2; exit 1; }
+  echo "importing Chrome profile '$prof' ($(jq -r --arg p "$prof" '.profile.info_cache[$p].name // "?"' "$CHROME_DIR/Local State")) into $PROFILE_DIR"
+  mkdir -p "$PROFILE_DIR/Default"
+  cp "$CHROME_DIR/Local State" "$PROFILE_DIR/Local State"
+  rsync -a --delete \
+    --exclude 'Cache' --exclude 'Code Cache' --exclude 'GPUCache' --exclude 'DawnCache' --exclude 'DawnGraphiteCache' --exclude 'DawnWebGPUCache' \
+    --exclude 'Service Worker' --exclude 'Session Storage' --exclude 'Sessions' --exclude 'Singleton*' --exclude 'LOCK' --exclude 'lockfile' \
+    "$CHROME_DIR/$prof/" "$PROFILE_DIR/Default/"
+  rm -f "$PROFILE_DIR"/Singleton* "$PROFILE_DIR/Default/LOCK"
+  echo "done. If macOS asks whether Chrome may use 'Chrome Safe Storage' from the keychain, click Always Allow: that is what decrypts the sign-in cookies."
+}
+
 record() {
   need node
+  if [ "${1:-}" = "--from-chrome" ]; then shift; import_profile; fi
   [ -d node_modules/playwright ] || npm install --no-audit --no-fund
   ls "$HOME/Library/Caches/ms-playwright" 2>/dev/null | grep -q '^ffmpeg' || npx playwright install ffmpeg
   node scripts/video/record.mjs "$@"
@@ -83,7 +117,9 @@ case "${1:-all}" in
   download) download ;;
   normalise|normalize) normalise ;;
   record) shift; record "$@" ;;
+  profiles) profiles ;;
+  import-profile) import_profile ;;
   assemble) assemble ;;
   all) download; normalise; record; assemble ;;
-  *) echo "usage: $0 {download|normalise|record [N…]|assemble|all}" >&2; exit 2 ;;
+  *) echo "usage: $0 {download|normalise|record [--from-chrome] [N…]|profiles|import-profile|assemble|all}" >&2; exit 2 ;;
 esac
