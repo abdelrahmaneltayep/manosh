@@ -6,6 +6,9 @@
 #   scripts/video/menna-video.sh record [N…]  record the scenes (all, or the ones given)
 #   scripts/video/menna-video.sh record --from-chrome [N…]
 #                                             same, after copying your signed-in Chrome profile
+#   scripts/video/menna-video.sh record --cdp [N…]
+#                                             start a normal Chrome you sign in to (Google works),
+#                                             then film through it; best when Google sign-in is needed
 #   scripts/video/menna-video.sh profiles     list the Chrome profiles on this Mac
 #   scripts/video/menna-video.sh assemble     trim, captions, voice, concat → mp4
 #   scripts/video/menna-video.sh all          the four in order
@@ -78,9 +81,32 @@ import_profile() {
   echo "done. If macOS asks whether Chrome may use 'Chrome Safe Storage' from the keychain, click Always Allow: that is what decrypts the sign-in cookies."
 }
 
+# Start a normal (non-automated) Chrome on the recorder profile with remote
+# debugging on, so a person can sign in with Google there, then attach to it.
+start_cdp_chrome() {
+  if curl -sS -m 2 http://127.0.0.1:9222/json/version >/dev/null 2>&1; then
+    echo "Chrome is already listening on port 9222"; return
+  fi
+  mkdir -p "$PROFILE_DIR"
+  echo "starting Google Chrome on $PROFILE_DIR with remote debugging (port 9222)…"
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    --user-data-dir="$PROFILE_DIR" --remote-debugging-port=9222 --no-first-run --no-default-browser-check \
+    --window-size=1920,1180 "https://admin.shopify.com/store/$(jq -r .store "$SCENES")/apps/$(jq -r .appHandle "$SCENES")/app" \
+    >/dev/null 2>&1 &
+  for _ in $(seq 1 60); do
+    curl -sS -m 2 http://127.0.0.1:9222/json/version >/dev/null 2>&1 && break
+    sleep 1
+  done
+  echo "Sign in to Shopify in that Chrome window (Google sign-in works there). The recorder waits for it."
+}
+
 record() {
   need node
   if [ "${1:-}" = "--from-chrome" ]; then shift; import_profile; fi
+  if [ "${1:-}" = "--cdp" ]; then
+    shift; start_cdp_chrome
+    export MANNON_VIDEO_CDP=http://127.0.0.1:9222
+  fi
   [ -d node_modules/playwright ] || npm install --no-audit --no-fund
   ls "$HOME/Library/Caches/ms-playwright" 2>/dev/null | grep -q '^ffmpeg' || npx playwright install ffmpeg
   node scripts/video/record.mjs "$@"

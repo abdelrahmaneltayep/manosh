@@ -29,3 +29,8 @@ To reuse the Chrome you are already signed in to, run the recorder with `--from-
 no caches) into `~/mannon-chrome` and records from that copy; your real Chrome is not
 touched. `bash scripts/video/menna-video.sh profiles` lists the profiles; pick one with
 `MANNON_VIDEO_CHROME_PROFILE="Profile 1"`.
+
+If the admin sign-in is through Google, use `npm run video:record -- --cdp 1` instead. It
+starts a normal Chrome window (no automation flags, so Google allows the sign-in), waits for
+you to sign in there, and films each scene through Chrome's own screencast. Later runs reuse
+that window while it stays open.

@@ -12,14 +12,23 @@
 // keeps recording for the scene's slot, so a person can take over in the
 // headed window. Nothing here is a test; it is a camera with a chauffeur.
 //
+// Two ways to get a signed-in admin:
+//   default           Playwright launches Chrome on the ~/mannon-chrome profile.
+//   MANNON_VIDEO_CDP  e.g. http://127.0.0.1:9222: attach to a Chrome a person
+//                     started themselves (so Google sign-in works there), and film
+//                     each scene through Chrome's own screencast instead of
+//                     Playwright's recorder. The shell wrapper's `record --cdp`
+//                     starts that Chrome for you.
+//
 // Environment (all optional):
 //   MANNON_VIDEO_PRODUCT_URL  a live product page with the Mannon blocks (scene 14a)
 //   MANNON_VIDEO_BUYER        text that identifies the buyer row on Buyers (scene 8)
 //   MANNON_VIDEO_SKUS         two lines for the order pad, e.g. "20x sku-a\n5x sku-b"
 
 import { chromium } from "playwright";
-import { readFileSync, mkdirSync, renameSync, existsSync } from "node:fs";
+import { readFileSync, mkdirSync, renameSync, existsSync, writeFileSync, rmSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
@@ -69,9 +78,59 @@ async function waitForSignIn(page) {
   throw new Error("no Shopify sign-in after 10 minutes");
 }
 
+const CDP = process.env.MANNON_VIDEO_CDP || null;
+
+function ffmpegBin() {
+  try { execFileSync("ffmpeg", ["-version"], { stdio: "ignore" }); return "ffmpeg"; } catch {}
+  const cache = path.join(homedir(), "Library", "Caches", "ms-playwright");
+  if (existsSync(cache)) {
+    const dir = readdirSync(cache).find((d) => d.startsWith("ffmpeg"));
+    if (dir) return path.join(cache, dir, "ffmpeg-mac");
+  }
+  throw new Error("ffmpeg not found: brew install ffmpeg, or npx playwright install ffmpeg");
+}
+
+/**
+ * Film a page through Chrome's own screencast (works on a Chrome we only
+ * attached to). Frames land in a temp folder with their timestamps and are
+ * turned into an mp4 by ffmpeg when the scene ends.
+ */
+async function startScreencast(page, n) {
+  const dir = path.join(RAW, `.frames-${String(n).padStart(2, "0")}`);
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(dir, { recursive: true });
+  const cdp = await page.context().newCDPSession(page);
+  const frames = [];
+  cdp.on("Page.screencastFrame", async ({ data, metadata, sessionId }) => {
+    const file = path.join(dir, `f${String(frames.length).padStart(6, "0")}.jpg`);
+    writeFileSync(file, Buffer.from(data, "base64"));
+    frames.push({ file, t: metadata.timestamp });
+    try { await cdp.send("Page.screencastFrameAck", { sessionId }); } catch {}
+  });
+  await cdp.send("Page.startScreencast", { format: "jpeg", quality: 92, maxWidth: SIZE.width, maxHeight: SIZE.height, everyNthFrame: 1 });
+  return async function stop() {
+    try { await cdp.send("Page.stopScreencast"); } catch {}
+    await sleep(300);
+    if (frames.length < 2) throw new Error("screencast produced no frames (was the tab in front?)");
+    const list = frames.map((f, i) => {
+      const next = frames[i + 1];
+      const d = next ? Math.max(0.01, next.t - f.t) : 0.5;
+      return `file '${f.file}'\nduration ${d.toFixed(3)}`;
+    }).join("\n") + `\nfile '${frames[frames.length - 1].file}'\n`;
+    const listFile = path.join(dir, "frames.txt");
+    writeFileSync(listFile, list);
+    const out = path.join(RAW, `${String(n).padStart(2, "0")}.mp4`);
+    execFileSync(ffmpegBin(), ["-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", listFile, "-vf", "fps=30,scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", out], { stdio: "inherit" });
+    rmSync(dir, { recursive: true, force: true });
+    return out;
+  };
+}
+
 /** Record one scene: open a page, run `drive`, hold for slot+2 s, save the video. */
 async function record(context, scene, drive) {
   const page = await context.newPage();
+  if (CDP) { try { await page.setViewportSize(SIZE); } catch {} }
+  const stop = CDP ? await startScreencast(page, scene.n) : null;
   const t0 = Date.now();
   log(`Scene ${scene.n} · ${scene.title} · ${scene.slot}s`);
   try {
@@ -81,6 +140,12 @@ async function record(context, scene, drive) {
   }
   const hold = (scene.slot + EXTRA_S) * 1000 - (Date.now() - t0);
   if (hold > 0) await sleep(hold);
+  if (stop) {
+    const out = await stop();
+    await page.close();
+    log(`  saved ${path.relative(repo, out)}`);
+    return;
+  }
   const video = page.video();
   await page.close();
   if (video) {
@@ -277,7 +342,18 @@ const adminScenes = cfg.scenes.filter((s) => s.kind === "admin" && want(s.n));
 const otherScenes = cfg.scenes.filter((s) => s.kind !== "admin" && want(s.n));
 
 let admin = null;
-if (adminScenes.length > 0 || want(8)) {
+let cdpBrowser = null;
+if (CDP) {
+  log(`attaching to Chrome at ${CDP}`);
+  cdpBrowser = await chromium.connectOverCDP(CDP);
+  admin = cdpBrowser.contexts()[0];
+  if (!admin) throw new Error("no browser context over CDP; is Chrome open?");
+  if (adminScenes.length > 0 || want(8)) {
+    const probe = await admin.newPage();
+    await waitForSignIn(probe);
+    await probe.close();
+  }
+} else if (adminScenes.length > 0 || want(8)) {
   admin = await chromium.launchPersistentContext(PROFILE, {
     channel: "chrome",
     headless: false,
@@ -290,8 +366,10 @@ if (adminScenes.length > 0 || want(8)) {
   await probe.close();
 }
 
-const buyer = await chromium.launch({ channel: "chrome", headless: false });
-const buyerCtx = await buyer.newContext({ viewport: SIZE, recordVideo: { dir: RAW, size: SIZE } });
+const buyer = CDP ? null : await chromium.launch({ channel: "chrome", headless: false });
+const buyerCtx = CDP
+  ? await cdpBrowser.newContext({ viewport: SIZE })
+  : await buyer.newContext({ viewport: SIZE, recordVideo: { dir: RAW, size: SIZE } });
 
 for (const s of cfg.scenes) {
   if (!want(s.n)) continue;
@@ -301,6 +379,7 @@ for (const s of cfg.scenes) {
 }
 
 await buyerCtx.close();
-await buyer.close();
-if (admin) await admin.close();
+if (buyer) await buyer.close();
+if (CDP) { log("leaving your Chrome open"); }
+else if (admin) await admin.close();
 log("done. Clips are in docs/video/menna/raw/. Delete the demo draft orders and held reorder quotes on the store; keep order #1001.");
