@@ -116,9 +116,13 @@ async function startScreencast(page, n) {
   });
   await cdp.send("Page.startScreencast", { format: "jpeg", quality: 92, maxWidth: SIZE.width, maxHeight: SIZE.height, everyNthFrame: 1 });
   return async function stop() {
+    const tEnd = Date.now() / 1000;
     try { await cdp.send("Page.stopScreencast"); } catch {}
     await sleep(300);
-    if (frames.length < 2) throw new Error("screencast produced no frames (was the tab in front?)");
+    if (frames.length < 1) throw new Error("screencast produced no frames (was the tab in front?)");
+    // Chrome only sends a frame when something changed, so hold the last one
+    // until the moment recording stopped; otherwise a still page ends early.
+    frames.push({ file: frames[frames.length - 1].file, t: Math.max(tEnd, frames[frames.length - 1].t + 0.5) });
     // Resample the variable-rate frames to a fixed 30 fps image sequence. This
     // needs only the image2 demuxer, which every ffmpeg build has, including
     // Playwright's small one (which lacks the concat demuxer and libx264).
