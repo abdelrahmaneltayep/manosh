@@ -211,6 +211,10 @@ const scene = (n) => cfg.scenes.find((s) => s.n === n);
 /** On a portal home page, open the first quote whose status pill says Countered. */
 async function openCounteredQuote(p) {
   const row = p.locator("li.quote-list-row").filter({ has: p.locator(".status-countered") }).first();
+  if ((await row.count()) === 0) {
+    const pills = await p.locator(".status-pill").allTextContents();
+    throw new Error(`no Countered quote on this portal (statuses: ${pills.join(", ") || "none"})`);
+  }
   await tap(row.getByRole("link").first());
   await p.getByRole("button", { name: /Accept & create order/ }).waitFor();
 }
@@ -273,6 +277,15 @@ const drivers = {
     await tryStep("wait for Totals from Shopify", async () => {
       await f.getByText("Totals from Shopify").first().waitFor();
     }, 20000);
+    // The quote page shows the buyer's email under the company name; that is
+    // the buyer whose link scene 8 must generate and whose quote scene 9 accepts.
+    await tryStep("read the buyer's email", async () => {
+      const text = (await f.locator("body").textContent()) ?? "";
+      const email = text.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0];
+      if (!email) throw new Error("no email on the quote page");
+      state.buyerEmail = email;
+      log(`    buyer: ${email}`);
+    }, 5000);
   },
 
   6: async (p) => {
