@@ -49,12 +49,18 @@ const state = { quoteUrl: null, magicLink: null };
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function tryStep(name, fn, timeout = 15000) {
+async function tryStep(name, fn, timeout = 15000, page = null) {
   try {
     await Promise.race([fn(), sleep(timeout).then(() => { throw new Error("timed out"); })]);
     log(`  ✓ ${name}`);
   } catch (e) {
     log(`  ! ${name}: ${e.message}. Take over in the Chrome window if needed.`);
+    if (page) {
+      try {
+        const alert = await page.locator("[role=alert], .error, .Polaris-Banner--statusCritical").first().textContent({ timeout: 1000 });
+        if (alert?.trim()) log(`    page says: ${alert.trim().slice(0, 300)}`);
+      } catch {}
+    }
   }
 }
 
@@ -287,8 +293,8 @@ const drivers = {
     await sleep(2500);
     await tryStep("Confirm & create order", async () => {
       await p.getByRole("button", { name: /Confirm & create order/ }).click();
-      await p.getByText("Ordered").first().waitFor();
-    }, 25000);
+      await p.locator(".status-ordered, text=Ordered").first().waitFor();
+    }, 40000, p);
   },
 
   10: async (p) => {
@@ -300,9 +306,14 @@ const drivers = {
   },
 
   11: async (p) => {
-    if (!state.magicLink) throw new Error("no magic link from scene 8");
-    await p.goto(state.magicLink.replace(/\/portal\/auth.*$/, "/portal"));
-    await sleep(2000);
+    // The reorder card comes from the demo company's seeded order, so this
+    // scene runs as a demo buyer rather than the magic-link buyer.
+    await p.goto(cfg.landing);
+    await tryStep("Open the buyer demo", async () => {
+      await p.getByRole("link", { name: /Open the buyer demo/ }).first().click();
+      await p.getByText("Reorder a past order").first().waitFor();
+    }, 20000);
+    await sleep(1500);
     await tryStep("Reorder", async () => {
       await p.locator("li.quote-list-row").getByRole("link", { name: "Reorder", exact: true }).first().click();
       await p.getByRole("button", { name: "Send reorder" }).waitFor();
