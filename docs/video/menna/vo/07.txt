@@ -1,0 +1,7 @@
+Happy with it?
+Click Send counter.
+
+The status flips to Countered,
+and the buyer gets the news.
+
+That's it. No email to write.

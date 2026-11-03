@@ -1,0 +1,9 @@
+How does the buyer get in?
+No password. A magic link.
+
+Go to Buyers,
+click Generate link,
+and copy it.
+
+One link, one buyer,
+and it expires on its own.

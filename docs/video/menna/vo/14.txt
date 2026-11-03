@@ -1,0 +1,9 @@
+Storefront blocks...
+Request a Quote, Add to Quote, Make an Offer,
+and they show up the moment you add them.
+
+Settings you own...
+reorder tolerance, quote expiry.
+
+And plans are billed by Shopify,
+on Shopify's own plan page.

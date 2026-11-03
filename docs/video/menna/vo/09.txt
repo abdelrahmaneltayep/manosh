@@ -1,0 +1,15 @@
+This is what the buyer sees.
+No login screen.
+
+They open the countered quote,
+pick their payment terms...
+Net thirty.
+
+Then Accept and create order.
+
+And then, a confirm panel.
+Nothing is written until they confirm.
+
+They confirm...
+and the quote is Ordered,
+with Shopify's tax and total.

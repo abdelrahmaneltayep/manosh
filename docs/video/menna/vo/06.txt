@@ -1,0 +1,10 @@
+Now the fun part.
+
+Click... Draft all lines with Claude.
+
+Claude drafts a counter price for each line.
+
+But here's the rule.
+Claude only drafts.
+You pick "Use this price", line by line,
+and nothing is sent until you say so.

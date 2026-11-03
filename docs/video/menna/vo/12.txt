@@ -1,0 +1,9 @@
+Buyers can paste a whole PO,
+and click Read my order.
+
+Claude matches every line
+to a real product in your catalog.
+
+Every id is checked against Shopify.
+The buyer confirms,
+then a quote exists.

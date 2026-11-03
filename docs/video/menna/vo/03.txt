@@ -1,0 +1,5 @@
+Home is your morning view.
+
+How many quotes came in,
+how many were accepted,
+and what still needs you today.

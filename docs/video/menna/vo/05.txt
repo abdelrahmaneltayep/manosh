@@ -1,0 +1,10 @@
+Here's the quote.
+
+And look at this card...
+Totals from Shopify.
+
+Subtotal, tax, total.
+Mannon never calculates money itself.
+
+It asks Shopify,
+and Shopify answers for this buyer's company.

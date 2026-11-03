@@ -1,0 +1,7 @@
+This is the quote inbox.
+
+Every request from a buyer lands here,
+with its status...
+New, Countered, Ordered.
+
+So let's open one.
