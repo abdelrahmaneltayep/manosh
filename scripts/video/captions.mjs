@@ -25,7 +25,7 @@ const html = (text) => `<!doctype html><meta charset="utf-8">
 </style>
 <body><div class="pill">${text.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</div></body>`;
 
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true }).catch(() => chromium.launch({ headless: true }));
 const page = await browser.newPage({ viewport: { width: 1920, height: 120 }, deviceScaleFactor: 1 });
 for (const s of cfg.scenes) {
   for (const [k, text] of [["a", s.captionA], ["b", s.captionB]]) {

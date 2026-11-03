@@ -34,3 +34,12 @@ If the admin sign-in is through Google, use `npm run video:record -- --cdp 1` in
 starts a normal Chrome window (no automation flags, so Google allows the sign-in), waits for
 you to sign in there, and films each scene through Chrome's own screencast. Later runs reuse
 that window while it stays open.
+
+## The edit
+
+`npm run video:assemble` now builds the educational cut: a soft pointer that eases to every
+button the recorder clicked and clicks with an indigo ripple and a tick, the lower-third
+captions, Menna's voice, 0.45 s cross-fades between scenes and a quiet swish on each cut.
+No music (Menna's guide). The pointer comes from `raw/NN.events.json`, which the recorder
+writes alongside each clip, so scenes recorded before that log existed show no pointer until
+they are re-recorded.

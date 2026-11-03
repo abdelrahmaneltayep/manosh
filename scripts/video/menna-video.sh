@@ -112,33 +112,9 @@ record() {
 }
 
 assemble() {
-  need ffmpeg; need jq; need node
-  mkdir -p "$CUT"
-  node scripts/video/captions.mjs
+  need ffmpeg; need node
   rm -f "$RAW"/page@*.webm
-  : > "$CUT/list.txt"
-  local count; count=$(jq '.scenes | length' "$SCENES")
-  for ((i = 0; i < count; i++)); do
-    local n slot nn raw vo capa capb
-    n=$(jq -r ".scenes[$i].n" "$SCENES"); slot=$(jq -r ".scenes[$i].slot" "$SCENES")
-    nn=$(printf "%02d" "$n")
-    raw=$(ls "$RAW/$nn".* 2>/dev/null | head -1)
-    vo="$VO/$nn.wav"; capa="$CUT/cap-$nn-a.png"; capb="$CUT/cap-$nn-b.png"
-    [ -n "$raw" ] || { echo "scene $n: no clip in $RAW" >&2; exit 1; }
-    [ -f "$vo" ] || { echo "scene $n: no voice in $VO (run normalise)" >&2; exit 1; }
-    local swap; swap=$(awk "BEGIN{printf \"%.2f\", $slot*0.52}")
-    # Captions are PNG pills overlaid at the bottom (60 px up), A until 52 % of the slot, then B.
-    # The screencast only emits frames when the page changes, so a raw clip can
-    # be shorter than its slot: tpad freezes its last frame to fill the slot,
-    # apad fills the voice with silence, and -t cuts both at the slot exactly.
-    ffmpeg -v error -y -i "$raw" -i "$vo" -i "$capa" -i "$capb" -t "$slot" \
-      -filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,tpad=stop_mode=clone:stop_duration=$slot[base];[base][2:v]overlay=0:H-h-60:enable='lt(t,$swap)'[v1];[v1][3:v]overlay=0:H-h-60:enable='gte(t,$swap)'[v];[1:a]apad[a]" \
-      -map "[v]" -map "[a]" -c:v libx264 -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k "$CUT/$nn.mp4"
-    echo "file '$nn.mp4'" >> "$CUT/list.txt"
-    echo "scene $n: cut to ${slot}s"
-  done
-  ffmpeg -v error -y -f concat -safe 0 -i "$CUT/list.txt" -c:v copy -c:a aac -b:a 128k -movflags +faststart "$OUT"
-  echo "wrote $OUT ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT")s)"
+  node scripts/video/assemble.mjs
 }
 
 case "${1:-all}" in

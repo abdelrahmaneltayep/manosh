@@ -48,6 +48,25 @@ mkdirSync(RAW, { recursive: true });
 const state = { quoteUrl: null, magicLink: null, buyerEmail: null };
 const COMPANY = process.env.MANNON_VIDEO_COMPANY || cfg.demoCompany || "";
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+
+// Cursor events for the edit: where and when each click or hover happened,
+// relative to the scene start, in page coordinates. The screencast does not
+// show the pointer, so the assembly draws one from this log.
+let cur = null;
+function mark(kind, box) {
+  if (!cur || !box) return;
+  cur.events.push({ t: +((Date.now() - cur.t0) / 1000).toFixed(3), x: Math.round(box.x + box.width / 2), y: Math.round(box.y + box.height / 2), kind });
+}
+async function tap(locator) {
+  await locator.first().waitFor({ state: "visible" });
+  mark("click", await locator.first().boundingBox());
+  await tap(locator.first());
+}
+async function hov(locator) {
+  await locator.first().waitFor({ state: "visible" });
+  mark("hover", await locator.first().boundingBox());
+  await hov(locator.first());
+}
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function tryStep(name, fn, timeout = 15000, page = null) {
@@ -159,6 +178,7 @@ async function record(context, scene, drive) {
   if (CDP) { try { await page.setViewportSize(SIZE); } catch {} }
   const stop = CDP ? await startScreencast(page, scene.n) : null;
   const t0 = Date.now();
+  cur = { t0, events: [] };
   log(`Scene ${scene.n} · ${scene.title} · ${scene.slot}s`);
   try {
     await drive(page);
@@ -167,6 +187,9 @@ async function record(context, scene, drive) {
   }
   const hold = (scene.slot + EXTRA_S) * 1000 - (Date.now() - t0);
   if (hold > 0) await sleep(hold);
+  const vp = page.viewportSize() ?? SIZE;
+  writeFileSync(path.join(RAW, `${String(scene.n).padStart(2, "0")}.events.json`), JSON.stringify({ viewport: vp, events: cur.events }, null, 2));
+  cur = null;
   if (stop) {
     const out = await stop();
     await page.close();
@@ -188,7 +211,7 @@ const scene = (n) => cfg.scenes.find((s) => s.n === n);
 /** On a portal home page, open the first quote whose status pill says Countered. */
 async function openCounteredQuote(p) {
   const row = p.locator("li.quote-list-row").filter({ has: p.locator(".status-countered") }).first();
-  await row.getByRole("link").first().click();
+  await tap(row.getByRole("link").first());
   await p.getByRole("button", { name: /Accept & create order/ }).waitFor();
 }
 
@@ -212,7 +235,7 @@ const drivers = {
     const f = await appFrame(p);
     await tryStep("hover the nav", async () => {
       for (const item of ["Quotes", "Quote forms", "Buyers", "Analytics", "Settings", "Pricing plans"]) {
-        await f.getByRole("link", { name: item, exact: true }).first().hover();
+        await hov(f.getByRole("link", { name: item, exact: true }).first());
         await sleep(900);
       }
     }, 12000);
@@ -227,7 +250,7 @@ const drivers = {
       let rows = f.getByRole("row").filter({ hasText: "New" });
       if (COMPANY && (await rows.filter({ hasText: COMPANY }).count()) > 0) rows = rows.filter({ hasText: COMPANY });
       const row = rows.first();
-      await row.hover();
+      await hov(row);
       const text = (await row.textContent()) ?? "";
       state.buyerEmail = text.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? null;
       const link = row.getByRole("link").first();
@@ -243,7 +266,7 @@ const drivers = {
       await tryStep("open a New quote", async () => {
         let rows = f.getByRole("row").filter({ hasText: "New" });
         if (COMPANY && (await rows.filter({ hasText: COMPANY }).count()) > 0) rows = rows.filter({ hasText: COMPANY });
-        await rows.first().getByRole("link").first().click();
+        await tap(rows.first().getByRole("link").first());
         state.quoteUrl = p.url();
       });
     }
@@ -257,12 +280,12 @@ const drivers = {
     const f = await appFrame(p);
     await sleep(1500);
     await tryStep("Draft all lines with Claude", async () => {
-      await f.getByRole("button", { name: /Draft all lines with Claude/ }).first().click();
+      await tap(f.getByRole("button", { name: /Draft all lines with Claude/ }).first());
       await f.getByRole("button", { name: "Use this price" }).first().waitFor();
     }, 25000);
     await sleep(1500);
     await tryStep("Use this price on the first line", async () => {
-      await f.getByRole("button", { name: "Use this price" }).first().click();
+      await tap(f.getByRole("button", { name: "Use this price" }).first());
     });
   },
 
@@ -271,7 +294,7 @@ const drivers = {
     const f = await appFrame(p);
     await sleep(2500);
     await tryStep("Send counter", async () => {
-      await f.getByRole("button", { name: "Send counter" }).first().click();
+      await tap(f.getByRole("button", { name: "Send counter" }).first());
       await f.getByText("Counter sent to the buyer").first().waitFor();
     }, 20000);
   },
@@ -286,27 +309,27 @@ const drivers = {
       for (const key of [process.env.MANNON_VIDEO_BUYER, state.buyerEmail, COMPANY]) {
         if (key && (await rows.filter({ hasText: key }).count()) > 0) { row = rows.filter({ hasText: key }).first(); log(`    buyer row: ${key}`); break; }
       }
-      await row.getByRole("button", { name: "Generate link" }).click();
+      await tap(row.getByRole("button", { name: "Generate link" }));
       await f.getByText("Magic link ready to send").waitFor();
       state.magicLink = (await f.locator("code").first().textContent())?.trim() ?? null;
     }, 20000);
     await sleep(1200);
-    await tryStep("Copy link", async () => { await f.getByRole("button", { name: "Copy link" }).click(); });
+    await tryStep("Copy link", async () => { await tap(f.getByRole("button", { name: "Copy link" })); });
   },
 
   9: async (p) => {
     if (!state.magicLink) throw new Error("no magic link from scene 8; run scenes 8 and 9 together");
     await p.goto(state.magicLink);
-    await tryStep("Continue", async () => { await p.getByRole("button", { name: "Continue" }).click(); });
+    await tryStep("Continue", async () => { await tap(p.getByRole("button", { name: "Continue" })); });
     await sleep(1500);
     await tryStep("open the Countered quote", () => openCounteredQuote(p));
     await sleep(1500);
     await tryStep("pick Net 30", () => pickNet30(p));
     await sleep(1200);
-    await tryStep("Accept & create order", async () => { await p.getByRole("button", { name: /Accept & create order/ }).click(); });
+    await tryStep("Accept & create order", async () => { await tap(p.getByRole("button", { name: /Accept & create order/ })); });
     await sleep(2500);
     await tryStep("Confirm & create order", async () => {
-      await p.getByRole("button", { name: /Confirm & create order/ }).click();
+      await tap(p.getByRole("button", { name: /Confirm & create order/ }));
       await p.locator(".status-ordered").or(p.getByText("Ordered", { exact: true })).first().waitFor();
     }, 40000, p);
   },
@@ -315,7 +338,7 @@ const drivers = {
     await p.goto(`${ADMIN}/draft_orders`);
     await sleep(3000);
     await tryStep("open the newest draft", async () => {
-      await p.getByRole("row").nth(1).getByRole("link").first().click();
+      await tap(p.getByRole("row").nth(1).getByRole("link").first());
     });
   },
 
@@ -324,17 +347,17 @@ const drivers = {
     // scene runs as a demo buyer rather than the magic-link buyer.
     await p.goto(cfg.landing);
     await tryStep("Open the buyer demo", async () => {
-      await p.getByRole("link", { name: /Open the buyer demo/ }).first().click();
+      await tap(p.getByRole("link", { name: /Open the buyer demo/ }).first());
       await p.getByText("Reorder a past order").first().waitFor();
     }, 20000);
     await sleep(1500);
     await tryStep("Reorder", async () => {
-      await p.locator("li.quote-list-row").getByRole("link", { name: "Reorder", exact: true }).first().click();
+      await tap(p.locator("li.quote-list-row").getByRole("link", { name: "Reorder", exact: true }).first());
       await p.getByRole("button", { name: "Send reorder" }).waitFor();
     });
     await sleep(2500);
     await tryStep("Send reorder", async () => {
-      await p.getByRole("button", { name: "Send reorder" }).click();
+      await tap(p.getByRole("button", { name: "Send reorder" }));
       await p.waitForURL(/\/portal\/quotes\//, { timeout: 20000 });
     }, 25000);
   },
@@ -343,13 +366,13 @@ const drivers = {
     if (!state.magicLink) throw new Error("no magic link from scene 8");
     await p.goto(state.magicLink.replace(/\/portal\/auth.*$/, "/portal/quick-order"));
     await sleep(1500);
-    await tryStep("Paste a PO or email", async () => { await p.getByText(/Paste a PO or email/).first().click(); }, 5000);
+    await tryStep("Paste a PO or email", async () => { await tap(p.getByText(/Paste a PO or email/).first()); }, 5000);
     await tryStep("type the lines", async () => {
       const box = p.getByRole("textbox").last();
       await box.fill(process.env.MANNON_VIDEO_SKUS ?? "Hi, please send\n20x sku-untracked-1\n5x sku-managed-1\nThanks");
     });
     await tryStep("Read my order", async () => {
-      await p.getByRole("button", { name: "Read my order" }).click();
+      await tap(p.getByRole("button", { name: "Read my order" }));
       await p.getByRole("button", { name: /Request quote for these items/ }).waitFor();
     }, 30000);
   },
@@ -370,20 +393,20 @@ const drivers = {
     await sleep(third);
     await p.goto(`${APP}/plans`);
     const f = await appFrame(p);
-    await tryStep("Choose Scale", async () => { await f.getByRole("button", { name: /Choose Scale/ }).click(); }, 8000);
+    await tryStep("Choose Scale", async () => { await tap(f.getByRole("button", { name: /Choose Scale/ })); }, 8000);
   },
 
   15: async (p) => {
     await p.goto(cfg.landing);
     await sleep(1500);
-    await tryStep("Open the buyer demo", async () => { await p.getByRole("link", { name: /Open the buyer demo/ }).first().click(); });
+    await tryStep("Open the buyer demo", async () => { await tap(p.getByRole("link", { name: /Open the buyer demo/ }).first()); });
     await sleep(3000);
     await tryStep("open the Countered quote", () => openCounteredQuote(p));
     await sleep(2000);
-    await tryStep("Accept & create order", async () => { await p.getByRole("button", { name: /Accept & create order/ }).click(); });
+    await tryStep("Accept & create order", async () => { await tap(p.getByRole("button", { name: /Accept & create order/ })); });
     await sleep(2000);
     await tryStep("Confirm & create order", async () => {
-      await p.getByRole("button", { name: /Confirm & create order/ }).click();
+      await tap(p.getByRole("button", { name: /Confirm & create order/ }));
       await p.getByText("Ordered").first().waitFor();
     }, 25000);
   },
