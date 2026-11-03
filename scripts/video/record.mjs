@@ -45,7 +45,8 @@ const only = new Set(process.argv.slice(2).map(Number).filter(Boolean));
 const want = (n) => only.size === 0 || only.has(n);
 
 mkdirSync(RAW, { recursive: true });
-const state = { quoteUrl: null, magicLink: null };
+const state = { quoteUrl: null, magicLink: null, buyerEmail: null };
+const COMPANY = process.env.MANNON_VIDEO_COMPANY || cfg.demoCompany || "";
 const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -218,9 +219,13 @@ const drivers = {
   4: async (p) => {
     await p.goto(`${APP}/quotes`);
     const f = await appFrame(p);
-    await tryStep("find the first New quote", async () => {
-      const row = f.getByRole("row").filter({ hasText: "New" }).first();
+    await tryStep(`find a New quote from ${COMPANY || "any company"}`, async () => {
+      let rows = f.getByRole("row").filter({ hasText: "New" });
+      if (COMPANY && (await rows.filter({ hasText: COMPANY }).count()) > 0) rows = rows.filter({ hasText: COMPANY });
+      const row = rows.first();
       await row.hover();
+      const text = (await row.textContent()) ?? "";
+      state.buyerEmail = text.match(/[\w.+-]+@[\w.-]+\.\w+/)?.[0] ?? null;
       const link = row.getByRole("link").first();
       const href = await link.getAttribute("href");
       if (href) state.quoteUrl = href.startsWith("http") ? href : `${APP.replace(/\/app$/, "")}${href}`;
@@ -231,8 +236,10 @@ const drivers = {
     await p.goto(state.quoteUrl ?? `${APP}/quotes`);
     const f = await appFrame(p);
     if (!state.quoteUrl) {
-      await tryStep("open the first New quote", async () => {
-        await f.getByRole("row").filter({ hasText: "New" }).first().getByRole("link").first().click();
+      await tryStep("open a New quote", async () => {
+        let rows = f.getByRole("row").filter({ hasText: "New" });
+        if (COMPANY && (await rows.filter({ hasText: COMPANY }).count()) > 0) rows = rows.filter({ hasText: COMPANY });
+        await rows.first().getByRole("link").first().click();
         state.quoteUrl = p.url();
       });
     }
@@ -270,8 +277,11 @@ const drivers = {
     const f = await appFrame(p);
     await sleep(2000);
     await tryStep("Generate link", async () => {
-      const rows = f.getByRole("row");
-      const row = process.env.MANNON_VIDEO_BUYER ? rows.filter({ hasText: process.env.MANNON_VIDEO_BUYER }).first() : rows.filter({ hasText: "Generate link" }).first();
+      const rows = f.getByRole("row").filter({ hasText: "Generate link" });
+      let row = rows.first();
+      for (const key of [process.env.MANNON_VIDEO_BUYER, state.buyerEmail, COMPANY]) {
+        if (key && (await rows.filter({ hasText: key }).count()) > 0) { row = rows.filter({ hasText: key }).first(); log(`    buyer row: ${key}`); break; }
+      }
       await row.getByRole("button", { name: "Generate link" }).click();
       await f.getByText("Magic link ready to send").waitFor();
       state.magicLink = (await f.locator("code").first().textContent())?.trim() ?? null;
@@ -293,7 +303,7 @@ const drivers = {
     await sleep(2500);
     await tryStep("Confirm & create order", async () => {
       await p.getByRole("button", { name: /Confirm & create order/ }).click();
-      await p.locator(".status-ordered, text=Ordered").first().waitFor();
+      await p.locator(".status-ordered").or(p.getByText("Ordered", { exact: true })).first().waitFor();
     }, 40000, p);
   },
 
