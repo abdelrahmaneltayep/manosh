@@ -48,6 +48,7 @@ normalise() {
 record() {
   need node
   [ -d node_modules/playwright ] || npm install --no-audit --no-fund
+  ls "$HOME/Library/Caches/ms-playwright" 2>/dev/null | grep -q '^ffmpeg' || npx playwright install ffmpeg
   node scripts/video/record.mjs "$@"
 }
 
