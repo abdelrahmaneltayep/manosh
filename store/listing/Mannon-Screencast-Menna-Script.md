@@ -24,26 +24,26 @@ confirms; no prices, plan names or statistics are spoken; the one recurring line
 
 ---
 
-## Timing table (240 s, 16 scenes)
+## Timing table (240 s, 16 scenes — fitted to the warm takes of 2026-11-03)
 
 | # | Slot | Scene | On-screen source | Words |
 |---|---|---|---|---|
 | 1 | 0:00–0:16 | Cold open, landing page | `https://manosh.fly.dev` | 31 |
-| 2 | 0:16–0:30 | Embedded in the Shopify admin | `admin.shopify.com/store/mannon-9iu9ewku/apps/mannon` | 29 |
-| 3 | 0:30–0:42 | Home dashboard | Mannon → Home | 20 |
-| 4 | 0:42–0:54 | Quote inbox | Mannon → Quotes | 22 |
-| 5 | 0:54–1:10 | A quote priced by Shopify | Quotes → the demo buyer's New quote | 29 |
-| 6 | 1:10–1:28 | ✦ Draft all lines with Claude | same page | 41 |
-| 7 | 1:28–1:38 | Send counter | same page | 23 |
-| 8 | 1:38–1:50 | Buyer's magic link | Mannon → Buyers → Generate link | 30 |
-| 9 | 1:50–2:10 | Buyer portal, Net 30, accept, confirm | the magic link, private window | 48 |
-| 10 | 2:10–2:22 | The real draft order | Shopify admin → Orders → Drafts | 30 |
-| 11 | 2:22–2:36 | One-tap reorder | portal home → Reorder a past order | 37 |
-| 12 | 2:36–2:52 | AI Order Pad | portal → Open the order pad | 35 |
-| 13 | 2:52–3:04 | Quote analytics + ✦ Claude insights | Mannon → Analytics | 28 |
-| 14 | 3:04–3:22 | Beyond the core loop (montage) | storefront block · Make an Offer · Pricing plans | 38 |
-| 15 | 3:22–3:48 | Try the demo | `/demo` → Open the buyer demo → draft order | 65 |
-| 16 | 3:48–4:00 | Close, logo card | logo card | 26 |
+| 2 | 0:16–0:29 | Embedded in the Shopify admin | `admin.shopify.com/store/mannon-9iu9ewku/apps/mannon` | 29 |
+| 3 | 0:29–0:38 | Home dashboard | Mannon → Home | 20 |
+| 4 | 0:38–0:49 | Quote inbox | Mannon → Quotes | 22 |
+| 5 | 0:49–1:05 | A quote priced by Shopify | Quotes → the demo buyer's New quote | 29 |
+| 6 | 1:05–1:23 | ✦ Draft all lines with Claude | same page | 41 |
+| 7 | 1:23–1:33 | Send counter | same page | 23 |
+| 8 | 1:33–1:45 | Buyer's magic link | Mannon → Buyers → Generate link | 30 |
+| 9 | 1:45–2:06 | Buyer portal, Net 30, accept, confirm | the magic link, private window | 48 |
+| 10 | 2:06–2:19 | The real draft order | Shopify admin → Orders → Drafts | 30 |
+| 11 | 2:19–2:36 | One-tap reorder | portal home → Reorder a past order | 37 |
+| 12 | 2:36–2:51 | AI Order Pad | portal → Open the order pad | 35 |
+| 13 | 2:51–3:05 | Quote analytics + ✦ Claude insights | Mannon → Analytics | 28 |
+| 14 | 3:05–3:23 | Beyond the core loop (montage) | storefront block · Make an Offer · Pricing plans | 38 |
+| 15 | 3:23–3:46 | Try the demo | `/demo` → Open the buyer demo → draft order | 65 |
+| 16 | 3:46–4:00 | Close, logo card | logo card | 26 |
 
 Total ≈ 532 spoken words. At 150 wpm that is 3:33 of speech inside 4:00, which leaves the
 0.5 s beat after every phrase and the 1 s beat before each new scene. Every scene's VO ends
@@ -78,7 +78,7 @@ and every price comes from Shopify.
 **Captions:** A "Wholesale quoting, without the email grind." · B "Built on Shopify's native B2B — every price comes from Shopify."
 **Emphasis:** *email grind*, *Shopify*.
 
-### 2 · Embedded in the admin · 0:16–0:30
+### 2 · Embedded in the admin · 0:16–0:29
 
 **On screen:** The app opening inside the Shopify admin: loading skeleton, then Home with
 the left nav Home · Quotes · Quote forms · Pricing & catalog · Buyers · Analytics · Settings
@@ -97,7 +97,7 @@ from a quote to a reorder.
 **Captions:** A "Embedded in your Shopify admin." · B "Quotes, buyers, analytics and settings, in one place."
 **Emphasis:** *inside*, *whole flow*.
 
-### 3 · Home · 0:30–0:42
+### 3 · Home · 0:29–0:38
 
 **On screen:** Home dashboard: the quote funnel cards and the open-quotes list. Cursor on
 the first card.
@@ -113,7 +113,7 @@ and what still needs you today.
 **Captions:** A "What came in, what was accepted, what needs you." · B "Always up to date."
 **Emphasis:** *today*.
 
-### 4 · Quote inbox · 0:42–0:54
+### 4 · Quote inbox · 0:38–0:49
 
 **On screen:** Quotes list: status badges New · Countered · Ordered, buyer and company per
 row. Cursor on the demo buyer's New quote.
@@ -131,7 +131,7 @@ So let's open one.
 **Captions:** A "Every buyer request lands in one inbox." · B "New · Countered · Ordered."
 **Emphasis:** *inbox*, *email threads*.
 
-### 5 · Priced by Shopify · 0:54–1:10
+### 5 · Priced by Shopify · 0:49–1:05
 
 **On screen:** The quote page: lines with quantity and unit price, then the "Totals from
 Shopify" card filling in Subtotal, Tax and Total, "Calculated by Shopify for this buyer's
@@ -153,7 +153,7 @@ and Shopify answers for this buyer's company.
 **Captions:** A "Totals from Shopify, for this buyer's company." · B "Mannon never calculates money itself."
 **Emphasis:** *Totals from Shopify*, *never*.
 
-### 6 · ✦ Draft with Claude · 1:10–1:28
+### 6 · ✦ Draft with Claude · 1:05–1:23
 
 **On screen:** Click "✦ Draft all lines with Claude". The drafted counter prices appear per
 line with "Use this price" buttons. One click on "Use this price" pre-fills that line.
@@ -175,7 +175,7 @@ and nothing is sent until you say so.
 **Captions:** A "✦ Claude drafts a counter for every line." · B "Claude drafts. You review and send. It never acts on its own."
 **Emphasis:** *drafts*, *Use this price*, *control*.
 
-### 7 · Send counter · 1:28–1:38
+### 7 · Send counter · 1:23–1:33
 
 **On screen:** Click "Send counter". Banner "Counter sent to the buyer." and the status
 flips to Countered.
@@ -193,7 +193,7 @@ That's it. No email to write.
 **Captions:** A "Send counter." · B "Counter sent to the buyer."
 **Emphasis:** *Send counter*.
 
-### 8 · The magic link · 1:38–1:50
+### 8 · The magic link · 1:33–1:45
 
 **On screen:** Buyers page, the demo buyer's row, click "Generate link". The "Magic link
 ready to send" card with the Copy link button. **The link itself is blurred in the edit;
@@ -214,7 +214,7 @@ and it expires on its own.
 **Captions:** A "Buyers → Generate link." · B "No passwords. One link per buyer, and it expires."
 **Emphasis:** *magic link*, *expires*.
 
-### 9 · Buyer portal, Net 30, accept · 1:50–2:10
+### 9 · Buyer portal, Net 30, accept · 1:45–2:06
 
 **On screen:** Private window with the "Incognito" tag. The link opens "Sign in to your
 wholesale portal … Continue", then the portal. Open the Countered quote. Payment terms
@@ -243,7 +243,7 @@ with Shopify's tax and total.
 **Captions:** A "Net thirty, straight from Shopify's payment terms." · B "Nothing is written until the buyer confirms."
 **Emphasis:** *no login*, *Net thirty*, *confirm*, *Ordered*.
 
-### 10 · The real draft order · 2:10–2:22
+### 10 · The real draft order · 2:06–2:19
 
 **On screen:** Shopify admin, Orders → Drafts. The new draft: "Mannon created this draft
 order", PO number, company Snowdevil, "Payment due on … (Net 30)". Cursor on the terms.
@@ -261,7 +261,7 @@ the company, and the net terms.
 **Captions:** A "A real Shopify draft order, with the PO and net terms." · B "Nothing to copy over."
 **Emphasis:** *real*, *Ever*.
 
-### 11 · One-tap reorder · 2:22–2:36
+### 11 · One-tap reorder · 2:19–2:36
 
 **On screen:** Portal home, "Reorder a past order" card: order number · date · total.
 Click Reorder, then "Send reorder". It becomes a draft order (or shows "Waiting for your
@@ -283,7 +283,7 @@ Otherwise, it waits for you to review.
 **Captions:** A "Reorder a past order, one tap." · B "Re-priced by Shopify. Outside your tolerance, you review it first."
 **Emphasis:** *one tap*, *re-prices*, *tolerance*.
 
-### 12 · AI Order Pad · 2:36–2:52
+### 12 · AI Order Pad · 2:36–2:51
 
 **On screen:** Portal → the order pad. Paste "20x <sku>, 5x <sku>" into "Paste a PO or
 email", click "Read my order". Claude's matched lines appear with the real products. Click
@@ -304,7 +304,7 @@ then a quote exists.
 **Captions:** A "Paste a PO or an email. Claude reads the lines." · B "Every product id is checked against Shopify. The buyer confirms."
 **Emphasis:** *paste*, *real product*, *confirms*.
 
-### 13 · Analytics + Claude insights · 2:52–3:04
+### 13 · Analytics + Claude insights · 2:51–3:05
 
 **On screen:** Analytics: "Quote analytics" with the funnel and the "✦ Claude insights"
 section (win-rate, credit-risk, buyer summary). Cursor on the insights.
@@ -322,7 +322,7 @@ It never changes anything.
 **Captions:** A "Quote analytics: the whole funnel." · B "✦ Claude insights: advisory, on screen only."
 **Emphasis:** *funnel*, *advisory*.
 
-### 14 · Beyond the core loop · 3:04–3:22
+### 14 · Beyond the core loop · 3:05–3:23
 
 **On screen:** Three quick cuts, 6 s each. (a) A product page on the store with the
 "Add to Quote" and "Make an Offer" buttons visible, a request submitted, then Mannon →
@@ -345,7 +345,7 @@ on Shopify's own plan page.
 **Captions:** A "Storefront blocks: Request a Quote, Add to Quote, Make an Offer." · B "Settings you own. Billing handled by Shopify."
 **Emphasis:** *storefront*, *moment*, *Shopify's own*.
 
-### 15 · Try the demo · 3:22–3:48
+### 15 · Try the demo · 3:23–3:46
 
 **On screen:** Landing page, "Try before you install" strip → "Open the buyer demo". The
 demo hub "See the whole workflow. No install, no sign-up." Then the live portal "Welcome,
@@ -373,7 +373,7 @@ and you just did it yourself.
 **Captions:** A "Try before you install: manosh.fly.dev → Open the buyer demo." · B "Quote → Accept → Reorder, on native Shopify draft orders."
 **Emphasis:** *demo*, *no install*, *real order*, *yourself*.
 
-### 16 · Close · 3:48–4:00
+### 16 · Close · 3:46–4:00
 
 **On screen:** Logo card: mark + wordmark, accent lines "Quote → Accept → Reorder, on
 native Shopify draft orders" and "✦ Claude drafts · you stay in control". 2 % zoom, fade to
