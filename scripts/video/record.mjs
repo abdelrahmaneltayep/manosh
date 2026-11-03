@@ -174,6 +174,23 @@ async function record(context, scene, drive) {
 
 const scene = (n) => cfg.scenes.find((s) => s.n === n);
 
+/** On a portal home page, open the first quote whose status pill says Countered. */
+async function openCounteredQuote(p) {
+  const row = p.locator("li.quote-list-row").filter({ has: p.locator(".status-countered") }).first();
+  await row.getByRole("link").first().click();
+  await p.getByRole("button", { name: /Accept & create order/ }).waitFor();
+}
+
+/** Pick the payment-terms option whose label mentions Net 30 (or the first Net option). */
+async function pickNet30(p) {
+  const sel = p.locator("select[name=paymentTermsTemplateId]").first();
+  const labels = await sel.locator("option").allTextContents();
+  let i = labels.findIndex((t) => /net\s*30/i.test(t));
+  if (i < 0) i = labels.findIndex((t) => /net\s*\d+/i.test(t));
+  if (i < 0) throw new Error(`no Net terms among: ${labels.join(" | ")}`);
+  await sel.selectOption({ index: i });
+}
+
 // ---------------------------------------------------------------- drivers
 
 const drivers = {
@@ -262,13 +279,9 @@ const drivers = {
     await p.goto(state.magicLink);
     await tryStep("Continue", async () => { await p.getByRole("button", { name: "Continue" }).click(); });
     await sleep(1500);
-    await tryStep("open the Countered quote", async () => {
-      await p.getByRole("link").filter({ hasText: /Countered/ }).first().click();
-    });
+    await tryStep("open the Countered quote", () => openCounteredQuote(p));
     await sleep(1500);
-    await tryStep("pick Net 30", async () => {
-      await p.getByRole("combobox").first().selectOption({ label: /Net 30/ });
-    });
+    await tryStep("pick Net 30", () => pickNet30(p));
     await sleep(1200);
     await tryStep("Accept & create order", async () => { await p.getByRole("button", { name: /Accept & create order/ }).click(); });
     await sleep(2500);
@@ -290,9 +303,15 @@ const drivers = {
     if (!state.magicLink) throw new Error("no magic link from scene 8");
     await p.goto(state.magicLink.replace(/\/portal\/auth.*$/, "/portal"));
     await sleep(2000);
-    await tryStep("Reorder", async () => { await p.getByRole("link", { name: "Reorder" }).first().click(); });
+    await tryStep("Reorder", async () => {
+      await p.locator("li.quote-list-row").getByRole("link", { name: "Reorder", exact: true }).first().click();
+      await p.getByRole("button", { name: "Send reorder" }).waitFor();
+    });
     await sleep(2500);
-    await tryStep("Send reorder", async () => { await p.getByRole("button", { name: "Send reorder" }).click(); });
+    await tryStep("Send reorder", async () => {
+      await p.getByRole("button", { name: "Send reorder" }).click();
+      await p.waitForURL(/\/portal\/quotes\//, { timeout: 20000 });
+    }, 25000);
   },
 
   12: async (p) => {
@@ -334,9 +353,7 @@ const drivers = {
     await sleep(1500);
     await tryStep("Open the buyer demo", async () => { await p.getByRole("link", { name: /Open the buyer demo/ }).first().click(); });
     await sleep(3000);
-    await tryStep("open the Countered quote", async () => {
-      await p.getByRole("link").filter({ hasText: /Countered/ }).first().click();
-    });
+    await tryStep("open the Countered quote", () => openCounteredQuote(p));
     await sleep(2000);
     await tryStep("Accept & create order", async () => { await p.getByRole("button", { name: /Accept & create order/ }).click(); });
     await sleep(2000);
