@@ -42,8 +42,8 @@ confirms; no prices, plan names or statistics are spoken; the one recurring line
 | 12 | 2:36–2:52 | AI Order Pad | portal → Open the order pad | 35 |
 | 13 | 2:52–3:04 | Quote analytics + ✦ Claude insights | Mannon → Analytics | 28 |
 | 14 | 3:04–3:22 | Beyond the core loop (montage) | storefront block · Make an Offer · Pricing plans | 38 |
-| 15 | 3:22–3:50 | Try the demo | `/demo` → Open the buyer demo → draft order | 65 |
-| 16 | 3:50–4:00 | Close, logo card | logo card | 26 |
+| 15 | 3:22–3:48 | Try the demo | `/demo` → Open the buyer demo → draft order | 65 |
+| 16 | 3:48–4:00 | Close, logo card | logo card | 26 |
 
 Total ≈ 532 spoken words. At 150 wpm that is 3:33 of speech inside 4:00, which leaves the
 0.5 s beat after every phrase and the 1 s beat before each new scene. Every scene's VO ends
@@ -345,12 +345,12 @@ on Shopify's own plan page.
 **Captions:** A "Storefront blocks: Request a Quote, Add to Quote, Make an Offer." · B "Settings you own. Billing handled by Shopify."
 **Emphasis:** *storefront*, *moment*, *Shopify's own*.
 
-### 15 · Try the demo · 3:22–3:50
+### 15 · Try the demo · 3:22–3:48
 
 **On screen:** Landing page, "Try before you install" strip → "Open the buyer demo". The
 demo hub "See the whole workflow. No install, no sign-up." Then the live portal "Welcome,
 Demo buyer" with a Countered quote and a reorder card. Accept → confirm → Ordered. Last
-8 s: the resulting draft order in the demo store's admin.
+6 s: the resulting draft order in the demo store's admin.
 
 **VO**
 ```
@@ -373,7 +373,7 @@ and you just did it yourself.
 **Captions:** A "Try before you install: manosh.fly.dev → Open the buyer demo." · B "Quote → Accept → Reorder, on native Shopify draft orders."
 **Emphasis:** *demo*, *no install*, *real order*, *yourself*.
 
-### 16 · Close · 3:50–4:00
+### 16 · Close · 3:48–4:00
 
 **On screen:** Logo card: mark + wordmark, accent lines "Quote → Accept → Reorder, on
 native Shopify draft orders" and "✦ Claude drafts · you stay in control". 2 % zoom, fade to
