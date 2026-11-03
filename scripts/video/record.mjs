@@ -1,0 +1,306 @@
+// Records the 16 walkthrough scenes as separate 1920x1080 clips with Playwright,
+// driving the real Google Chrome so the Shopify admin sign-in persists.
+//
+//   node scripts/video/record.mjs            all scenes
+//   node scripts/video/record.mjs 5 6 7      only those scenes
+//
+// Admin scenes run in a persistent Chrome profile (~/mannon-chrome). On the
+// first run the script opens the admin and waits for a person to sign in; it
+// never types credentials. Buyer scenes run in a fresh private context.
+//
+// Every click is best-effort: if a control is not found the script says so and
+// keeps recording for the scene's slot, so a person can take over in the
+// headed window. Nothing here is a test; it is a camera with a chauffeur.
+//
+// Environment (all optional):
+//   MANNON_VIDEO_PRODUCT_URL  a live product page with the Mannon blocks (scene 14a)
+//   MANNON_VIDEO_BUYER        text that identifies the buyer row on Buyers (scene 8)
+//   MANNON_VIDEO_SKUS         two lines for the order pad, e.g. "20x sku-a\n5x sku-b"
+
+import { chromium } from "playwright";
+import { readFileSync, mkdirSync, renameSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+
+const here = path.dirname(new URL(import.meta.url).pathname);
+const repo = path.resolve(here, "..", "..");
+const cfg = JSON.parse(readFileSync(path.join(here, "scenes.json"), "utf8"));
+const RAW = path.join(repo, "docs", "video", "menna", "raw");
+const PROFILE = path.join(homedir(), "mannon-chrome");
+const SIZE = { width: 1920, height: 1080 };
+const EXTRA_S = 2;
+
+const ADMIN = `https://admin.shopify.com/store/${cfg.store}`;
+const APP = `${ADMIN}/apps/${cfg.appHandle}/app`;
+const only = new Set(process.argv.slice(2).map(Number).filter(Boolean));
+const want = (n) => only.size === 0 || only.has(n);
+
+mkdirSync(RAW, { recursive: true });
+const state = { quoteUrl: null, magicLink: null };
+const log = (...a) => console.log(new Date().toISOString().slice(11, 19), ...a);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function tryStep(name, fn, timeout = 15000) {
+  try {
+    await Promise.race([fn(), sleep(timeout).then(() => { throw new Error("timed out"); })]);
+    log(`  ✓ ${name}`);
+  } catch (e) {
+    log(`  ! ${name}: ${e.message}. Take over in the Chrome window if needed.`);
+  }
+}
+
+/** The embedded app's frame inside the Shopify admin page. */
+async function appFrame(page) {
+  for (let i = 0; i < 60; i++) {
+    const f = page.frames().find((fr) => fr.url().includes(cfg.appHost));
+    if (f) return f;
+    await sleep(500);
+  }
+  throw new Error("app frame not found");
+}
+
+async function waitForSignIn(page) {
+  await page.goto(APP);
+  for (let i = 0; i < 1200; i++) {
+    if (page.url().includes(`/apps/${cfg.appHandle}`) && page.frames().some((f) => f.url().includes(cfg.appHost))) return;
+    if (i % 20 === 0) log("Waiting for a Shopify sign-in in the Chrome window (admin scenes need it)…");
+    await sleep(500);
+  }
+  throw new Error("no Shopify sign-in after 10 minutes");
+}
+
+/** Record one scene: open a page, run `drive`, hold for slot+2 s, save the video. */
+async function record(context, scene, drive) {
+  const page = await context.newPage();
+  const t0 = Date.now();
+  log(`Scene ${scene.n} · ${scene.title} · ${scene.slot}s`);
+  try {
+    await drive(page);
+  } catch (e) {
+    log(`  ! ${e.message}`);
+  }
+  const hold = (scene.slot + EXTRA_S) * 1000 - (Date.now() - t0);
+  if (hold > 0) await sleep(hold);
+  const video = page.video();
+  await page.close();
+  if (video) {
+    const src = await video.path();
+    const dst = path.join(RAW, `${String(scene.n).padStart(2, "0")}.webm`);
+    renameSync(src, dst);
+    log(`  saved ${path.relative(repo, dst)}`);
+  }
+}
+
+const scene = (n) => cfg.scenes.find((s) => s.n === n);
+
+// ---------------------------------------------------------------- drivers
+
+const drivers = {
+  1: async (p) => { await p.goto(cfg.landing); },
+
+  2: async (p) => {
+    await p.goto(APP);
+    const f = await appFrame(p);
+    await tryStep("hover the nav", async () => {
+      for (const item of ["Quotes", "Quote forms", "Buyers", "Analytics", "Settings", "Pricing plans"]) {
+        await f.getByRole("link", { name: item, exact: true }).first().hover();
+        await sleep(900);
+      }
+    }, 12000);
+  },
+
+  3: async (p) => { await p.goto(APP); await appFrame(p); },
+
+  4: async (p) => {
+    await p.goto(`${APP}/quotes`);
+    const f = await appFrame(p);
+    await tryStep("find the first New quote", async () => {
+      const row = f.getByRole("row").filter({ hasText: "New" }).first();
+      await row.hover();
+      const link = row.getByRole("link").first();
+      const href = await link.getAttribute("href");
+      if (href) state.quoteUrl = href.startsWith("http") ? href : `${APP.replace(/\/app$/, "")}${href}`;
+    });
+  },
+
+  5: async (p) => {
+    await p.goto(state.quoteUrl ?? `${APP}/quotes`);
+    const f = await appFrame(p);
+    if (!state.quoteUrl) {
+      await tryStep("open the first New quote", async () => {
+        await f.getByRole("row").filter({ hasText: "New" }).first().getByRole("link").first().click();
+        state.quoteUrl = p.url();
+      });
+    }
+    await tryStep("wait for Totals from Shopify", async () => {
+      await f.getByText("Totals from Shopify").first().waitFor();
+    }, 20000);
+  },
+
+  6: async (p) => {
+    await p.goto(state.quoteUrl ?? `${APP}/quotes`);
+    const f = await appFrame(p);
+    await sleep(1500);
+    await tryStep("Draft all lines with Claude", async () => {
+      await f.getByRole("button", { name: /Draft all lines with Claude/ }).first().click();
+      await f.getByRole("button", { name: "Use this price" }).first().waitFor();
+    }, 25000);
+    await sleep(1500);
+    await tryStep("Use this price on the first line", async () => {
+      await f.getByRole("button", { name: "Use this price" }).first().click();
+    });
+  },
+
+  7: async (p) => {
+    await p.goto(state.quoteUrl ?? `${APP}/quotes`);
+    const f = await appFrame(p);
+    await sleep(2500);
+    await tryStep("Send counter", async () => {
+      await f.getByRole("button", { name: "Send counter" }).first().click();
+      await f.getByText("Counter sent to the buyer").first().waitFor();
+    }, 20000);
+  },
+
+  8: async (p) => {
+    await p.goto(`${APP}/buyers`);
+    const f = await appFrame(p);
+    await sleep(2000);
+    await tryStep("Generate link", async () => {
+      const rows = f.getByRole("row");
+      const row = process.env.MANNON_VIDEO_BUYER ? rows.filter({ hasText: process.env.MANNON_VIDEO_BUYER }).first() : rows.filter({ hasText: "Generate link" }).first();
+      await row.getByRole("button", { name: "Generate link" }).click();
+      await f.getByText("Magic link ready to send").waitFor();
+      state.magicLink = (await f.locator("code").first().textContent())?.trim() ?? null;
+    }, 20000);
+    await sleep(1200);
+    await tryStep("Copy link", async () => { await f.getByRole("button", { name: "Copy link" }).click(); });
+  },
+
+  9: async (p) => {
+    if (!state.magicLink) throw new Error("no magic link from scene 8; run scenes 8 and 9 together");
+    await p.goto(state.magicLink);
+    await tryStep("Continue", async () => { await p.getByRole("button", { name: "Continue" }).click(); });
+    await sleep(1500);
+    await tryStep("open the Countered quote", async () => {
+      await p.getByRole("link").filter({ hasText: /Countered/ }).first().click();
+    });
+    await sleep(1500);
+    await tryStep("pick Net 30", async () => {
+      await p.getByRole("combobox").first().selectOption({ label: /Net 30/ });
+    });
+    await sleep(1200);
+    await tryStep("Accept & create order", async () => { await p.getByRole("button", { name: /Accept & create order/ }).click(); });
+    await sleep(2500);
+    await tryStep("Confirm & create order", async () => {
+      await p.getByRole("button", { name: /Confirm & create order/ }).click();
+      await p.getByText("Ordered").first().waitFor();
+    }, 25000);
+  },
+
+  10: async (p) => {
+    await p.goto(`${ADMIN}/draft_orders`);
+    await sleep(3000);
+    await tryStep("open the newest draft", async () => {
+      await p.getByRole("row").nth(1).getByRole("link").first().click();
+    });
+  },
+
+  11: async (p) => {
+    if (!state.magicLink) throw new Error("no magic link from scene 8");
+    await p.goto(state.magicLink.replace(/\/portal\/auth.*$/, "/portal"));
+    await sleep(2000);
+    await tryStep("Reorder", async () => { await p.getByRole("link", { name: "Reorder" }).first().click(); });
+    await sleep(2500);
+    await tryStep("Send reorder", async () => { await p.getByRole("button", { name: "Send reorder" }).click(); });
+  },
+
+  12: async (p) => {
+    if (!state.magicLink) throw new Error("no magic link from scene 8");
+    await p.goto(state.magicLink.replace(/\/portal\/auth.*$/, "/portal/quick-order"));
+    await sleep(1500);
+    await tryStep("Paste a PO or email", async () => { await p.getByText(/Paste a PO or email/).first().click(); }, 5000);
+    await tryStep("type the lines", async () => {
+      const box = p.getByRole("textbox").last();
+      await box.fill(process.env.MANNON_VIDEO_SKUS ?? "Hi, please send\n20x sku-untracked-1\n5x sku-managed-1\nThanks");
+    });
+    await tryStep("Read my order", async () => {
+      await p.getByRole("button", { name: "Read my order" }).click();
+      await p.getByRole("button", { name: /Request quote for these items/ }).waitFor();
+    }, 30000);
+  },
+
+  13: async (p) => { await p.goto(`${APP}/analytics`); await appFrame(p); },
+
+  14: async (p) => {
+    const third = Math.floor((scene(14).slot + EXTRA_S) * 1000 / 3);
+    if (process.env.MANNON_VIDEO_PRODUCT_URL) {
+      await p.goto(process.env.MANNON_VIDEO_PRODUCT_URL);
+    } else {
+      log("  ! MANNON_VIDEO_PRODUCT_URL not set: showing Settings for the first third instead");
+      await p.goto(`${APP}/settings`);
+    }
+    await sleep(third);
+    await p.goto(`${APP}/settings`);
+    await appFrame(p);
+    await sleep(third);
+    await p.goto(`${APP}/plans`);
+    const f = await appFrame(p);
+    await tryStep("Choose Scale", async () => { await f.getByRole("button", { name: /Choose Scale/ }).click(); }, 8000);
+  },
+
+  15: async (p) => {
+    await p.goto(cfg.landing);
+    await sleep(1500);
+    await tryStep("Open the buyer demo", async () => { await p.getByRole("link", { name: /Open the buyer demo/ }).first().click(); });
+    await sleep(3000);
+    await tryStep("open the Countered quote", async () => {
+      await p.getByRole("link").filter({ hasText: /Countered/ }).first().click();
+    });
+    await sleep(2000);
+    await tryStep("Accept & create order", async () => { await p.getByRole("button", { name: /Accept & create order/ }).click(); });
+    await sleep(2000);
+    await tryStep("Confirm & create order", async () => {
+      await p.getByRole("button", { name: /Confirm & create order/ }).click();
+      await p.getByText("Ordered").first().waitFor();
+    }, 25000);
+  },
+
+  16: async (p) => {
+    const card = path.join(repo, "store", "listing", "Mannon-Logo-Preview.html");
+    await p.goto(existsSync(card) ? `file://${card}` : cfg.landing);
+  },
+};
+
+// ---------------------------------------------------------------- main
+
+const adminScenes = cfg.scenes.filter((s) => s.kind === "admin" && want(s.n));
+const otherScenes = cfg.scenes.filter((s) => s.kind !== "admin" && want(s.n));
+
+let admin = null;
+if (adminScenes.length > 0 || want(8)) {
+  admin = await chromium.launchPersistentContext(PROFILE, {
+    channel: "chrome",
+    headless: false,
+    viewport: SIZE,
+    recordVideo: { dir: RAW, size: SIZE },
+    args: ["--window-size=1920,1120", "--hide-scrollbars"],
+  });
+  const probe = await admin.newPage();
+  await waitForSignIn(probe);
+  await probe.close();
+}
+
+const buyer = await chromium.launch({ channel: "chrome", headless: false });
+const buyerCtx = await buyer.newContext({ viewport: SIZE, recordVideo: { dir: RAW, size: SIZE } });
+
+for (const s of cfg.scenes) {
+  if (!want(s.n)) continue;
+  const ctx = s.kind === "admin" ? admin : buyerCtx;
+  if (!ctx) continue;
+  await record(ctx, s, drivers[s.n]);
+}
+
+await buyerCtx.close();
+await buyer.close();
+if (admin) await admin.close();
+log("done. Clips are in docs/video/menna/raw/. Delete the demo draft orders and held reorder quotes on the store; keep order #1001.");

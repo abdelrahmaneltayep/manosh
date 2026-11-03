@@ -25,7 +25,11 @@
     "test:watch": "vitest",
     "test:e2e": "remix vite:build && e2e run",
     "test:e2e:live": "e2e run --config e2e.live.config.ts",
-    "qa": "remix vite:build && bash scripts/qa-smoke.sh"
+    "qa": "remix vite:build && bash scripts/qa-smoke.sh",
+    "video": "bash scripts/video/menna-video.sh all",
+    "video:download": "bash scripts/video/menna-video.sh download",
+    "video:record": "bash scripts/video/menna-video.sh record",
+    "video:assemble": "bash scripts/video/menna-video.sh assemble"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",

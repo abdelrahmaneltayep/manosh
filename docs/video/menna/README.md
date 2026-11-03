@@ -9,3 +9,17 @@
 
 Consent for the cloned voice was given by Mennatullah on 2026-11-03. The clone lives in the
 ElevenLabs workspace; the reference sample is not stored in this repo.
+
+## From the terminal, end to end
+
+```
+export ELEVENLABS_API_KEY=your_key
+npm run video
+```
+
+Or step by step: `npm run video:download`, then `bash scripts/video/menna-video.sh normalise`,
+`npm run video:record` (add scene numbers to redo some: `npm run video:record -- 8 9`), and
+`npm run video:assemble`. The recorder opens Google Chrome; sign in to the dev store admin in
+that window on the first run (someone with access to the store, never by typing credentials
+into a script). Scenes 8 and 9 must run together, because 9 opens the link 8 generates.
+Captions, slots and the scene order live in `scripts/video/scenes.json`.

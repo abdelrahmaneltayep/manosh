@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Mannon walkthrough, narrated by Menna: everything from the terminal.
+#
+#   scripts/video/menna-video.sh download     fetch the 16 chosen takes from ElevenLabs
+#   scripts/video/menna-video.sh normalise    -16 LUFS wavs next to them
+#   scripts/video/menna-video.sh record [N…]  record the scenes (all, or the ones given)
+#   scripts/video/menna-video.sh assemble     trim, captions, voice, concat → mp4
+#   scripts/video/menna-video.sh all          the four in order
+#
+# Needs: node 18+, ffmpeg, jq, curl, Google Chrome. ELEVENLABS_API_KEY for download.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+VO=docs/video/menna/vo
+RAW=docs/video/menna/raw
+CUT=docs/video/menna/cut
+OUT=docs/video/menna/mannon-walkthrough-menna.mp4
+SCENES=scripts/video/scenes.json
+FONT="${MANNON_VIDEO_FONT:-/System/Library/Fonts/Helvetica.ttc}"
+
+need() { command -v "$1" >/dev/null 2>&1 || { echo "missing: $1" >&2; exit 1; }; }
+
+download() {
+  need curl; need jq
+  : "${ELEVENLABS_API_KEY:?set ELEVENLABS_API_KEY to the key of the workspace that holds the Menna clone}"
+  mkdir -p "$VO"
+  local pairs="01:puSmsPr2EZC1FJQ2UjAT 02:N8lc5YP3ob0wN4m9jXDu 03:sgDT1srfQPswJByH6R5a 04:2IUoe5Op0UWOLylVbtFV 05:4nGc9PsAgLIgYQ5xZvft 06:dZ39FXET5rg7zimIw35G 07:09TWTjCIcUuzOvyOEOSu 08:QV8xfGGPLJ4Nmg8Ji5x3 09:YerN1pW8sXIao1B4JKjh 10:O5KGXmXsAzFyQS4WsDe5 11:XazFlXYLNUty4HJASJCG 12:10rXqCTUMZwnjTvNqohD 13:0r5Tz0mGdvw6ezgMBSRO 14:o59yqMTmHZeLFfmpfqTv 15:00DWG1ts5Xsp6gLGdqzA 16:yhO55Z6QDu1GjswBDt3N"
+  for pair in $pairs; do
+    n=${pair%%:*}; id=${pair##*:}
+    curl -sS -o "$VO/$n.mp3" -H "xi-api-key: $ELEVENLABS_API_KEY" "https://api.elevenlabs.io/v1/history/$id/audio"
+    size=$(stat -f%z "$VO/$n.mp3" 2>/dev/null || stat -c%s "$VO/$n.mp3")
+    if [ "$size" -lt 20000 ]; then
+      echo "scene $n: download failed, ElevenLabs said:" >&2; cat "$VO/$n.mp3" >&2; echo >&2
+      rm -f "$VO/$n.mp3"; exit 1
+    fi
+    echo "scene $n: $size bytes"
+  done
+}
+
+normalise() {
+  need ffmpeg
+  for f in "$VO"/*.mp3; do
+    ffmpeg -v error -y -i "$f" -af loudnorm=I=-16:TP=-1:LRA=3 -ar 48000 "${f%.mp3}.wav"
+    echo "normalised $(basename "$f")"
+  done
+}
+
+record() {
+  need node
+  [ -d node_modules/playwright ] || npm install --no-audit --no-fund
+  node scripts/video/record.mjs "$@"
+}
+
+assemble() {
+  need ffmpeg; need jq
+  mkdir -p "$CUT"
+  : > "$CUT/list.txt"
+  local count; count=$(jq '.scenes | length' "$SCENES")
+  for ((i = 0; i < count; i++)); do
+    local n slot a b nn raw vo
+    n=$(jq -r ".scenes[$i].n" "$SCENES"); slot=$(jq -r ".scenes[$i].slot" "$SCENES")
+    a=$(jq -r ".scenes[$i].captionA" "$SCENES" | sed "s/'/\\\\'/g; s/:/\\\\:/g")
+    b=$(jq -r ".scenes[$i].captionB" "$SCENES" | sed "s/'/\\\\'/g; s/:/\\\\:/g")
+    nn=$(printf "%02d" "$n")
+    raw=$(ls "$RAW/$nn".* 2>/dev/null | head -1)
+    vo="$VO/$nn.wav"
+    [ -n "$raw" ] || { echo "scene $n: no clip in $RAW" >&2; exit 1; }
+    [ -f "$vo" ] || { echo "scene $n: no voice in $VO (run normalise)" >&2; exit 1; }
+    local swap; swap=$(awk "BEGIN{printf \"%.2f\", $slot*0.52}")
+    local pill="fontfile=$FONT:fontsize=28:fontcolor=white:box=1:boxcolor=0x1c1d2b@1:boxborderw=18:x=(w-text_w)/2:y=h-60-text_h"
+    ffmpeg -v error -y -i "$raw" -i "$vo" -t "$slot" \
+      -filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,drawtext=text='$a':$pill:enable='lt(t,$swap)',drawtext=text='$b':$pill:enable='gte(t,$swap)'[v];[1:a]apad[a]" \
+      -map "[v]" -map "[a]" -c:v libx264 -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -shortest "$CUT/$nn.mp4"
+    echo "file '$nn.mp4'" >> "$CUT/list.txt"
+    echo "scene $n: cut to ${slot}s"
+  done
+  ffmpeg -v error -y -f concat -safe 0 -i "$CUT/list.txt" -c:v copy -c:a aac -b:a 128k -movflags +faststart "$OUT"
+  echo "wrote $OUT ($(ffprobe -v error -show_entries format=duration -of csv=p=0 "$OUT")s)"
+}
+
+case "${1:-all}" in
+  download) download ;;
+  normalise|normalize) normalise ;;
+  record) shift; record "$@" ;;
+  assemble) assemble ;;
+  all) download; normalise; record; assemble ;;
+  *) echo "usage: $0 {download|normalise|record [N…]|assemble|all}" >&2; exit 2 ;;
+esac
