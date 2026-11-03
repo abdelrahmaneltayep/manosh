@@ -22,7 +22,6 @@ RAW=docs/video/menna/raw
 CUT=docs/video/menna/cut
 OUT=docs/video/menna/mannon-walkthrough-menna.mp4
 SCENES=scripts/video/scenes.json
-FONT="${MANNON_VIDEO_FONT:-/System/Library/Fonts/Helvetica.ttc}"
 
 need() { command -v "$1" >/dev/null 2>&1 || { echo "missing: $1" >&2; exit 1; }; }
 
@@ -113,24 +112,23 @@ record() {
 }
 
 assemble() {
-  need ffmpeg; need jq
+  need ffmpeg; need jq; need node
   mkdir -p "$CUT"
+  node scripts/video/captions.mjs
   : > "$CUT/list.txt"
   local count; count=$(jq '.scenes | length' "$SCENES")
   for ((i = 0; i < count; i++)); do
-    local n slot a b nn raw vo
+    local n slot nn raw vo capa capb
     n=$(jq -r ".scenes[$i].n" "$SCENES"); slot=$(jq -r ".scenes[$i].slot" "$SCENES")
-    a=$(jq -r ".scenes[$i].captionA" "$SCENES" | sed "s/'/\\\\'/g; s/:/\\\\:/g")
-    b=$(jq -r ".scenes[$i].captionB" "$SCENES" | sed "s/'/\\\\'/g; s/:/\\\\:/g")
     nn=$(printf "%02d" "$n")
     raw=$(ls "$RAW/$nn".* 2>/dev/null | head -1)
-    vo="$VO/$nn.wav"
+    vo="$VO/$nn.wav"; capa="$CUT/cap-$nn-a.png"; capb="$CUT/cap-$nn-b.png"
     [ -n "$raw" ] || { echo "scene $n: no clip in $RAW" >&2; exit 1; }
     [ -f "$vo" ] || { echo "scene $n: no voice in $VO (run normalise)" >&2; exit 1; }
     local swap; swap=$(awk "BEGIN{printf \"%.2f\", $slot*0.52}")
-    local pill="fontfile=$FONT:fontsize=28:fontcolor=white:box=1:boxcolor=0x1c1d2b@1:boxborderw=18:x=(w-text_w)/2:y=h-60-text_h"
-    ffmpeg -v error -y -i "$raw" -i "$vo" -t "$slot" \
-      -filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,drawtext=text='$a':$pill:enable='lt(t,$swap)',drawtext=text='$b':$pill:enable='gte(t,$swap)'[v];[1:a]apad[a]" \
+    # Captions are PNG pills overlaid at the bottom (60 px up), A until 52 % of the slot, then B.
+    ffmpeg -v error -y -i "$raw" -i "$vo" -i "$capa" -i "$capb" -t "$slot" \
+      -filter_complex "[0:v]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[base];[base][2:v]overlay=0:H-h-60:enable='lt(t,$swap)'[v1];[v1][3:v]overlay=0:H-h-60:enable='gte(t,$swap)'[v];[1:a]apad[a]" \
       -map "[v]" -map "[a]" -c:v libx264 -crf 23 -pix_fmt yuv420p -c:a aac -b:a 128k -shortest "$CUT/$nn.mp4"
     echo "file '$nn.mp4'" >> "$CUT/list.txt"
     echo "scene $n: cut to ${slot}s"
