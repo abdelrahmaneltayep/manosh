@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mannon</title>
+<meta name="viewport" content="width=1920, height=1080">
+<style>
+  :root { --indigo:#4f46e5; --indigo-2:#5b4bf0; --lime:#84cc16; --ink:#1c1d2b; --sub:#5b5f6e; --bg:#f6f5ff; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  body { font-family: Inter, -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--ink);
+    display: flex; align-items: center; justify-content: center; }
+  .card { display: flex; flex-direction: column; align-items: center; gap: 28px; transform: scale(1);
+    animation: zoom 14s linear forwards; }
+  @keyframes zoom { from { transform: scale(1); } to { transform: scale(1.02); } }
+  .lockup { display: flex; align-items: center; gap: 28px; }
+  .mark { width: 168px; height: 168px; border-radius: 40px; background: #fff; box-shadow: 0 20px 60px rgba(79,70,229,.14);
+    display: flex; align-items: center; justify-content: center; }
+  .mark img { width: 132px; height: 132px; display: block; }
+  .word { font-size: 128px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .word .dot { color: var(--lime); }
+  .line1 { margin-top: 44px; font-size: 44px; font-weight: 700; letter-spacing: -0.01em; }
+  .line1 .arrow { color: var(--indigo); margin: 0 10px; }
+  .line2 { font-size: 34px; font-weight: 600; color: var(--sub); }
+  .line2 .star { color: var(--indigo); }
+  .foot { position: absolute; bottom: 140px; font-size: 24px; color: var(--sub); font-weight: 500; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="lockup">
+      <div class="mark"><img src="Mannon-App-Icon.svg" alt=""></div>
+      <div class="word">mannon<span class="dot">.</span></div>
+    </div>
+    <div class="line1">Quote <span class="arrow">→</span> Accept <span class="arrow">→</span> Reorder, on native Shopify draft orders</div>
+    <div class="line2"><span class="star">✦</span> Claude drafts · you stay in control</div>
+  </div>
+  <div class="foot">Built on Shopify's native B2B — every price comes from Shopify.</div>
+</body>
+</html>

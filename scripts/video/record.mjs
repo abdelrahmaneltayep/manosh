@@ -389,7 +389,7 @@ const drivers = {
   },
 
   16: async (p) => {
-    const card = path.join(repo, "store", "listing", "Mannon-Logo-Preview.html");
+    const card = path.join(repo, "store", "listing", "Mannon-Close-Card.html");
     await p.goto(existsSync(card) ? `file://${card}` : cfg.landing);
   },
 };
