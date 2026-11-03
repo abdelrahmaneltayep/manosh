@@ -1,43 +1,45 @@
-# Menna narration — generated takes (2026-11-03)
+# Menna narration — chosen takes (2026-11-03)
 
-Cloned voice **Menna** (consented), on one ElevenLabs flow:
+Cloned voice **Menna** (consented). Flow: https://elevenlabs.io/app/flows/qhG7rdINn0dPF6IVY0du
 
-https://elevenlabs.io/app/flows/qhG7rdINn0dPF6IVY0du
+**Chosen: set 2 (eleven_v4, `[warmly] [softly]`), take B for every scene** — the owner's pick
+after listening. B is the second take as the canvas lists them. Every take ends at least 0.6 s
+before its slot; scene 10 is exactly at that margin, so keep its clip tight to the VO.
 
-Two sets exist on the flow. **Use set 2.**
+| Scene | Slot | Take B | Margin | ElevenLabs history id |
+|---|---|---|---|---|
+| 01 Cold open | 16 s | 14.7 s | 1.3 s | `puSmsPr2EZC1FJQ2UjAT` |
+| 02 Embedded | 13 s | 11.8 s | 1.2 s | `N8lc5YP3ob0wN4m9jXDu` |
+| 03 Home | 9 s | 7.5 s | 1.5 s | `sgDT1srfQPswJByH6R5a` |
+| 04 Inbox | 11 s | 9.1 s | 1.9 s | `2IUoe5Op0UWOLylVbtFV` |
+| 05 Totals from Shopify | 16 s | 14.6 s | 1.4 s | `4nGc9PsAgLIgYQ5xZvft` |
+| 06 Draft with Claude | 18 s | 16.9 s | 1.1 s | `dZ39FXET5rg7zimIw35G` |
+| 07 Send counter | 10 s | 8.9 s | 1.1 s | `09TWTjCIcUuzOvyOEOSu` |
+| 08 Magic link | 12 s | 11.1 s | 0.9 s | `QV8xfGGPLJ4Nmg8Ji5x3` |
+| 09 Buyer accept | 21 s | 19.8 s | 1.2 s | `YerN1pW8sXIao1B4JKjh` |
+| 10 Draft order | 13 s | 12.4 s | 0.6 s | `O5KGXmXsAzFyQS4WsDe5` |
+| 11 Reorder | 17 s | 15.3 s | 1.7 s | `XazFlXYLNUty4HJASJCG` |
+| 12 Order Pad | 15 s | 13.8 s | 1.2 s | `10rXqCTUMZwnjTvNqohD` |
+| 13 Analytics | 14 s | 12.7 s | 1.3 s | `0r5Tz0mGdvw6ezgMBSRO` |
+| 14 Beyond the loop | 18 s | 16.2 s | 1.8 s | `o59yqMTmHZeLFfmpfqTv` |
+| 15 Try the demo | 23 s | 21.8 s | 1.2 s | `00DWG1ts5Xsp6gLGdqzA` |
+| 16 Close | 14 s | 13.1 s | 0.9 s | `yhO55Z6QDu1GjswBDt3N` |
 
-| Set | Model | Direction | Why |
-|---|---|---|---|
-| 1 | `eleven_multilingual_v2` | none | first pass, brighter and a touch quick |
-| 2 | `eleven_v4` | `[warmly] [softly]` at the top of every scene | the warm, quiet read that was asked for; same words, no speed change |
+## Download from the terminal (ElevenLabs API key in the environment)
 
-Set 2's prompts start with the tags, so they are easy to tell apart on the canvas. Download
-each chosen take as `docs/video/menna/vo/NN.mp3`, then normalise before the edit:
-`ffmpeg -i NN.mp3 -af loudnorm=I=-16:TP=-1:LRA=3 NN.wav`. "Quiet" in the final mix comes
-from that −16 LUFS target, not from the take.
+```
+export ELEVENLABS_API_KEY=your_key
+mkdir -p docs/video/menna/vo
+for pair in 01:puSmsPr2EZC1FJQ2UjAT 02:N8lc5YP3ob0wN4m9jXDu 03:sgDT1srfQPswJByH6R5a 04:2IUoe5Op0UWOLylVbtFV 05:4nGc9PsAgLIgYQ5xZvft 06:dZ39FXET5rg7zimIw35G 07:09TWTjCIcUuzOvyOEOSu 08:QV8xfGGPLJ4Nmg8Ji5x3 09:YerN1pW8sXIao1B4JKjh 10:O5KGXmXsAzFyQS4WsDe5 11:XazFlXYLNUty4HJASJCG 12:10rXqCTUMZwnjTvNqohD 13:0r5Tz0mGdvw6ezgMBSRO 14:o59yqMTmHZeLFfmpfqTv 15:00DWG1ts5Xsp6gLGdqzA 16:yhO55Z6QDu1GjswBDt3N; do
+  n=${pair%%:*}; id=${pair##*:}
+  curl -sS -o docs/video/menna/vo/$n.mp3 -H "xi-api-key: $ELEVENLABS_API_KEY" "https://api.elevenlabs.io/v1/history/$id/audio"
+done
+```
 
-**Listen to every take before using it.** Picks below are by fit only (the take must end at
-least 0.6 s before its slot); the ear decides between A and B.
+Then normalise to −16 LUFS for the edit:
 
-| Scene | Slot | Take A | Take B | Pick by fit | Note |
-|---|---|---|---|---|---|
-| 01 Cold open | 16 s | 14.3 s | 14.7 s | A | |
-| 02 Embedded | 13 s | 11.8 s | 12.1 s | A | |
-| 03 Home | 9 s | 7.5 s | 7.5 s | either | |
-| 04 Inbox | 11 s | 9.1 s | 9.4 s | either | |
-| 05 Totals from Shopify | 16 s | 14.6 s | pending | A | second take was still queued |
-| 06 Draft with Claude | 18 s | 16.5 s | 16.9 s | A | check "Use this price" is read as a label |
-| 07 Send counter | 10 s | 8.9 s | 8.9 s | either | |
-| 08 Magic link | 12 s | 11.2 s | 11.1 s | B | tight: 0.9 s margin |
-| 09 Buyer accept | 21 s | 19.8 s | 19.8 s | either | |
-| 10 Draft order | 13 s | 12.2 s | 12.4 s | A | tight: 0.8 s margin |
-| 11 Reorder | 17 s | 15.2 s | pending | A | |
-| 12 Order Pad | 15 s | 14.1 s | 13.8 s | B | |
-| 13 Analytics | 14 s | 12.7 s | 12.7 s | either | |
-| 14 Beyond the loop | 18 s | 16.3 s | 16.2 s | either | |
-| 15 Try the demo | 23 s | 21.8 s | 21.8 s | either | |
-| 16 Close | 14 s | pending | 13.1 s | B | let the last line settle, then fade |
+```
+cd docs/video/menna/vo && for f in *.mp3; do ffmpeg -y -i "$f" -af loudnorm=I=-16:TP=-1:LRA=3 "${f%.mp3}.wav"; done
+```
 
-Pronunciation to check on every take: "Mannon", "Shopify", "B2B", "PO", "Net thirty",
-"manosh dot fly dot dev". Re-generate a single scene from its `vo/NN.txt` (with the two
-tags in front) if any is wrong.
+Set 1 (multilingual v2, no tags) stays on the flow for reference only.
