@@ -60,12 +60,12 @@ function mark(kind, box) {
 async function tap(locator) {
   await locator.first().waitFor({ state: "visible" });
   mark("click", await locator.first().boundingBox());
-  await tap(locator.first());
+  await locator.first().click();
 }
 async function hov(locator) {
   await locator.first().waitFor({ state: "visible" });
   mark("hover", await locator.first().boundingBox());
-  await hov(locator.first());
+  await locator.first().hover();
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
