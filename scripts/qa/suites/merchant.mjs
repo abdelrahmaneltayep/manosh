@@ -298,6 +298,20 @@ export async function merchant(rec, ctx) {
       }
     }, fail);
 
+    // M13 — agency stores join by invite code, never by a typed store domain (App Store 2.3.1)
+    await rec.tc("M13", "Agency: stores join by invite code, no store-domain field (App Store 2.3.1)", { action: "open Agency; look for a visible field named shop and for the invite / join controls", expected: "no field asking for a store domain; 'Create invite code' (in an organization) or 'Join an organization'" }, async () => {
+      const f = await openApp(page, app, "/app/agency");
+      const t = await textOf(f);
+      if (/Manage & white-label multiple stores/.test(t) && /See Growth/.test(t)) return { status: "SKIP", actual: "Agency is a Growth feature on this plan" };
+      const shopFields = await f.locator('input[name="shop"]:not([type="hidden"])').count();
+      if (shopFields) throw new Error("the page asks for a store domain");
+      if (/myshopify\.com/.test(await f.locator("input").evaluateAll((els) => els.map((e) => e.getAttribute("placeholder") || "").join(" ")))) throw new Error("an input's placeholder suggests a myshopify.com domain");
+      const invite = await f.getByRole("button", { name: "Create invite code" }).count();
+      const join = await f.getByRole("button", { name: "Join organization" }).count();
+      if (!invite && !join) throw new Error("neither 'Create invite code' nor 'Join organization' is on the page");
+      return { actual: `no store-domain field; ${invite ? "Create invite code" : "Join an organization"} offered` };
+    }, fail);
+
     // M11 — the guest gating rule
     await rec.tc("M11", "Price rules: guest gating", { action: "open Price rules", expected: "'Logged-out visitors' rule listed as Active (INFO when off)" }, async () => {
       const f = await openApp(page, app, "/app/price-rules");

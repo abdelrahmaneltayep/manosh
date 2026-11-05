@@ -28,7 +28,8 @@ import {
   getOrgForShop,
   getOrgRollup,
   createOrganization,
-  linkStore,
+  createStoreInvite,
+  joinWithInvite,
   unlinkStore,
 } from "../services/org.server";
 import { canManage, roleLabel } from "../lib/org";
@@ -70,7 +71,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-type ActionResult = { ok: boolean; error?: string; message?: string };
+type ActionResult = { ok: boolean; error?: string; message?: string; invite?: { code: string; expiresAt: string; role: string } };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -94,10 +95,19 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
         );
         return "error" in res ? { ok: false, error: res.error } : { ok: true, message: "Agency workspace created." };
       }
-      case "link-store": {
+      case "create-invite": {
         if (!org) return { ok: false, error: "Create your organization first." };
-        const res = await linkStore(org.orgId, org.myRole, String(form.get("shop") ?? ""), (String(form.get("role") ?? "MANAGER") as OrgRole), baseUrl);
-        return res.ok ? { ok: true, message: "Store linked." } : { ok: false, error: res.error };
+        const role = String(form.get("role") ?? "MANAGER") as OrgRole;
+        const res = await createStoreInvite(org.orgId, org.myRole, role);
+        return res.ok
+          ? { ok: true, invite: { code: res.code, expiresAt: res.expiresAt.toISOString(), role: roleLabel(role === "VIEWER" ? "VIEWER" : "MANAGER") } }
+          : { ok: false, error: res.error };
+      }
+      case "join-org": {
+        // The joining store is always this signed-in store; no store domain is ever typed (App Store 2.3.1).
+        if (org) return { ok: false, error: "This store is already part of an organization." };
+        const res = await joinWithInvite(session.shop, String(form.get("code") ?? ""), baseUrl);
+        return res.ok ? { ok: true, message: `This store joined ${res.orgName}.` } : { ok: false, error: res.error };
       }
       case "unlink-store": {
         if (!org) return { ok: false, error: "No organization." };
@@ -161,7 +171,10 @@ export default function Agency() {
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
 
         {!data.org ? (
-          <CreateOrg shop={data.shop} busy={busy} />
+          <>
+            <JoinOrg busy={busy} />
+            <CreateOrg shop={data.shop} busy={busy} />
+          </>
         ) : (
           <>
             <Card>
@@ -191,7 +204,7 @@ export default function Agency() {
                 <Text as="h2" variant="headingMd">Connected stores</Text>
                 {!data.rollup || data.rollup.stores.length === 0 ? (
                   <EmptyState heading="No stores yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-                    <p>Link a client store below to see it here.</p>
+                    <p>Invite a client store below to see it here.</p>
                   </EmptyState>
                 ) : (
                   <IndexTable
@@ -233,7 +246,7 @@ export default function Agency() {
                 {canManage(data.org.myRole) && (
                   <>
                     <Divider />
-                    <LinkStoreForm busy={busy} />
+                    <InviteStoreForm busy={busy} invite={actionData?.invite ?? null} />
                   </>
                 )}
               </BlockStack>
@@ -283,28 +296,65 @@ function CreateOrg({ shop, busy }: { shop: string; busy: boolean }) {
   );
 }
 
-function LinkStoreForm({ busy }: { busy: boolean }) {
-  const [shop, setShop] = useState("");
+function InviteStoreForm({ busy, invite }: { busy: boolean; invite: { code: string; expiresAt: string; role: string } | null }) {
   const [role, setRole] = useState("MANAGER");
   return (
-    <Form method="post">
-      <input type="hidden" name="intent" value="link-store" />
-      <BlockStack gap="200">
-        <Text as="h3" variant="headingSm">Link a client store</Text>
-        <Text as="p" tone="subdued" variant="bodySm">
-          The store must have installed Mannon and be on its own Growth plan.
-        </Text>
+    <BlockStack gap="300">
+      <Text as="h3" variant="headingSm">Add a client store</Text>
+      <Text as="p" tone="subdued" variant="bodySm">
+        Create an invite code and send it to the store’s owner. They join from inside their own
+        Mannon, so a store is only added with its owner’s consent. The store needs Mannon installed
+        from the Shopify App Store and its own Growth plan.
+      </Text>
+      <Form method="post">
+        <input type="hidden" name="intent" value="create-invite" />
         <InlineStack gap="300" blockAlign="end" wrap>
-          <Box minWidth="18rem">
-            <TextField label="Store domain" name="shop" value={shop} onChange={setShop} autoComplete="off" placeholder="client.myshopify.com" />
-          </Box>
           <Box minWidth="16rem">
-            <Select label="Role" name="role" options={ROLE_OPTIONS} value={role} onChange={setRole} />
+            <Select label="Their role" name="role" options={ROLE_OPTIONS.filter((o) => o.value !== "OWNER")} value={role} onChange={setRole} />
           </Box>
-          <Button submit disabled={busy}>Link store</Button>
+          <Button submit disabled={busy}>Create invite code</Button>
         </InlineStack>
+      </Form>
+      {invite && (
+        <Banner tone="success" title="Invite code ready to send">
+          <BlockStack gap="200">
+            <Text as="p" variant="headingMd"><code>{invite.code}</code></Text>
+            <Text as="p">
+              Role: {invite.role}. Single use; expires {new Date(invite.expiresAt).toLocaleDateString()}. It isn’t shown again.
+            </Text>
+            <Text as="p">
+              The store owner opens <strong>Apps → Mannon → Settings → Agency</strong> in their Shopify admin,
+              chooses <strong>Join an organization</strong> and enters the code.
+            </Text>
+          </BlockStack>
+        </Banner>
+      )}
+    </BlockStack>
+  );
+}
+
+function JoinOrg({ busy }: { busy: boolean }) {
+  const [code, setCode] = useState("");
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <Text as="h2" variant="headingMd">Join an organization</Text>
+        <Text as="p" tone="subdued" variant="bodyMd">
+          Did an agency or your head office send you an invite code? Enter it to add this store to
+          their organization. They’ll see this store’s quote and order totals; each store keeps its
+          own data and billing.
+        </Text>
+        <Form method="post">
+          <input type="hidden" name="intent" value="join-org" />
+          <InlineStack gap="300" blockAlign="end" wrap>
+            <Box minWidth="18rem">
+              <TextField label="Invite code" name="code" value={code} onChange={setCode} autoComplete="off" placeholder="MNN-XXXX-XXXX-XXXX" />
+            </Box>
+            <Button submit disabled={busy || !code.trim()}>Join organization</Button>
+          </InlineStack>
+        </Form>
       </BlockStack>
-    </Form>
+    </Card>
   );
 }
 

@@ -103,6 +103,7 @@ store, theme and Shopify Admin.
 | M9 | Analytics: page and ✦ Claude insights section | renders, or an upgrade note |
 | M10 | Pricing plans → Choose Growth (review 1.2.2) | Shopify's plan page opens and lists all four plans; nothing approved |
 | M11 | Price rules: guest gating rule present | listed as Active |
+| M13 | Agency: add a client store (App Store 2.3.1) | no field asking for a store domain; stores join with a single-use invite code entered in their own Mannon |
 | M12 | Requests, Offers → widget, Price rules: "Add to theme" (App Store 5.1.3) | one deep link per block in Shopify's format; live, the theme editor opens with the block placed (left unsaved) |
 
 ## B — Buyer in the passwordless portal (magic link from M7)

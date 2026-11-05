@@ -39,6 +39,16 @@ export interface BillingStatus {
 
 // --- plan gating -------------------------------------------------------------
 
+/**
+ * True for Growth and for Scale, which includes everything Growth has. Accepts
+ * the stored plan ("GROWTH", "SCALE") and the billing view's name ("Growth").
+ * Before Pricing v3 added Scale, the checks below compared to "GROWTH" only,
+ * so a Scale store read from the database was treated as unpaid. Pure.
+ */
+export function isGrowthTier(plan: string | null | undefined): boolean {
+  return plan === "GROWTH" || plan === "SCALE" || plan === GROWTH_PLAN || plan === "Scale";
+}
+
 /** Higher rank includes everything below it. Growth ⊃ Starter. */
 export const PLAN_RANK: Record<PlanName, number> = {
   [STARTER_PLAN]: 1,
@@ -128,7 +138,7 @@ export const PLAN_LIMITS = {
  * trial, cancelled, and unknown all fall back to Starter limits.
  */
 export function getPlanLimits(plan: string | null | undefined): PlanLimits {
-  return plan === "GROWTH" || plan === GROWTH_PLAN
+  return isGrowthTier(plan)
     ? PLAN_LIMITS.growth
     : PLAN_LIMITS.starter;
 }
@@ -189,7 +199,7 @@ export type RuleScopeName = "STORE" | "COLLECTION" | "PRODUCT" | "CUSTOMER_GROUP
  * gated separately). Pure.
  */
 export function allowedRuleScopes(plan: string | null | undefined): RuleScopeName[] {
-  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  const isGrowth = isGrowthTier(plan);
   return isGrowth
     ? ["STORE", "PRODUCT", "COLLECTION", "CUSTOMER_GROUP"]
     : ["STORE", "PRODUCT"];
@@ -197,14 +207,14 @@ export function allowedRuleScopes(plan: string | null | undefined): RuleScopeNam
 
 /** Pack/case-size multiples + CSV import are Growth-only. Pure. */
 export function packRulesAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 // --- F10 accounting sync gating ----------------------------------------------
 
 /** Accounting sync (QuickBooks Online / Xero) is Growth-only. Pure. */
 export function accountingSyncAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 // --- F11 custom catalog gating -----------------------------------------------
@@ -217,13 +227,13 @@ export type CatalogAssignmentScope = "COMPANY" | "GROUP" | "MEMBER";
  * targeting. Pure.
  */
 export function catalogAssignmentScopes(plan: string | null | undefined): CatalogAssignmentScope[] {
-  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  const isGrowth = isGrowthTier(plan);
   return isGrowth ? ["COMPANY", "GROUP", "MEMBER"] : ["COMPANY"];
 }
 
 /** CSV catalog import is Growth-only. Pure. */
 export function catalogCsvAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** Pure allowance decision for creating another custom catalog. */
@@ -240,12 +250,12 @@ export function catalogCapMessage(cap: number): string {
 
 /** The sales-rep portal (order-on-behalf + assigned accounts) is Growth-only. */
 export function repPortalAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** Flexible payments (deposits / installments / pay-by-link) are Growth-only. */
 export function flexPayAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 // --- F14 tax / VAT gating ----------------------------------------------------
@@ -255,24 +265,24 @@ export function flexPayAllowed(plan: string | null | undefined): boolean {
 
 /** Per-region tax rules are Growth-only. Pure. */
 export function taxRegionsAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** The certificate + verification workflow (and ID validation) is Growth-only. Pure. */
 export function taxCertWorkflowAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** Compliant sequential invoice numbering is Growth-only. Pure. */
 export function compliantInvoiceNumbering(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 // --- F15 ERP / inventory sync gating -----------------------------------------
 
 /** ERP / inventory sync (stock in, orders out) is Growth-only. Pure. */
 export function erpSyncAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 // --- F18 buyer PWA gating ----------------------------------------------------
@@ -281,7 +291,7 @@ export function erpSyncAllowed(plan: string | null | undefined): boolean {
 
 /** Web-push reorder reminders are Growth-only. Pure. */
 export function pushRemindersAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** Pure allowance decision for saving another reorder shortcut. */
@@ -302,12 +312,12 @@ export function shortcutCapMessage(cap: number): string {
 
 /** Agency org management (create org, link stores) is Growth-only. Pure. */
 export function agencyAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** White-label buyer-portal branding is Growth-only. Pure. */
 export function whiteLabelAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** Merchant-facing copy when the agency add-on is hit on Starter. */
@@ -318,7 +328,7 @@ export const AGENCY_UPGRADE_MESSAGE =
 
 /** Publishing a shareable public catalog + the discovery listing is Growth-only. Pure. */
 export function catalogSharingAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** Merchant-facing copy when catalog sharing is hit on Starter. */
@@ -342,7 +352,7 @@ export interface QuoteWidgetFeatures {
 
 /** Which quote-widget capabilities a plan unlocks. Both plans get the PDP form. Pure. */
 export function quoteWidgetFeatures(plan: string | null | undefined): QuoteWidgetFeatures {
-  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  const isGrowth = isGrowthTier(plan);
   return { pdpForm: true, cartLevel: isGrowth, gatedMode: isGrowth, customFields: isGrowth, autoPrefill: isGrowth };
 }
 
@@ -361,7 +371,7 @@ export interface QuoteFormFeatures {
 
 /** Which quote-form-builder capabilities a plan unlocks. Basic is universal. Pure. */
 export function quoteFormFeatures(plan: string | null | undefined): QuoteFormFeatures {
-  const isGrowth = plan === "GROWTH" || plan === GROWTH_PLAN;
+  const isGrowth = isGrowthTier(plan);
   return { basicBuilder: true, conditionalLogic: isGrowth, multipleForms: isGrowth, multiLanguage: isGrowth };
 }
 
@@ -392,7 +402,7 @@ export function quoteCaptureAllowed(plan: string | null | undefined): boolean {
 
 /** F25.3 — bulk CSV import is a Growth feature. Pure. */
 export function bulkImportAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** F25.3 — max rows per import batch (Growth cap; a higher tier would raise it). Pure. */
@@ -407,7 +417,7 @@ export function bulkImportRowCap(plan: string | null | undefined): number {
  * (Both plans get display-conversion via a rate.) Pure.
  */
 export function contractRatesAllowed(plan: string | null | undefined): boolean {
-  return plan === "GROWTH" || plan === GROWTH_PLAN;
+  return isGrowthTier(plan);
 }
 
 /** Pure allowance decision for enabling another currency (beyond the store default). */

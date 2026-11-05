@@ -1311,6 +1311,7 @@ model Organization {
   name       String
   ownerEmail String
   stores     OrgStore[]
+  invites    OrgInvite[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 }
@@ -1326,6 +1327,23 @@ model OrgStore {
   createdAt DateTime @default(now())
 
   @@unique([shop])
+  @@index([orgId])
+}
+
+// A single-use code an organization gives a client store so that store's own
+// merchant can join from inside their Mannon (consent; nobody types a store
+// domain — App Store 2.3.1). Only the SHA-256 hash of the code is stored.
+model OrgInvite {
+  id         String    @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  codeHash   String    @unique
+  role       OrgRole   @default(MANAGER)
+  expiresAt  DateTime
+  usedAt     DateTime?
+  usedByShop String?
+  createdAt  DateTime  @default(now())
+
   @@index([orgId])
 }
 

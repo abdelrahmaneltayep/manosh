@@ -1,3 +1,4 @@
+import { createHash, randomBytes } from "node:crypto";
 import type { OrgRole } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -77,43 +78,84 @@ export async function createOrganization(
 
 // --- store linking -----------------------------------------------------------
 
-export async function linkStore(
+/** Days an invite code stays valid. Documented in docs/compliance.md (agency linking). */
+export const ORG_INVITE_TTL_DAYS = 7;
+
+/** A readable single-use code, e.g. "MNN-7KQ2-XW9D-4TPA" (no 0/O/1/I). Pure apart from randomness. */
+export function generateInviteCode(random: (n: number) => Buffer = randomBytes): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = random(12);
+  const chars = [...bytes].map((b) => alphabet[b % alphabet.length]).join("");
+  return `MNN-${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)}`;
+}
+
+/** Normalize what a merchant typed (spaces, case, missing dashes) before hashing. Pure. */
+export function normalizeInviteCode(input: string): string {
+  const raw = (input || "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^MNN/, "");
+  return raw.length === 12 ? `MNN-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}` : "";
+}
+
+export const hashInviteCode = (code: string): string => createHash("sha256").update(code).digest("hex");
+
+/**
+ * Create a single-use code that lets a client store join this organization.
+ * The client store's own merchant redeems it inside their Mannon, so a store is
+ * only ever linked with its consent, and nobody types a store domain (App Store
+ * 2.3.1). Only the hash is stored; the raw code is shown once.
+ */
+export async function createStoreInvite(
   orgId: string,
   actingRole: OrgRole,
-  shopDomain: string,
   role: OrgRole,
+  now: Date = new Date(),
+): Promise<{ ok: true; code: string; expiresAt: Date } | { ok: false; error: string }> {
+  if (!canManage(actingRole)) return { ok: false, error: "You don’t have permission to invite stores." };
+  const safeRole: OrgRole = role === "VIEWER" ? "VIEWER" : "MANAGER"; // an invite never grants OWNER
+  const code = generateInviteCode();
+  const expiresAt = new Date(now.getTime() + ORG_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000);
+  await prisma.orgInvite.create({ data: { orgId, codeHash: hashInviteCode(code), role: safeRole, expiresAt } });
+  return { ok: true, code, expiresAt };
+}
+
+/**
+ * Redeem an invite code for the store the merchant is signed in to. The
+ * joining store is always the authenticated session's shop.
+ */
+export async function joinWithInvite(
+  shopDomain: string,
+  codeInput: string,
   baseUrl: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!canManage(actingRole)) return { ok: false, error: "You don’t have permission to link stores." };
-  const domain = shopDomain.trim().toLowerCase();
-  if (!domain) return { ok: false, error: "Enter a store domain." };
+  now: Date = new Date(),
+): Promise<{ ok: true; orgName: string } | { ok: false; error: string }> {
+  const code = normalizeInviteCode(codeInput);
+  if (!code) return { ok: false, error: "Enter the invite code exactly as you received it, e.g. MNN-7KQ2-XW9D-4TPA." };
 
-  // Entitlement: each managed store needs its own Growth subscription.
-  const shop = await shopBy(domain);
-  if (!shop) return { ok: false, error: "That store hasn’t installed Mannon yet." };
-  if (!agencyAllowed(shop.plan)) return { ok: false, error: "That store needs its own Growth plan before it can be linked." };
+  const shop = await shopBy(shopDomain);
+  if (!shop) return { ok: false, error: "Unknown shop." };
+  if (!agencyAllowed(shop.plan)) return { ok: false, error: "This store needs its own Growth plan before it can join an organization." };
+  if (await prisma.orgStore.findUnique({ where: { shop: shopDomain } })) return { ok: false, error: "This store is already part of an organization." };
 
-  const existing = await prisma.orgStore.findUnique({ where: { shop: domain } });
-  if (existing) {
-    return { ok: false, error: existing.orgId === orgId ? "That store is already in this organization." : "That store belongs to another organization." };
+  const invite = await prisma.orgInvite.findUnique({ where: { codeHash: hashInviteCode(code) }, include: { org: { select: { id: true, name: true, ownerEmail: true } } } });
+  if (!invite || invite.usedAt || invite.expiresAt <= now) {
+    return { ok: false, error: "That invite code isn’t valid. It may have been used already or expired; ask the organization for a new one." };
   }
 
-  await prisma.orgStore.create({ data: { orgId, shop: domain, role } });
-  await appendEvent({ shopId: shop.id, type: "STORE_LINKED", entityType: "OrgStore", entityId: domain, payload: { role } });
+  // Claim the invite first (single use, race-safe), then link.
+  const claimed = await prisma.orgInvite.updateMany({ where: { id: invite.id, usedAt: null }, data: { usedAt: now, usedByShop: shopDomain } });
+  if (claimed.count !== 1) return { ok: false, error: "That invite code has just been used. Ask the organization for a new one." };
+  await prisma.orgStore.create({ data: { orgId: invite.orgId, shop: shopDomain, role: invite.role } });
+  await appendEvent({ shopId: shop.id, type: "STORE_LINKED", entityType: "OrgStore", entityId: shopDomain, payload: { role: invite.role, via: "invite" } });
 
-  // Store-linked confirmation (best-effort, white-label-aware wording).
+  // Store-linked confirmation to the organization owner (best-effort, white-label-aware wording).
   try {
-    const org = await prisma.organization.findUnique({ where: { id: orgId }, select: { name: true, ownerEmail: true } });
-    if (org) {
-      const tokens = await getBrandingTokens(domain);
-      const tpl = resolveTemplate("store_linked", null);
-      const { subject, body } = renderTemplate(tpl, { orgName: org.name, storeDomain: domain, portalName: tokens.portalName, appUrl: `${baseUrl.replace(/\/$/, "")}/app/agency` });
-      await sendEmail({ to: org.ownerEmail, subject, html: body.replace(/\n/g, "<br>"), text: body });
-    }
+    const tokens = await getBrandingTokens(shopDomain);
+    const tpl = resolveTemplate("store_linked", null);
+    const { subject, body } = renderTemplate(tpl, { orgName: invite.org.name, storeDomain: shopDomain, portalName: tokens.portalName, appUrl: `${baseUrl.replace(/\/$/, "")}/app/agency` });
+    await sendEmail({ to: invite.org.ownerEmail, subject, html: body.replace(/\n/g, "<br>"), text: body });
   } catch {
     /* best-effort */
   }
-  return { ok: true };
+  return { ok: true, orgName: invite.org.name };
 }
 
 export async function unlinkStore(orgId: string, actingRole: OrgRole, shopDomain: string): Promise<{ ok: boolean; error?: string }> {

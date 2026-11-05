@@ -93,3 +93,13 @@ Notes:
 - [ ] Secrets hashed (magic-link tokens), no raw tokens stored.
 - [ ] No PII in Event payloads or analytics events.
 - [ ] Billing works fresh install → trial → paid across both tiers.
+
+## Agency store linking (App Store 2.3.1)
+
+Mannon never asks anyone to type a store domain. An organization adds a client
+store with a **single-use invite code** (`createStoreInvite`): only its SHA-256
+hash is stored (`OrgInvite.codeHash`), it expires after `ORG_INVITE_TTL_DAYS`
+(7 days), and it can grant Manager or Viewer, never Owner. The client store's own
+merchant redeems it inside their Mannon (Agency → Join an organization), so the
+store that joins is always the signed-in one and is only linked with its owner's
+consent. Each linked store keeps its own data and its own Growth subscription.

@@ -54,3 +54,12 @@ describe("plan limits (pure)", () => {
     expect(evaluateQuoteAllowance(9999, Infinity).allowed).toBe(true);
   });
 });
+
+describe("isGrowthTier (Scale includes Growth)", () => {
+  it("accepts Growth and Scale, stored or display names; refuses the rest", async () => {
+    const { isGrowthTier, agencyAllowed } = await import("./billing");
+    for (const p of ["GROWTH", "SCALE", "Growth", "Scale"]) expect(isGrowthTier(p)).toBe(true);
+    for (const p of ["STARTER", "TRIAL", "FREE", "CANCELLED", "Starter", null, undefined]) expect(isGrowthTier(p as string | null)).toBe(false);
+    expect(agencyAllowed("SCALE")).toBe(true);
+  });
+});
