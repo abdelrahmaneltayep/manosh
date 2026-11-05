@@ -370,16 +370,26 @@ async function adminSide(appUrl) {
       if (!frame) continue;
       await frame.waitForLoadState("networkidle").catch(() => {});
       await sleep(1500);
-      const text = (await frame.locator("body").innerText().catch(() => "")) || "";
-      count = Math.max((text.match(new RegExp(RUN, "g")) || []).length, (text.match(new RegExp(`qa\\+${RUN}`, "gi")) || []).length);
+      // Count rows (table rows / list items / cards) that mention the run tag,
+      // not raw text matches: one entry shows the tag in its email, company and note.
+      count = await frame.evaluate((tag) => {
+        const rows = Array.from(document.querySelectorAll("tr, li, [role='row'], .Polaris-ResourceItem, .Polaris-IndexTable__TableRow"));
+        const hits = rows.filter((r) => (r.textContent || "").includes(tag));
+        // keep only the innermost matching rows so nested containers don't double count
+        return hits.filter((r) => !hits.some((o) => o !== r && r.contains(o))).length;
+      }, RUN).catch(() => 0);
+      if (!count) {
+        const text = (await frame.locator("body").innerText().catch(() => "")) || "";
+        count = (text.match(new RegExp(`qa\\+${RUN}@example\\.com`, "gi")) || []).length;
+      }
     }
     await shot(page, `admin-${id}`);
-    record(id, label, count >= expectAtLeast ? "PASS" : "FAIL", count ? `found ${count} entr${count === 1 ? "y" : "ies"} tagged ${RUN}` : `nothing tagged ${RUN} yet`);
+    record(id, label, count >= expectAtLeast ? "PASS" : "FAIL", count ? `found ${count} entr${count === 1 ? "y" : "ies"} tagged ${RUN} (expected ${expectAtLeast})` : `nothing tagged ${RUN} yet`);
   };
   try {
     const quoteSends = results.filter((r) => ["T1", "T2", "T4"].includes(r.id) && r.status === "PASS").length;
     const offerSent = results.some((r) => r.id === "T3" && r.status === "PASS");
-    if (quoteSends) await findIn("/app/quote-requests", "Requests reach Mannon → Quotes → Requests", "A1", 1);
+    if (quoteSends) await findIn("/app/quote-requests", "Requests reach Mannon → Quotes → Requests", "A1", quoteSends);
     else record("A1", "Requests reach Mannon → Quotes → Requests", "SKIP", "no request was sent");
     if (offerSent) await findIn("/app/offers", "Offer reaches Mannon → Offers", "A2", 1);
     else record("A2", "Offer reaches Mannon → Offers", "SKIP", "no offer was sent");
