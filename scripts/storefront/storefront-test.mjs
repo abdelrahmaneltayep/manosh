@@ -335,22 +335,49 @@ async function shopperSide() {
   return { appUrl };
 }
 
-async function cdpUp() {
-  try { const r = await fetch(`${CDP}/json/version`); return r.ok; } catch { return false; }
+async function cdpInfo(url) {
+  try {
+    const r = await fetch(`${url}/json/version`, { signal: AbortSignal.timeout(2000) });
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+/** Something on the port that is a real Chrome (not an Electron app like Slack, Figma or VS Code). */
+const isChrome = (v) => Boolean(v) && /Chrome|Chromium/.test(v.Browser || "") && !/Electron/i.test(v["User-Agent"] || "");
+
+async function startChrome(port) {
+  const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+  if (process.platform !== "darwin" || !existsSync(chrome)) return false;
+  console.log(`Starting your Chrome (profile ~/mannon-chrome, port ${port}) so the admin check can use your sign-in…`);
+  spawn(chrome, [`--user-data-dir=${join(homedir(), "mannon-chrome")}`, `--remote-debugging-port=${port}`, "--no-first-run", "--no-default-browser-check", "about:blank"], { detached: true, stdio: "ignore" }).unref();
+  for (let i = 0; i < 30; i++) { if (isChrome(await cdpInfo(`http://127.0.0.1:${port}`))) return true; await sleep(500); }
+  return false;
+}
+
+/** Find a Chrome to attach to: MANNON_CDP if it is Chrome, else our own on 9333. */
+async function attachChrome() {
+  const first = await cdpInfo(CDP);
+  const tried = [];
+  const candidates = [];
+  if (isChrome(first)) candidates.push(CDP);
+  else if (first) tried.push(`${CDP} is ${/Electron/i.test(first["User-Agent"] || "") ? "an Electron app" : first.Browser || "not Chrome"} (${(first["User-Agent"] || "").replace(/.*\) /, "").slice(0, 60)})`);
+  const own = "http://127.0.0.1:9333";
+  if (!candidates.length && (isChrome(await cdpInfo(own)) || (await startChrome(9333)))) candidates.push(own);
+  if (!candidates.length && !first && (await startChrome(9222))) candidates.push(CDP);
+  for (const url of candidates) {
+    try { return { browser: await chromium.connectOverCDP(url), url }; }
+    catch (e) { tried.push(`${url}: ${String(e.message || e).split("\n")[0]}`); }
+  }
+  return { browser: null, why: tried.length ? tried.join("; ") : "no Chrome could be started" };
 }
 
 async function adminSide(appUrl) {
   const appHost = appUrl ? new URL(appUrl).host : "manosh.fly.dev";
-  if (!(await cdpUp())) {
-    const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-    if (process.platform === "darwin" && existsSync(chrome)) {
-      console.log("Starting your Chrome (profile ~/mannon-chrome) so the admin check can use your sign-in…");
-      spawn(chrome, [`--user-data-dir=${join(homedir(), "mannon-chrome")}`, "--remote-debugging-port=9222", "--no-first-run", "--no-default-browser-check", "about:blank"], { detached: true, stdio: "ignore" }).unref();
-      for (let i = 0; i < 30 && !(await cdpUp()); i++) await sleep(500);
-    }
+  const { browser, url, why } = await attachChrome();
+  if (!browser) {
+    record("A0", "Attach to your signed-in Chrome", "FAIL", `${why}. If Chrome with the ~/mannon-chrome profile is already open without a debug port, quit it and run again. To see what holds the port: lsof -nP -iTCP:9222 -sTCP:LISTEN`);
+    return;
   }
-  if (!(await cdpUp())) { record("A0", "Attach to your signed-in Chrome", "SKIP", `nothing listening on ${CDP}`); return; }
-  const browser = await chromium.connectOverCDP(CDP);
+  record("A0", "Attach to your signed-in Chrome", "PASS", url);
   const context = browser.contexts()[0] || (await browser.newContext());
   const page = await context.newPage();
   const storeHandle = STORE.replace(/\.myshopify\.com$/, "");
@@ -405,7 +432,10 @@ async function adminSide(appUrl) {
 console.log(`Mannon storefront test · run ${RUN} · ${STORE_URL}`);
 console.log(`Submissions are tagged ${EMAIL} / "${COMPANY}"\n`);
 const { appUrl } = await shopperSide();
-if (ADMIN) { console.log(""); await adminSide(appUrl); }
+if (ADMIN) {
+  console.log("");
+  try { await adminSide(appUrl); } catch (e) { record("AERR", "Admin side stopped", "FAIL", String(e.message || e).split("\n")[0]); }
+}
 
 const counts = results.reduce((m, r) => ((m[r.status] = (m[r.status] || 0) + 1), m), {});
 const summary = `PASS ${counts.PASS || 0} · FAIL ${counts.FAIL || 0} · SKIP ${counts.SKIP || 0} · INFO ${counts.INFO || 0}`;
