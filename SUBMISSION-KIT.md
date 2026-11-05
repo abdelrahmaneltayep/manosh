@@ -204,6 +204,12 @@ with padding, 1200×1200 PNG. No words, no screenshot, no Shopify trademark. Sho
 asks icons to avoid text; the single-letter mark is the logo, not a word, but if a
 reviewer flags it, use the mark without the letter's counter detail.
 
+### Review screencast (requirement 4.5.3)
+
+The clip-by-clip recording plan is in [`docs/screencast-recording.md`](docs/screencast-recording.md):
+12 silent clips that follow the testing instructions step for step, edited into one
+1920×1080 MP4 with English captions and an `.srt`.
+
 ### Uploading the screencast
 
 Shopify's listing takes the demo video as a **YouTube or Vimeo link**, not a file. Upload
