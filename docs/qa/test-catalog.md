@@ -16,6 +16,15 @@ Who the flows serve:
 Cases marked (local) run against a production build on your machine and need
 `DATABASE_URL`. Every other case runs against the live app and the dev store.
 
+**Two modes.** `npm run qa:all` tests the live app, your storefront and Shopify
+Admin in your signed-in Chrome. `npm run qa:local` runs every section on your
+machine instead: the production build on 127.0.0.1 wired to a mock Shopify
+Admin API, a mock Claude and a mock Online Store (`scripts/qa/local/`), with the
+embedded admin opened the way Shopify frames it (a session token signed with
+the app secret, App Bridge stubbed). Local mode needs only a local Postgres; it
+proves the app's flows and its calls to Shopify, the live mode proves the real
+store, theme and Shopify Admin.
+
 ## P — Prerequisites
 | ID | Case | Expected |
 |---|---|---|
@@ -103,7 +112,7 @@ Cases marked (local) run against a production build on your machine and need
 | B3 | Open the Countered quote, choose Net 30, Accept & create order | a confirm panel appears; nothing written yet |
 | B4 | Confirm & create order | status Ordered with Shopify's subtotal, tax and total |
 | B5 | Order pad: paste two SKU lines → Add pasted lines | lines appear in "Your order" |
-| B6 | Order pad: paste a PO → ✦ Read my order | Claude's matches appear; nothing ordered until "Request quote for these items" |
+| B6 | Order pad: paste a PO → ✦ Read my order | Claude's matches appear; nothing ordered until "Request quote for these items". Locally a "made-up" line comes back from mock Claude with an invented id and must be listed as not matched |
 | B7 | Request a quote page | renders with the catalog |
 | B8 | Invoices and Team pages | render |
 | B9 | Language: العربية then English | page turns right-to-left, then back |
@@ -118,11 +127,35 @@ Cases marked (local) run against a production build on your machine and need
 | D4 | Confirm & create order | Ordered |
 | D5 | Reorder card → Reorder | a new quote or an approval note |
 
+## A — The Shopify side
+Live, in your signed-in Chrome (Shopify Admin's own pages, read-only):
+| ID | Case | Expected |
+|---|---|---|
+| A1 | Settings → Apps | Mannon installed |
+| A2 | Admin sidebar | a Mannon link (INFO when not pinned) |
+| A3 | Orders → Drafts | the draft orders this run created (B4, B10, D4), created today |
+| A4 | Customers → Companies | native B2B companies listed (INFO when the plan has none) |
+| A5 | Customers, search this run's storefront email | INFO: whether Shopify has a customer for it |
+| A6 | Settings → Billing → Subscriptions | INFO: Mannon's plan as Shopify bills it |
+| A7 | Settings → Payments | Net 30 available |
+
+Local (`qa:local`), from the mock Admin API and mock Claude logs:
+| ID | Case | Expected |
+|---|---|---|
+| A1 | Every Admin API operation the run made | answered by the mock (an unanswered one could hide a failure) |
+| A2 | The accepted quote's total in the portal (B4, else D4) | equals the draft order's `totalPriceSet` from Shopify |
+| A3 | The `draftOrderCreate` input | purchasing company, location and contact; `priceOverride` on every line; Net 30 with `issuedAt` |
+| A4 | Every variant id sent to `draftOrderCalculate`/`draftOrderCreate` | all from the catalog; the invented id from B6 never reaches Shopify |
+| A5 | Every Claude call | temperature 0, forced tool, Haiku 4.5 |
+| A6 | Admin API writes while B6 ran | none |
+| A7 | The reorder (B10, else D5) | a draft with the past order's lines when the portal says Ordered |
+
 ## X — Clean-up and evidence
 | ID | Case | Expected |
 |---|---|---|
 | X1 | Every browser context closed, every tmux session killed | none left |
 | X2 | Artifacts created by this run listed (requests, offer, quote, draft orders, the guest rule) | listed with the run tag |
+| X0 | (local) The app's request log for the whole run | no 5xx except the cron 503s C13 asks for; `server.log` and `shopify-calls.json` saved |
 
 What is deliberately not automated: approving a paid plan (test charges still
 change the subscription), uninstalling the app, editing the theme (see

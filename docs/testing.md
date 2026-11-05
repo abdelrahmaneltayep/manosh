@@ -219,4 +219,27 @@ screenshots, and lists what the run created (tagged with the run id) and what
 is left to check by hand. The command exits 1 when any case FAILs. A case is
 BLOCKED, not FAILED, when its precondition is missing, for example no Countered
 quote for B3, or "We couldn't load the catalog" when Shopify is unreachable.
-It never approves a plan charge, uninstalls the app or edits the theme.
+It never approves a plan charge, uninstalls the app or edits the theme. Section
+**A** checks the Shopify side in Shopify Admin's own pages: Apps, Draft orders,
+Companies, Customers, Billing and Payment terms.
+
+### Everything on your machine (`npm run qa:local`)
+
+```
+export DATABASE_URL=postgresql://postgres:postgres@localhost:5433/mannon_test?schema=public
+npm run qa:local
+```
+
+Runs every section with no store and no network: L first (Vitest truncates the
+database), then it migrates and seeds, sets the local shop to the Scale plan
+(`MANNON_QA_PLAN` to change), and serves the production build on 127.0.0.1:3101
+with `scripts/qa/local/preload.mjs`, which sends `*.myshopify.com` calls to a mock
+Admin API (:3103). Claude calls go to a mock Claude (:3104, via
+`ANTHROPIC_BASE_URL`), and the theme blocks render on a mock Online Store (:3102,
+password `letmein`). Merchant pages open as Shopify frames them: `embedded=1`,
+`shop`, `host` and a session token signed with `SHOPIFY_API_SECRET`, with a
+browser user agent (Shopify's library answers bot agents with 410) and a stub in
+place of App Bridge. Section A then reads the mock logs to check the guardrails at
+the API boundary: Shopify's totals shown as is, the draft order's purchasing
+entity, terms and agreed prices, no invented id sent, Claude at temperature 0.
+`--build` rebuilds first. The run also saves `server.log` and `shopify-calls.json`.

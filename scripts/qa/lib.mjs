@@ -184,7 +184,16 @@ export async function attachChrome(cdp = process.env.MANNON_CDP || "http://127.0
 export const ERROR_TEXT = /Something went wrong|Application error|Unexpected Server Error|There['’]s no page at this address|We hit an unexpected problem/i;
 
 /** Open a page of the embedded app; returns the app frame (waits for sign-in). */
-export async function openApp(page, { store, appHandle, appHost }, path) {
+export async function openApp(page, { store, appHandle, appHost, local }, path) {
+  if (local) {
+    // Local stack: open the app the way Shopify Admin frames it (embedded=1,
+    // shop, host, a signed session token); App Bridge is stubbed by the context.
+    const host = Buffer.from(`admin.shopify.com/store/${store.replace(/\.myshopify\.com$/, "")}`).toString("base64url");
+    const sep = path.includes("?") ? "&" : "?";
+    await page.goto(`${local.live}${path}${sep}embedded=1&shop=${store}&host=${host}&id_token=${local.token()}`, { waitUntil: "networkidle" });
+    await page.locator("body").waitFor({ timeout: 20000 });
+    return page.mainFrame();
+  }
   const handle = store.replace(/\.myshopify\.com$/, "");
   const url = `https://admin.shopify.com/store/${handle}/apps/${appHandle}${path}`;
   await page.goto(url, { waitUntil: "domcontentloaded" });

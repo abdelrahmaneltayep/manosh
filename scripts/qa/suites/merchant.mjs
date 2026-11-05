@@ -29,7 +29,7 @@ async function rowWith(frame, text, button) {
 
 export async function merchant(rec, ctx) {
   rec.begin("M · Merchant in Shopify Admin");
-  const app = { store: ctx.store, appHandle: ctx.appHandle, appHost: new URL(ctx.live).host };
+  const app = { store: ctx.store, appHandle: ctx.appHandle, appHost: new URL(ctx.live).host, local: ctx.localStack ? { live: ctx.live, token: ctx.localStack.token } : null };
   const browser = ctx.adminBrowser;
   const context = browser.contexts()[0] || (await browser.newContext());
   const page = await context.newPage();
@@ -102,6 +102,11 @@ export async function merchant(rec, ctx) {
       await rec.tc("M3", "Quote: Totals from Shopify", { action: "read the Totals from Shopify card", expected: "Subtotal, Tax, Total and 'Calculated by Shopify'" }, async () => {
         await f.getByText("Totals from Shopify").first().waitFor({ timeout: 20000 });
         const t = await textOf(f);
+        const unavailable = t.match(/Totals unavailable\s*(Shopify can[’']t price this quote yet:[^.]*\.)/);
+        if (unavailable) {
+          ctx.unpriceable = unavailable[1];
+          return { status: "FAIL", actual: `Shopify can't price it: "${unavailable[1]}" — a buyer who arrives from the storefront is never linked to a Shopify company, so no quote of theirs can be priced or ordered (see REPORT notes)`, evidence: await rec.shot(page, "quote-totals") };
+        }
         for (const w of ["Subtotal", "Total", "Calculated by Shopify"]) if (!t.includes(w)) throw new Error(`missing "${w}"`);
         const email = (t.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/) || [null])[0];
         ctx.buyerEmail = email;
@@ -109,6 +114,7 @@ export async function merchant(rec, ctx) {
       }, fail);
 
       await rec.tc("M4", "Quote: change a price → Recalculate with these prices", { action: "lower the first unit price by 5%, click Recalculate with these prices", expected: "totals update; 'Not saved until you send the counter'" }, async () => {
+        if (ctx.unpriceable) return { status: "BLOCKED", actual: `Shopify can't price this quote (M3): ${ctx.unpriceable}` };
         const price = f.getByLabel("Unit price").first();
         if (!(await price.count())) return { status: "SKIP", actual: "no editable unit price on this quote (already countered?)" };
         const v = parseFloat(((await price.inputValue()) || "0").replace(/[^0-9.]/g, ""));
@@ -179,7 +185,11 @@ export async function merchant(rec, ctx) {
       await rec.tc("M8", "Offers: this run's offer → Send counter", { action: `Offers → offer from ${ctx.email} → counter amount → Send counter`, expected: "'Counter sent.'" }, async () => {
         const f = await openApp(page, app, "/app/offers");
         const row = f.locator("tr, li").filter({ hasText: ctx.email }).first();
-        if (!(await row.count())) throw new Error(`no offer row for ${ctx.email}`);
+        if (!(await row.count())) {
+          const t = await textOf(f);
+          if (/Available on Growth|See Growth|Upgrade to Growth/.test(t)) return { status: "INFO", actual: "Offers is a Growth feature and this shop is on a lower plan" };
+          throw new Error(`no offer row for ${ctx.email}`);
+        }
         await row.getByRole("link").first().click();
         let o = null;
         const t0 = Date.now();
@@ -221,6 +231,23 @@ export async function merchant(rec, ctx) {
         return { status: "INFO", actual: `no Choose button (${(t.match(/Current plan[^.]*|You're on[^.]*/i) || ["plan page shown"])[0]})` };
       }
       const label = (await choose.innerText()).trim();
+      if (app.local) {
+        // No Shopify Admin around the local page: check the app sends the
+        // merchant to Shopify's own plan page (managed pricing), and stop there.
+        const seen = [];
+        const onResp = (r) => { for (const v of Object.values(r.headers())) if (/pricing_plans/.test(v)) seen.push(v); };
+        const onReq = (r) => { if (/admin\.shopify\.com/.test(r.url())) seen.push(r.url()); };
+        page.on("response", onResp);
+        page.on("request", onReq);
+        await choose.click();
+        await sleep(4000);
+        page.off("response", onResp);
+        page.off("request", onReq);
+        const opened = await page.evaluate(() => (window.__mannonAppBridge || []).map((c) => c.args).join(" ")).catch(() => "");
+        const all = [...seen, opened].join(" ");
+        const m = all.match(/https:\/\/admin\.shopify\.com\/store\/[^/"\s]+\/charges\/[^/"\s]+\/pricing_plans/);
+        return { status: m ? "PASS" : "FAIL", actual: m ? `clicked "${label}" → ${m[0]} (Shopify's plan page; not loaded locally; nothing approved)` : `clicked "${label}"; no redirect to Shopify's pricing_plans page seen`, evidence: await rec.shot(page, "plan-choose") };
+      }
       await choose.click();
       await page.waitForURL(/pricing_plans|charges|\/settings\/billing/, { timeout: 30000 }).catch(() => {});
       await sleep(3000);

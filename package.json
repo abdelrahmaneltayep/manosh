@@ -32,7 +32,8 @@
     "video:assemble": "bash scripts/video/menna-video.sh assemble",
     "test:storefront": "node scripts/storefront/storefront-test.mjs",
     "theme:add-blocks": "node scripts/storefront/add-theme-blocks.mjs",
-    "qa:all": "node scripts/qa/qa-all.mjs"
+    "qa:all": "node scripts/qa/qa-all.mjs",
+    "qa:local": "node scripts/qa/qa-all.mjs --local"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",

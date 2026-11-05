@@ -32,18 +32,19 @@ async function acceptCountered(rec, p, idPrefix, ctx) {
   const ready = await p.getByRole("button", { name: /Confirm & create order/ }).count();
   await rec.tc(`${idPrefix}4`, "Confirm & create order", { action: "click Confirm & create order", expected: "status Ordered with Shopify's subtotal, tax and total" }, async () => {
     if (!ready) return { status: "BLOCKED", actual: "the confirm panel never opened" };
+    const startedAt = new Date().toISOString();
     await p.getByRole("button", { name: /Confirm & create order/ }).click();
     const t0 = Date.now();
     while (Date.now() - t0 < 45000) {
       if (await p.locator(".status-ordered").count()) break;
-      const t = await textOf(p);
-      const err = t.match(/(Shopify couldn[’']t[^.]*\.|Your supplier[^.]*\.|store connection[^.]*\.|Something went wrong[^.]*\.)/);
-      if (err) throw new Error(err[0]);
+      const alert = ((await p.locator("[role=alert]").allInnerTexts().catch(() => [])) || []).join(" ").trim();
+      if (alert) throw new Error(`the portal says: "${alert.slice(0, 200)}"`);
       await sleep(800);
     }
     if (!(await p.locator(".status-ordered").count())) throw new Error("no Ordered status within 45 s");
     const t = await textOf(p);
     const total = (t.match(/Total\s*\$?[\d,]+\.\d\d[^ ]*/) || [""])[0];
+    ctx[`${idPrefix.toLowerCase()}4`] = { startedAt, total: Number(total.replace(/[^0-9.]/g, "")), via: `${idPrefix}4` };
     rec.created.push(`Shopify draft order from accepting ${ctx.portalQuoteUrl} (payment pending, Net 30)`);
     return { actual: `Ordered · ${total}`, evidence: await rec.shot(p, `${idPrefix}-ordered`) };
   }, () => rec.shot(p, `${idPrefix}-confirm-fail`));
@@ -92,25 +93,39 @@ export async function buyer(rec, ctx) {
       await p.getByRole("button", { name: "Add pasted lines" }).click();
       await sleep(1500);
       const t = await textOf(p);
-      const m = t.match(/Your order \((\d+)\)/);
+      const m = t.match(/Your order \((\d+)/);
       if (!m || Number(m[1]) < 1) {
         const note = (t.match(/[^.]*(not found|unknown|no match)[^.]*\./i) || [""])[0];
         throw new Error(note || "no lines added (set MANNON_SKUS to real SKUs from the store)");
       }
-      return { actual: `Your order (${m[1]})`, evidence: await rec.shot(p, "order-pad-skus") };
+      return { actual: `Your order (${m[1]} items)`, evidence: await rec.shot(p, "order-pad-skus") };
     }, fail("b5-fail"));
 
     if (ctx.ai) {
       await rec.tc("B6", "Order pad: paste a PO → ✦ Read my order", { action: "Paste a PO or email → Read my order", expected: "Claude's matches appear; nothing ordered until 'Request quote for these items'" }, async () => {
-        const po = `Hi, please send\n${ctx.skus.split("\n").map((l) => { const [s, q] = l.split(","); return `${(q || "1").trim()}x ${s.trim()}`; }).join("\n")}\nThanks`;
+        const lines = ctx.skus.split("\n").map((l) => { const [s, q] = l.split(","); return `${(q || "1").trim()}x ${s.trim()}`; });
+        // Locally the mock Claude answers a "made-up" line with an invented id: the server must drop it.
+        if (ctx.localStack) lines.push("3x made-up widget");
+        const po = `Hi, please send\n${lines.join("\n")}\nThanks`;
         if (!/\/portal\/quick-order/.test(p.url())) await p.goto(`${base}/portal/quick-order`, { waitUntil: "networkidle" });
         const problem = await portalProblem(p);
         if (problem) return { status: "BLOCKED", actual: `the order pad says: "${problem}"` };
         const ta = (await p.getByPlaceholder(/please send/i).count()) ? p.getByPlaceholder(/please send/i).first() : p.locator("textarea").last();
         await ta.fill(po);
+        const start = new Date().toISOString();
         await p.getByRole("button", { name: "Read my order" }).click();
         await p.getByRole("button", { name: /Request quote for these items/ }).waitFor({ timeout: 60000 });
-        return { actual: "Claude matched the lines; nothing ordered", evidence: await rec.shot(p, "order-pad-ai") };
+        await sleep(1000);
+        ctx.b6 = { start, end: new Date().toISOString() };
+        const ev = await rec.shot(p, "order-pad-ai");
+        if (ctx.localStack) {
+          const review = await textOf(p);
+          const matched = (review.match(/sku-untracked-1|sku-managed-1|Untracked Sample|Managed Sample/gi) || []).length;
+          if (!/made-up widget/i.test(review)) throw new Error("the invented line is not shown as unmatched");
+          if (/MADE-UP|ProductVariant\/999999/.test(review)) throw new Error("the invented id is offered as a match");
+          return { actual: `matches shown (${matched} mentions); the made-up line is listed as not matched; nothing ordered`, evidence: ev };
+        }
+        return { actual: "Claude matched the lines; nothing ordered", evidence: ev };
       }, fail("b6-fail"));
     } else rec.skip("B6", "Order pad: ✦ Read my order", { action: "—", expected: "—" }, "--no-ai");
 
@@ -158,10 +173,12 @@ export async function buyer(rec, ctx) {
       await send.or(p.getByText(/We couldn[’']t /)).first().waitFor({ timeout: 20000 });
       const problem = await portalProblem(p);
       if (problem && !(await send.count())) return { status: "BLOCKED", actual: `the reorder page says: "${problem}"`, evidence: await rec.shot(p, "reorder-blocked") };
+      const startedAt = new Date().toISOString();
       await send.click();
       await p.waitForURL(/\/portal\/quotes\//, { timeout: 30000 });
       const t = await textOf(p);
       const outcome = /Ordered/.test(t) ? "Ordered (draft order created)" : /approv/i.test(t) ? "awaiting the merchant's approval" : "a new quote";
+      ctx.b10 = { startedAt, outcome, ordered: /Ordered/.test(t) };
       rec.created.push(`Reorder from the buyer portal: ${outcome}`);
       return { actual: outcome, evidence: await rec.shot(p, "portal-reorder") };
     }, fail("b10-fail"));
@@ -213,9 +230,11 @@ export async function demo(rec, ctx) {
         await send.or(p.getByText(/We couldn[’']t /)).first().waitFor({ timeout: 20000 });
         const problem = await portalProblem(p);
         if (problem && !(await send.count())) return { status: "BLOCKED", actual: `the reorder page says: "${problem}"` };
+        const startedAt = new Date().toISOString();
         await send.click();
         await p.waitForURL(/\/portal\/quotes\//, { timeout: 30000 });
         const t = await textOf(p);
+        ctx.d5 = { startedAt, outcome: /Ordered/.test(t) ? "Ordered" : "awaiting approval or a new quote", ordered: /Ordered/.test(t) };
         rec.created.push("Demo reorder on the demo store");
         return { actual: /Ordered/.test(t) ? "Ordered" : /approv/i.test(t) ? "awaiting approval" : "new quote", evidence: await rec.shot(p, "demo-reorder") };
       }, () => rec.shot(p, "d5-fail"));
