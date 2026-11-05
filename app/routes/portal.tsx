@@ -117,7 +117,7 @@ export default function PortalLayout() {
         <header className="portal-header">
           <Link to="/portal" className="portal-logo" aria-label="Mannon wholesale portal">
             <span className="mark" aria-hidden="true">M</span>
-            <span>mannon</span>
+            <span>Mannon</span>
           </Link>
           <span className="portal-header-tag">{t(locale, "portal_title")}</span>
         </header>

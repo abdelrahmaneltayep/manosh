@@ -43,7 +43,7 @@ export function LandingHeader({ cta }: { cta?: { to: string; label: string } }) 
       <div className="l-wrap">
         <Link to="/" className="l-brand" aria-label="Mannon home">
           <img src="/landing/logo.png" alt="" width={34} height={34} />
-          mannon
+          Mannon
         </Link>
         <nav className="l-menu" aria-label="Main">
           <Link to="/demo/store">Demo store</Link>
@@ -66,7 +66,7 @@ export function LandingFooter() {
         <div>
           <Link to="/" className="l-brand" aria-label="Mannon home">
             <img src="/landing/logo.png" alt="" width={34} height={34} />
-            mannon
+            Mannon
           </Link>
           <p className="l-muted" style={{ marginTop: 10 }}>B2B quoting and reorders for Shopify merchants.</p>
           <p className="l-muted">Built on Shopify’s native B2B — every price comes from Shopify.</p>

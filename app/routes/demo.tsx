@@ -31,7 +31,7 @@ export default function DemoLayout() {
       <header className="demo-head">
         <Link to="/" className="demo-logo" aria-label="Mannon home">
           <span className="demo-mark" aria-hidden="true">M</span>
-          <span>mannon</span>
+          <span>Mannon</span>
         </Link>
         <nav className="demo-head-links" aria-label="Demo">
           <Link to="/demo">Demo</Link>
