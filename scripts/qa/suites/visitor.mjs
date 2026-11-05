@@ -130,10 +130,18 @@ export async function visitor(rec, ctx) {
   pp.on("console", (m) => { if (m.type() === "error") perr.push(m.text()); });
   for (const path of ["/", "/pricing", "/demo/store", "/demo", "/demo/tour", "/privacy"]) {
     await rec.tc("V11", `Phone width ${path}`, { action: `open ${L}${path} at 390 px; scroll to the end`, expected: "no sideways scroll, no console errors, no broken images, every image has alt text" }, async () => {
-      perr.length = 0;
-      await pp.goto(L + path, { waitUntil: "networkidle" });
-      await pp.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 700) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 50)); } window.scrollTo(0, 0); });
-      await pp.waitForTimeout(500);
+      // A dropped connection (Chrome's net::ERR_HTTP2_PING_FAILED, ERR_NETWORK_CHANGED, …)
+      // is the tester's network, not the page: look once more before judging.
+      const NET_BLIP = /net::ERR_(HTTP2_PING_FAILED|NETWORK_CHANGED|INTERNET_DISCONNECTED|CONNECTION_RESET|CONNECTION_CLOSED|TIMED_OUT|NETWORK_IO_SUSPENDED|HTTP2_PROTOCOL_ERROR)/;
+      let note = "";
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        perr.length = 0;
+        await pp.goto(L + path, { waitUntil: "networkidle" });
+        await pp.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 700) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 50)); } window.scrollTo(0, 0); });
+        await pp.waitForTimeout(500);
+        if (attempt === 1 && perr.length && perr.every((e) => NET_BLIP.test(e))) { note = ` (first load hit a network blip: ${perr[0].match(NET_BLIP)[0]}; retried)`; continue; }
+        break;
+      }
       const m = await pp.evaluate(() => ({
         over: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
         broken: [...document.images].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.getAttribute("src")),
@@ -147,7 +155,7 @@ export async function visitor(rec, ctx) {
       if (perr.length) problems.push(`console: ${perr[0].slice(0, 100)}`);
       if (!m.lang) problems.push("<html> has no lang");
       if (problems.length) throw new Error(problems.join("; "));
-      return { actual: "fits, no errors, images ok", evidence: path === "/" ? await rec.shot(pp, "home-phone") : null };
+      return { actual: `fits, no errors, images ok${note}`, evidence: path === "/" ? await rec.shot(pp, "home-phone") : null };
     }, () => rec.shot(pp, `phone-${path}`));
   }
   if (errors.length) rec.add({ id: "V12", name: "No console errors on the desktop walk", action: "listen for page errors", expected: "none", status: "FAIL", actual: errors.slice(0, 3).join(" | ") });
