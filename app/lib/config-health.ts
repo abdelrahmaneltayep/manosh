@@ -84,7 +84,7 @@ export const FEATURE_FLAGS: Array<{ flag: string; feature: string }> = [
   { flag: "MANNON_FF_I18N", feature: "F16 Multi-currency & language" },
   { flag: "MANNON_FF_QUOTE_WIDGET", feature: "F17 Storefront quote widget" },
   { flag: "MANNON_FF_BUYER_PWA", feature: "F18 Buyer PWA & one-tap reorder" },
-  { flag: "MANNON_FF_CATALOG_SHARE", feature: "F19 Catalog sharing & discovery" },
+  { flag: "MANNON_FF_CATALOG_SHARE", feature: "F19 Catalog sharing" },
   { flag: "MANNON_FF_WHITE_LABEL", feature: "F20 White-label / agency" },
 ];
 

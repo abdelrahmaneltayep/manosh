@@ -126,8 +126,8 @@ it orchestrates what Shopify already owns.
   Growth adds opt-in push "time to reorder?" reminders and multi-bundle
   shortcuts. Works offline-friendly and never breaks on older browsers.
 - **Publish a shareable wholesale catalog & capture new buyers (Growth).** Turn
-  any custom catalog into a branded public page — link it or list it in Mannon's
-  discovery index — so new buyers browse and request access. Prices stay hidden
+  any custom catalog into a branded public page and share its link, so new buyers
+  browse and request access. Prices stay hidden
   until you approve them, hidden SKUs never leak, and approving a request
   provisions the buyer and unlocks their prices automatically.
 - **Agency mode — manage & white-label multiple stores (Growth).** Run wholesale
@@ -193,7 +193,7 @@ migrate — install, invite a buyer, and send your first quote.
 - Multi-currency & Arabic/RTL buyer portal — FX locked per quote (1 extra currency + EN/AR on Starter)
 - “Request a Quote” storefront button (theme app block, no code) — one-click convert to a quote
 - Installable buyer app (PWA): add to home screen + one-tap mobile reorder (push reminders + saved bundles on Growth)
-- Shareable wholesale catalog + B2B discovery index — capture new buyers, prices protected until approval (Growth)
+- Shareable wholesale catalog — capture new buyers, prices protected until approval (Growth)
 - Agency mode: manage & white-label multiple stores from one org dashboard, per-store data isolation (Growth add-on)
 - Volume-break pricing + CSV import/export for price lists (Growth plan)
 - Bulk order pad: SKU search, paste, saved lists, live subtotal (3 lists on Starter)
@@ -238,9 +238,8 @@ the **AI Quote Assistant** (AI counter-offers).
   Strict per-store data isolation; the Shopify admin always stays Mannon; each
   managed store keeps its own Growth subscription (management-only, never a billing
   bypass).
-- **Shareable wholesale catalog & B2B discovery (Growth):** publish a custom
-  catalog as a branded public page — share the link or list it in Mannon's
-  discovery index — so new buyers find you and request access. Prices stay hidden
+- **Shareable wholesale catalog (Growth):** publish a custom catalog as a branded
+  public page and share the link, so new buyers find you and request access. Prices stay hidden
   until you approve, hidden SKUs never leak, and approving a request provisions the
   buyer and unlocks their prices automatically.
 - **Installable buyer app + one-tap reorder:** repeat buyers add your wholesale

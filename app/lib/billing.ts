@@ -333,7 +333,7 @@ export function catalogSharingAllowed(plan: string | null | undefined): boolean 
 
 /** Merchant-facing copy when catalog sharing is hit on Starter. */
 export const CATALOG_SHARE_UPGRADE_MESSAGE =
-  "Publish a shareable wholesale catalog — upgrade to Growth to get discovered by new buyers.";
+  "Publish a shareable wholesale catalog — upgrade to Growth to share it with new buyers.";
 
 // --- F17 storefront quote-widget gating --------------------------------------
 

@@ -33,8 +33,7 @@ import {
   deletePublicCatalog,
   approveLead,
   declineLead,
-  NotAllowedError,
-} from "../services/public-catalog.server";
+  NotAllowedError, DISCOVERY_ENABLED } from "../services/public-catalog.server";
 import { formatDate } from "../lib/format";
 import prisma from "../db.server";
 import {
@@ -76,6 +75,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     catalogs: catalogs.map((c) => ({ id: c.id, name: c.name, itemCount: c.itemCount })),
     leads,
     access,
+    discoveryEnabled: DISCOVERY_ENABLED(),
   };
 };
 
@@ -159,6 +159,8 @@ const VIS_OPTIONS = [
   { label: "Link only (unlisted)", value: "LINK" },
   { label: "Listed in the Mannon discovery index", value: "LISTED" },
 ];
+/** "Listed" is offered only while the discovery directory is on (MANNON_FF_DISCOVERY). */
+const visOptions = (discovery: boolean) => (discovery ? VIS_OPTIONS : VIS_OPTIONS.filter((o) => o.value !== "LISTED"));
 
 export default function CatalogSharing() {
   const data = useLoaderData<typeof loader>();
@@ -283,7 +285,7 @@ export default function CatalogSharing() {
             ) : (
               <BlockStack gap="400">
                 {data.publicCatalogs.map((pc) => (
-                  <PublicCatalogCard key={pc.id} pc={pc} publicUrl={`${data.appUrl}/catalog/${data.shop}/${pc.slug}`} busy={busy} />
+                  <PublicCatalogCard key={pc.id} pc={pc} publicUrl={`${data.appUrl}/catalog/${data.shop}/${pc.slug}`} busy={busy} discovery={data.discoveryEnabled} />
                 ))}
               </BlockStack>
             )}
@@ -337,9 +339,9 @@ export default function CatalogSharing() {
 
 type PublicCatalogItem = Awaited<ReturnType<typeof loader>>["publicCatalogs"][number];
 
-function PublicCatalogCard({ pc, publicUrl, busy }: { pc: PublicCatalogItem; publicUrl: string; busy: boolean }) {
+function PublicCatalogCard({ pc, publicUrl, busy, discovery }: { pc: PublicCatalogItem; publicUrl: string; busy: boolean; discovery: boolean }) {
   const [showPrices, setShowPrices] = useState(pc.showPrices);
-  const [visibility, setVisibility] = useState(pc.visibility);
+  const [visibility, setVisibility] = useState(!discovery && pc.visibility === "LISTED" ? "LINK" : pc.visibility);
   return (
     <Box padding="300" borderColor="border" borderWidth="025" borderRadius="200">
       <BlockStack gap="200">
@@ -366,7 +368,7 @@ function PublicCatalogCard({ pc, publicUrl, busy }: { pc: PublicCatalogItem; pub
               <Select label="Prices" name="showPrices" options={PRICE_OPTIONS} value={showPrices} onChange={(v) => setShowPrices(v as typeof showPrices)} />
             </Box>
             <Box minWidth="16rem">
-              <Select label="Visibility" name="visibility" options={VIS_OPTIONS} value={visibility} onChange={(v) => setVisibility(v as typeof visibility)} />
+              <Select label="Visibility" name="visibility" options={visOptions(discovery)} value={visibility} onChange={(v) => setVisibility(v as typeof visibility)} />
             </Box>
             <Button submit disabled={busy}>Save</Button>
           </InlineStack>

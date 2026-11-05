@@ -70,3 +70,13 @@ The container can't reach a store, so after merge:
    no prices and no hidden SKUs → request access → the lead appears → **Approve** →
    the buyer gets a link and, in the portal, sees real prices → **Unlist** → the
    public page 404s.
+
+## Discovery directory switch
+
+The cross-store directory (`/discover` and the "Listed in the Mannon discovery
+index" visibility) is off unless `MANNON_FF_DISCOVERY=true`, and it stays off
+for the App Store review (requirement 1.1.6: marketplace-like features belong in
+a sales channel). While off, `/discover` is a 404, the "Listed" option is hidden,
+saving "Listed" stores link-only, and catalogs already marked "Listed" work as
+link-only. Each merchant's own share link (`/catalog/{shop}/{slug}`) and access
+requests are unaffected.

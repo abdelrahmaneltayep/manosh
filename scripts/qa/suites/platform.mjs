@@ -109,6 +109,7 @@ export async function contract(rec, ctx) {
   await page("C5b", "Merchant tour", "/demo/tour", { must: /tour-step/ });
   await page("C5c", "Privacy policy", "/privacy", { must: /Privacy Policy/ });
   await page("C6", "Unknown URL is a friendly 404", "/qa-no-such-page", { status: /^404$/, must: /Page not found|page you/i, mustNot: /TypeError|ReferenceError/ });
+  await page("C16", "Discovery directory is off for the App Store review (1.1.6)", "/discover", { status: /^404$/, mustNot: /Discover wholesale/ });
   for (const [id, path, type] of [["C7a", "/favicon.ico", /icon/], ["C7b", "/favicon-32.png", /png/], ["C7c", "/apple-touch-icon.png", /png/]]) {
     await rec.tc(id, `Icon ${path}`, { action: `GET ${L}${path}`, expected: "200 with an image type" }, async () => {
       const { r } = await timed(L + path);

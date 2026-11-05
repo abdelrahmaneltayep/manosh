@@ -950,7 +950,7 @@ export default function Settings() {
               </InlineStack>
               <InlineStack gap="200" blockAlign="center" wrap>
                 <Text as="span" variant="bodySm" fontWeight="semibold">
-                  Shareable catalog &amp; B2B discovery
+                  Shareable wholesale catalog
                 </Text>
                 <Badge tone="info">Growth</Badge>
                 {data.plan !== GROWTH_PLAN && (

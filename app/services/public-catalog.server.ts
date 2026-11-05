@@ -35,6 +35,19 @@ import {
 
 export const CATALOG_SHARE_ENABLED = () => process.env.MANNON_FF_CATALOG_SHARE === "true";
 
+/**
+ * The cross-store discovery directory (/discover and "Listed" visibility) has
+ * its own switch, off unless MANNON_FF_DISCOVERY=true. Kept off for the App
+ * Store review (requirement 1.1.6, marketplaces): each merchant's own share
+ * link works either way. While off, "Listed" catalogs behave as link-only.
+ */
+export const DISCOVERY_ENABLED = () => CATALOG_SHARE_ENABLED() && process.env.MANNON_FF_DISCOVERY === "true";
+
+/** The visibility to store: "LISTED" only while the directory is on. Pure apart from the flag. */
+export function allowedVisibility(v: "LINK" | "LISTED" | undefined): "LINK" | "LISTED" | undefined {
+  return v === "LISTED" && !DISCOVERY_ENABLED() ? "LINK" : v;
+}
+
 export class NotFoundError extends Error {}
 export class NotAllowedError extends Error {}
 
@@ -128,7 +141,7 @@ export async function updatePublicCatalog(
     where: { id },
     data: {
       title: input.title?.trim() || undefined,
-      visibility: input.visibility,
+      visibility: allowedVisibility(input.visibility),
       showPrices: input.showPrices,
     },
   });
@@ -238,6 +251,7 @@ export async function getPublicCatalogView(shopDomain: string, slug: string): Pr
 
 /** The opt-in in-app discovery index: listed + live public catalogs across shops. */
 export async function listDiscovery(limit = 60): Promise<Array<{ shopDomain: string; slug: string; title: string; productHint: number }>> {
+  if (!DISCOVERY_ENABLED()) return [];
   const rows = await prisma.publicCatalog.findMany({
     where: { visibility: "LISTED", status: "LIVE" },
     orderBy: { updatedAt: "desc" },

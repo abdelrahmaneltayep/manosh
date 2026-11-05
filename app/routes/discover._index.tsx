@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { Link, useLoaderData } from "@remix-run/react";
-import { CATALOG_SHARE_ENABLED, listDiscovery } from "../services/public-catalog.server";
+import { DISCOVERY_ENABLED, listDiscovery } from "../services/public-catalog.server";
 
 /**
  * F19 — the opt-in Mannon discovery index (/discover): a simple public directory
@@ -14,7 +14,8 @@ export const meta: MetaFunction = () => [
 ];
 
 export const loader = async (_args: LoaderFunctionArgs) => {
-  if (!CATALOG_SHARE_ENABLED()) throw new Response("Not found", { status: 404 });
+  // Off unless MANNON_FF_DISCOVERY=true (kept off for the App Store review).
+  if (!DISCOVERY_ENABLED()) throw new Response("Not found", { status: 404 });
   const catalogs = await listDiscovery();
   return { catalogs };
 };

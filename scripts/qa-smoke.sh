@@ -91,6 +91,7 @@ tc "Landing: ?shop= hands off to the embedded app (install path)" "30[1278]" "lo
 tc "Embedded /app with a shop: OAuth redirect or App Bridge bounce (410), never 5xx" "30[1278]|40[01]|410" "" "" -- -i "$BASE/app?shop=example.myshopify.com"
 tc "Embedded /app without a shop fails closed (no 5xx)" "30[1278]|40[01]|410" "" "" -- -i "$BASE/app"
 tc "/auth/login explains how to open Mannon, no shop-domain field (2.3.1)" "200" "Open Mannon from Shopify" "name=\"shop\"" -- "$BASE/auth/login"
+tc "/discover directory is off for the App Store review (1.1.6)" "404" "" "Discover wholesale" -- "$BASE/discover"
 tc "Privacy policy served" "200" "Privacy Policy" "" -- "$BASE/privacy"
 tc "Health probe: value-free config signal" "200|503" "\"configOk\"" "SHOPIFY_|DATABASE_URL" -- "$BASE/healthz"
 tc "Unknown route → friendly 404 page, not a stack trace" "404" "Page not found|page you" "TypeError|ReferenceError|Something went wrong" -- "$BASE/this-route-does-not-exist"
