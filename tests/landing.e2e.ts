@@ -26,7 +26,7 @@ describe("home page", { tags: ["smoke", "public"] }, () => {
     // nobody is asked to type a shop domain (App Store requirement 2.3.1).
     await expect(screen.getByRole("link", "Install from the Shopify App Store")).toHaveAttribute("href", "https://apps.shopify.com/mannon");
     await expect(screen.getByLabel("Shop domain")).toHaveCount(0);
-    await expect(screen.getByText(/myshopify\.com/)).toHaveCount(0);
+    await expect(screen.getByRole("textbox")).toHaveCount(0);
   });
 
   test("/auth/login explains how to open Mannon and asks for no shop domain", async ({ app, screen }) => {

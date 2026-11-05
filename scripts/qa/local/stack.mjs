@@ -49,6 +49,17 @@ export function appBridgeStub(token) {
   });
   const shopify = noop("shopify");
   window.shopify = new Proxy(shopify, { get: (t, k) => (k === "idToken" ? async () => ${JSON.stringify(token)} : k === "config" ? { shop: ${JSON.stringify(LOCAL_SHOP)}, apiKey: "e2e-key" } : t[k]) });
+  // App Bridge's web components (save bar, modal, title bar, nav menu): the real
+  // script defines them with show()/hide()/toggle(); here they are quiet no-ops.
+  for (const tag of ["ui-save-bar", "ui-modal", "ui-title-bar", "ui-nav-menu"]) {
+    if (customElements.get(tag)) continue;
+    customElements.define(tag, class extends HTMLElement {
+      show() { calls.push({ path: tag + ".show", args: "" }); return Promise.resolve(); }
+      hide() { calls.push({ path: tag + ".hide", args: "" }); return Promise.resolve(); }
+      toggle() { return Promise.resolve(); }
+      get showing() { return false; }
+    });
+  }
   const open = window.open;
   window.open = (url, target) => { calls.push({ path: "window.open", args: JSON.stringify([url, target]) }); return target === "_top" ? null : open.call(window, url, target); };
 })();`;

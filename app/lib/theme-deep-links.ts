@@ -39,7 +39,7 @@ export function themeEditorUrl(shopDomain: string, apiKey: string | undefined, h
   const shop = (shopDomain || "").trim().toLowerCase();
   const key = (apiKey || "").trim();
   const block = STOREFRONT_BLOCKS[handle];
-  if (!SHOP_RE.test(shop) || !/^[A-Za-z0-9]+$/.test(key) || !block) return null;
+  if (!SHOP_RE.test(shop) || !/^[A-Za-z0-9_-]+$/.test(key) || !block) return null;
   return `https://${shop}/admin/themes/current/editor?template=${block.template}&addAppBlockId=${key}/${block.handle}&target=${block.target}`;
 }
 

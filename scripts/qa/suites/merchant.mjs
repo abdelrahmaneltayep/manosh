@@ -14,6 +14,7 @@ const PAGES = [
   ["/app/order-rules", "Order rules"], ["/app/buyers", "Buyers"], ["/app/reps", "Reps"], ["/app/credit", "Credit"],
   ["/app/analytics", "Analytics"], ["/app/settings", "General settings"], ["/app/payments", "Payments"], ["/app/tax", "Tax & VAT"],
   ["/app/erp", "ERP sync"], ["/app/accounting", "Accounting"], ["/app/agency", "Agency"], ["/app/plans", "Pricing plans"],
+  ["/app/offers/widget", "Offers → widget"], ["/app/offers/rules", "Offers → rules"],
 ];
 
 /** The smallest element that contains `text` and the named button. */
@@ -278,7 +279,7 @@ export async function merchant(rec, ctx) {
         for (const b of blocks) {
           const h = hrefs.find((x) => x && x.includes(`/${b}&`));
           if (!h) throw new Error(`${path}: no 'Add to theme' link for ${b} (${hrefs.length} links)`);
-          if (!/^https:\/\/[a-z0-9-]+\.myshopify\.com\/admin\/themes\/current\/editor\?template=(product|cart)&addAppBlockId=[A-Za-z0-9]+\/[a-z_]+&target=(mainSection|newAppsSection)$/.test(h)) throw new Error(`${b}: unexpected link ${h}`);
+          if (!/^https:\/\/[a-z0-9-]+\.myshopify\.com\/admin\/themes\/current\/editor\?template=(product|cart)&addAppBlockId=[A-Za-z0-9_-]+\/[a-z_]+&target=(mainSection|newAppsSection)$/.test(h)) throw new Error(`${b}: unexpected link ${h}`);
           found.push(h);
         }
       }
