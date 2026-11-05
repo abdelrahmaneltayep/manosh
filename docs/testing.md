@@ -167,3 +167,19 @@ sends a minute per store and IP, so the script waits 1.6 s per form and sends
 four. Dry-run against a local stand-in store (the real block markup and assets,
 a password page and a cart) with all flags on: 13 pass, and the three quote
 requests and the offer were in the database.
+
+### Adding the missing blocks to the live theme (`npm run theme:add-blocks`)
+
+When the storefront test skips Price / ATC gate or Convert Cart to Quote
+because the blocks are not on the theme, this command adds them with the
+Shopify CLI from your machine: it pulls `templates/product.json`,
+`templates/cart.json` and the section files from the live theme into
+`qa-storefront/theme-<stamp>/`, keeps a backup, adds the price gate next to the
+Mannon blocks already on the product template (copying their app reference),
+adds Convert Cart to Quote to the cart section whose schema accepts app blocks
+(or an Apps section), and pushes only those two files with `--nodelete`. The
+CLI asks before it writes to the live theme, and the script prints the command
+that pushes the backup back. `--dry-run` edits locally and pushes nothing.
+The template edits are covered by `scripts/storefront/theme-blocks.test.mjs`
+(Dawn and Horizon shaped templates).
+

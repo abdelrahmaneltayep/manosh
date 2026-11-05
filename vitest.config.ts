@@ -12,7 +12,7 @@ export default defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     environment: "node",
-    include: ["app/**/*.test.{ts,tsx}", "prisma/**/*.test.{ts,tsx}"],
+    include: ["app/**/*.test.{ts,tsx}", "prisma/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
     fileParallelism: false,
   },
 });
