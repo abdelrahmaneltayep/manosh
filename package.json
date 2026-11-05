@@ -33,7 +33,8 @@
     "test:storefront": "node scripts/storefront/storefront-test.mjs",
     "theme:add-blocks": "node scripts/storefront/add-theme-blocks.mjs",
     "qa:all": "node scripts/qa/qa-all.mjs",
-    "qa:local": "node scripts/qa/qa-all.mjs --local"
+    "qa:local": "node scripts/qa/qa-all.mjs --local",
+    "listing:shots": "node scripts/listing/capture-shots.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",

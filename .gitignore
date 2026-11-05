@@ -35,3 +35,4 @@ docs/video/menna/raw/*.json
 # storefront test runs (screenshots + report)
 qa-storefront/
 qa-runs/
+listing-shots/
