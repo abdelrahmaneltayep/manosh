@@ -29,7 +29,8 @@
     "video": "bash scripts/video/menna-video.sh all",
     "video:download": "bash scripts/video/menna-video.sh download",
     "video:record": "bash scripts/video/menna-video.sh record",
-    "video:assemble": "bash scripts/video/menna-video.sh assemble"
+    "video:assemble": "bash scripts/video/menna-video.sh assemble",
+    "test:storefront": "node scripts/storefront/storefront-test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.112.3",

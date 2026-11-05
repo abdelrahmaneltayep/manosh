@@ -31,3 +31,6 @@ docs/video/menna/cut/
 docs/video/menna/*.mp4
 docs/video/menna/vo/*.wav
 docs/video/menna/raw/*.json
+
+# storefront test runs (screenshots + report)
+qa-storefront/

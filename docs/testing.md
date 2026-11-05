@@ -132,3 +132,38 @@ starts a Postgres service, applies the migrations, and runs `npm run test:e2e`
 with the Shopify variables set to placeholders. Upload `.e2e/report.json` and
 `.e2e/artifacts` when the job is not cancelled. The live suite stays manual: it
 spends demo sessions and model calls.
+
+## Storefront test from your machine (`npm run test:storefront`)
+
+`scripts/storefront/storefront-test.mjs` drives the live storefront the way a
+shopper does, then (with `--admin`) checks the merchant admin. Run it on a
+machine that can reach the store; it is not part of CI.
+
+```
+npm run test:storefront
+npm run test:storefront -- --admin
+npm run test:storefront -- --admin --headed
+```
+
+Shopper side, in a fresh browser: opens the store (asks for the Online Store
+password if there is one, or reads `MANNON_STOREFRONT_PASSWORD`), finds a
+product page with Mannon's blocks (or `MANNON_PRODUCT_URL`), checks each block
+is present and visible, sends Request a Quote, Add to Quote, Make an Offer (80%
+of list) and Convert Cart to Quote from `/cart`, and reports what the price gate
+shows a guest. A hidden block's line quotes what the app answered, so a
+switched-off toggle or server flag reads differently from a broken block.
+
+Admin side (`--admin`): attaches to Chrome on port 9222 with the
+`~/mannon-chrome` profile (the screencast recorder's; it starts it if needed and
+waits for you to sign in) and looks for the run tag in Mannon → Quotes →
+Requests and Mannon → Offers.
+
+Every submission is tagged `qa+sf<run>@example.com` / "QA Storefront sf<run>";
+decline them afterwards. The report and screenshots land in
+`qa-storefront/<run>/` (git-ignored). Exit code is 1 if any step failed.
+
+The anti-bot timer drops forms sent under 1.2 s and the rate limit is five
+sends a minute per store and IP, so the script waits 1.6 s per form and sends
+four. Dry-run against a local stand-in store (the real block markup and assets,
+a password page and a cart) with all flags on: 13 pass, and the three quote
+requests and the offer were in the database.
