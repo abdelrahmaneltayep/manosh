@@ -38,6 +38,10 @@ async function acceptCountered(rec, p, idPrefix, ctx) {
     while (Date.now() - t0 < 45000) {
       if (await p.locator(".status-ordered").count()) break;
       const alert = ((await p.locator("[role=alert]").allInnerTexts().catch(() => [])) || []).join(" ").trim();
+      if (alert && /finished setting up your company account in Shopify/.test(alert)) {
+        // The buyer isn't a company contact in Shopify: a store precondition, and the designed message.
+        return { status: "BLOCKED", actual: `the portal says: "${alert.slice(0, 200)}" — the buyer isn't a company contact in Shopify (set MANNON_QA_EMAIL to a contact's email)`, evidence: await rec.shot(p, `${idPrefix}-not-a-contact`) };
+      }
       if (alert) throw new Error(`the portal says: "${alert.slice(0, 200)}"`);
       await sleep(800);
     }

@@ -102,7 +102,7 @@ async function liveChecks(rec, ctx) {
       const t = await admin(page, ctx, "/draft_orders");
       if (/There['’]s no page at this address/i.test(t)) throw new Error("no Draft orders page (read_draft_orders?)");
       const recent = (t.match(/Just now|\d+ minutes? ago|Today at/gi) || []).length;
-      const expected = [ctx.b4, ctx.b10?.ordered].filter(Boolean).length;
+      const expected = [ctx.b4, ctx.b10?.ordered, ctx.d4, ctx.d5?.ordered].filter(Boolean).length;
       const status = expected === 0 ? "INFO" : recent >= 1 ? "PASS" : "FAIL";
       return { status, actual: `${recent} draft(s) created today${expected ? ` (this run created ${expected})` : ""}`, evidence: await rec.shot(page, "shopify-draft-orders") };
     }, fail);
@@ -113,10 +113,14 @@ async function liveChecks(rec, ctx) {
       return { actual: /No companies|Add a company/i.test(t) && !/Acme|QA/.test(t) ? "no companies yet" : "companies listed", evidence: await rec.shot(page, "shopify-companies") };
     }, fail);
 
-    await rec.tc("A5", "Customers: this run's storefront email", { action: `Customers → search ${ctx.email || "(no email)"}`, expected: "INFO: whether Shopify has a customer for the storefront shopper" }, async () => {
+    await rec.tc("A5", "Customers: is this run's shopper a Shopify customer?", { action: `Customers → search ${ctx.email || "(no email)"}`, expected: "INFO: a customer (and, for M3–B4, a company contact) or none" }, async () => {
       if (!ctx.email) return { status: "SKIP", actual: "the storefront step sent no request" };
       const t = await admin(page, ctx, `/customers?query=${encodeURIComponent(ctx.email)}`);
-      return { status: "INFO", actual: t.includes(ctx.email) ? "a customer exists for the email" : "no customer for the email (requests do not create customers)" };
+      // The search box and "No customers found matching …" both echo the email,
+      // so count result links instead of looking for the text.
+      const rows = await page.locator('a[href*="/customers/"]').filter({ hasNotText: /^Customers$/ }).count();
+      const none = /No customers found|couldn[’']t find any customers|No results/i.test(t) || rows === 0;
+      return { status: "INFO", actual: none ? `no customer has ${ctx.email}: add them as a contact at a company (Customers → Companies) or run with MANNON_QA_EMAIL set to a contact's email` : `a customer has ${ctx.email}` };
     }, fail);
 
     await rec.tc("A6", "Billing: the Mannon subscription", { action: "Settings → Billing → Subscriptions", expected: "INFO: Mannon's plan as Shopify bills it (none on Free)" }, async () => {

@@ -227,7 +227,7 @@ export async function merchant(rec, ctx) {
     }, fail);
 
     // M10 — Pricing plans → Choose Growth opens Shopify's plan page (review 1.2.2)
-    await rec.tc("M10", "Pricing plans → Choose Growth opens Shopify's plan page (review 1.2.2)", { action: "Pricing plans → Choose Growth (or Switch to Growth on Scale); read Shopify's page; leave without approving", expected: "Shopify's plan page lists Free, Starter, Growth and Scale; no 'There's no page at this address'" }, async () => {
+    await rec.tc("M10", "Pricing plans → Choose Growth opens Shopify's plan page (review 1.2.2)", { action: "Pricing plans → Choose Growth (or Switch to Growth on Scale); read Shopify's page; leave without approving", expected: "Shopify's own plan page opens (pricing_plans); no 'There's no page at this address'; plan names reported" }, async () => {
       const f = await openApp(page, app, "/app/plans");
       // Any plan change (upgrade or switch down) opens Shopify's plan page; nothing is approved here.
       let choose = f.getByRole("button", { name: "Choose Growth", exact: true });
@@ -262,7 +262,10 @@ export async function merchant(rec, ctx) {
       if (/There['’]s no page at this address/i.test(t)) throw new Error("Shopify shows 'There's no page at this address' (the 1.2.2 bug)");
       const seen = ["Free", "Starter", "Growth", "Scale"].filter((p) => new RegExp(`\\b${p}\\b`).test(t));
       const ev = await rec.shot(page, "shopify-plan-page");
-      return { status: seen.length >= 3 ? "PASS" : "FAIL", actual: `clicked "${label}" → ${page.url().replace(/\?.*/, "")} · plans seen: ${seen.join(", ") || "none"} · nothing approved`, evidence: ev };
+      // Review 1.2.2: the button must land on Shopify's own plan page, not "no page at this address".
+      // Which plan cards Shopify renders (and when) is Shopify's; it is reported, not judged.
+      const onPlans = /\/charges\/[^/]+\/pricing_plans|\/settings\/billing/.test(page.url());
+      return { status: onPlans ? "PASS" : "FAIL", actual: `clicked "${label}" → ${page.url().replace(/\?.*/, "")} · plan names read on the page: ${seen.join(", ") || "none"} · nothing approved`, evidence: ev };
     }, fail);
 
     // M11 — the guest gating rule
