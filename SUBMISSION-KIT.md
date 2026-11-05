@@ -227,32 +227,37 @@ closes on the native-B2B line, the demo, and the resulting draft order. Script i
 
 ---
 
-## Testing instructions for the reviewer  (≤ 2800 characters)
+## Testing instructions for the reviewer  (≤ 2800 characters · 2641/2800)
+
+Matches the flow verified live on 2026-11-05 by `npm run qa:all` (cases M2–M7,
+B1–B4, D1–D5, M10). Nothing is seeded on install, so step 0 asks the reviewer to
+create one B2B company contact; the public demo needs no setup.
 
 ```
-A demo company and buyer are seeded on install, so you can create a quote immediately. Works on any plan, no Plus needed. Native B2B (companies) is on for the test store.
+Quick look with no setup: open https://manosh.fly.dev/demo and click "Open the buyer demo" (steps 9-10). The full flow on your test store takes about 10 minutes.
+
+BEFORE YOU START (test store)
+Customers > Companies: add a company with one location and one contact, using an email you can read. Mannon reads companies, locations and contacts from Shopify; it never asks for a store domain.
 
 STEPS
-1. Install the app on the test store. Open it and click each left-nav section (Home through Pricing plans) — every page loads.
-2. Quotes: open the demo buyer's New quote. The Totals from Shopify card shows subtotal, tax and total priced by Shopify; the app never recomputes.
-3. "✦ Draft all lines with Claude" drafts a counter on screen; "Use this price" only pre-fills. Click Send counter.
-4. Buyers > demo buyer > Magic link. Copy the link; there is no buyer login.
-5. Open it in a private window, pick Net 30, click Accept & create order, then Confirm & create order. Nothing is written before the confirm.
-6. The quote becomes Ordered; Orders > Drafts shows a draft created by Mannon with Shopify's tax, total and Net 30 terms.
-7. Quote forms > AI Order Pad: paste "20x <SKU>, 5x <SKU>" — Claude matches the lines; nothing is ordered until you click Confirm & build cart.
-8. Analytics: view the ✦ Claude insights (win-rate, credit-risk, buyer summary) — advisory, on screen only.
-9. Reorder: one-tap reorder clones a past order into a fresh draft, re-priced by Shopify.
-10. Pricing plans: click Choose plan. Shopify's plan page opens; pick a plan and approve. You return with the plan active.
-11. Storefront: add the "Request a Quote" block (or Add to Quote / Make an Offer) to a product page in the theme editor and save. The button shows at once; submit and the request appears under Quotes > Requests.
-12. Public demo (no login): on https://manosh.fly.dev, under Try before you install, click Open the buyer demo. You're a sample buyer on the demo store with a Countered quote and a reorder card from a real order.
-13. Open that quote, click Accept & create order, then Confirm & create order. It flips to Ordered and a draft order (PO PO-DEMO-1042, tax and total from Shopify) appears under Orders > Drafts on the demo store.
-14. Click Reorder, then Send reorder. Within the Settings tolerance it becomes a draft order; otherwise it waits in the Quote Inbox.
+1. Install from the App Store and open Mannon. Every left-nav page loads.
+2. Quotes > Requests: under "Add quote requests to your storefront", click "Add to theme" for Request a Quote. The theme editor opens with the block placed; click Save.
+3. On the storefront, open a product, click "Request a Quote" and send it with the contact's email. It appears under Quotes > Requests.
+4. Click "Convert to quote". The quote shows "Totals from Shopify" (subtotal, tax and total priced by Shopify). Change a unit price and click "Recalculate with these prices".
+5. Optional: "✦ Draft all lines with Claude" shows a suggestion; "Use this price" only pre-fills. Click "Send counter".
+6. Buyers: click "Generate link" for that buyer. Open the link in a private window and click Continue. There is no password.
+7. Open the Countered quote, choose Payment terms "Net 30", click "Accept & create order", then "Confirm & create order". Nothing is written before the confirm. Orders > Drafts shows the draft for the company, with Net 30 and Shopify's totals.
+8. In the portal, open the order pad, paste a PO under "Paste a PO or email" and click "Read my order". Claude's matches appear; nothing is ordered until you click "Request quote for these items".
+9. Public demo: https://manosh.fly.dev/demo > "Open the buyer demo". You are a sample buyer with a Countered quote; accept it as in step 7.
+10. On the demo portal home, click Reorder, then "Send reorder". It becomes a draft order, or waits for the merchant when it's over the auto-approve tolerance.
+11. Pricing plans: "Choose Growth" opens Shopify's plan page. Approve or decline; you return to the app.
 
 NOTES
-- AI is human-in-the-loop: every output lands on a confirm screen, every returned product id is checked against the live catalog. Claude never writes a quote, cart or order on its own.
-- ✦ Draft with Claude and Claude insights are on Growth and Scale (and a one-time trial). If you don't see the ✦ controls, select the Growth plan.
-- Pricing via Shopify App Pricing: Free $0, Starter $9, Growth $29, Scale $69/month; 14-day trial on paid plans. No per-order charges.
-- GDPR webhooks (customers/data_request, customers/redact, shop/redact) and app/uninstalled are HMAC-verified; bad signatures get 401.
+- ✦ Claude features are on Growth and Scale (and a one-time trial). If the ✦ buttons are missing, choose Growth (step 11) first.
+- Claude never acts on its own: every output lands on a confirm screen, and every product id it returns is checked against the live catalog.
+- Pricing: Shopify App Pricing. Free $0, Starter $9, Growth $29, Scale $69 per month; 14-day trial on paid plans; no per-order fees.
+- GDPR and app/uninstalled webhooks are HMAC-verified; bad signatures get 401.
+- The public demo allows 5 starts per hour per network.
 - Privacy policy: https://manosh.fly.dev/privacy
 ```
 
@@ -285,7 +290,9 @@ NOTES
 
 ## Pre-submission checklist (dashboard side)
 
-- [x] Protected customer data access requested (Level 2, fields: email, name) — saved 2026-11-01,
+- [ ] Protected customer data access: Level 1 + **Email** only (deselect Name; no
+      query reads names, phone or address — see docs/compliance.md). Was saved
+      2026-11-01 with email + name;
       Data protection details answered (see docs/data-protection.md) —
       required before resubmitting. Until Shopify records it, every draft order
       (buyer accept, reorder, merchant convert, offer convert) fails with
@@ -294,7 +301,7 @@ NOTES
       Protected customer data access:
       1. Select **Protected customer data** itself (the Level 1 box), with a reason
          such as "Creating B2B draft orders and reading past orders for reorder".
-      2. Then select **Name** and **Email** (Level 2), each with a reason.
+      2. Then select **Email** (Level 2) with a reason. Leave Name, Phone and Address unselected.
       3. Complete **Data protection details** (the questionnaire) and save — a
          dev-store app gets access only after this step, and only once a
          distribution method is chosen for the app.
@@ -321,6 +328,8 @@ NOTES
 - [ ] Network access approved for the `customer-account-quotes` extension (works on
       the dev store without it; production stores need the approval).
 - [ ] Support email filled in and monitored; privacy URL returns a page after deploy.
+- [ ] Cross-store discovery directory off for the review: `MANNON_FF_DISCOVERY` unset
+      on Fly, `/discover` returns 404 (QA case C16; requirement 1.1.6).
 - [ ] Screenshots replaced with the 9-slide set in the upload order above; icon
       uploaded at 1200×1200.
 - [ ] Languages = admin UI languages only; "Merchant must have online store" selected.
