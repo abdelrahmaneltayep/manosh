@@ -125,13 +125,13 @@ describe.skipIf(!hasDb)("previewQuoteTotals (DB + mocked Admin API)", () => {
     expect(inputs).toHaveLength(0);
   });
 
-  it("explains, in plain language, a buyer not linked to a location and contact", async () => {
+  it("explains, in plain language, what to set up when Shopify has no company contact for the buyer", async () => {
     const { quote } = await setup({ linked: false });
-    const { client, inputs } = admin(calculated);
+    const { client, inputs } = admin({ data: { customers: { nodes: [] } } });
     const r = await previewQuoteTotals({ shopDomain: SHOP, quoteId: quote.id, admin: client, currencyCode: "USD" });
     expect(r).toMatchObject({ ok: false });
-    expect(!r.ok && r.message).toMatch(/company location and contact/);
-    expect(inputs).toHaveLength(0);
+    expect(!r.ok && r.message).toMatch(/Shopify can’t price this quote yet\. .*Customers → Companies/);
+    expect(inputs.filter((i) => i && "input" in i)).toHaveLength(0);
   });
 
   it("turns a Shopify userError into a plain message", async () => {

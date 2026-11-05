@@ -1,5 +1,6 @@
 import type { OfferSource, OfferStatus, OfferRuleScope } from "@prisma/client";
 import prisma from "../db.server";
+import { ensureBuyerCompanyLink } from "./buyer-link.server";
 import { appendEvent } from "./events.server";
 import { getVariantCosts } from "./variant-cost.server";
 import { getShopCapabilities } from "./billing.server";
@@ -312,24 +313,15 @@ export async function convertOffer(
   if (!offer.companyId) {
     return { error: "Link this buyer to a B2B company before turning the offer into an order." };
   }
-  const company = await prisma.company.findFirst({ where: { id: offer.companyId, shopId }, select: { shopifyCompanyId: true } });
   const buyer = await prisma.buyer.findFirst({
     where: { companyId: offer.companyId, email: offer.buyerEmail },
-    select: { shopifyContactId: true, shopifyCompanyLocationId: true },
+    select: { id: true },
   });
-  if (!company || !buyer?.shopifyCompanyLocationId) {
-    return { error: "This buyer isn’t linked to a company location yet, so an order can’t be created." };
-  }
-  // Shopify requires a company contact on a B2B draft order (companyContactId
-  // is ID!), so stop here with a plain message rather than a GraphQL error.
-  if (!buyer.shopifyContactId) {
-    return { error: "This buyer isn’t linked to a contact at their company yet, so an order can’t be created." };
-  }
-  const purchasingEntity: PurchasingEntityRef = {
-    companyId: company.shopifyCompanyId,
-    companyLocationId: buyer.shopifyCompanyLocationId,
-    companyContactId: buyer.shopifyContactId,
-  };
+  if (!buyer) return { error: "This offer’s buyer isn’t in Mannon yet, so an order can’t be created." };
+  // The native purchasing entity, read from Shopify when the buyer isn't linked yet.
+  const linked = await ensureBuyerCompanyLink(admin, buyer.id);
+  if (!linked.ok) return { error: linked.merchantMessage };
+  const purchasingEntity: PurchasingEntityRef = linked.link;
 
   // The final agreed total: the buyer accepted either their own offer or the
   // current counter. Split it into agreed per-unit prices; Shopify totals it.

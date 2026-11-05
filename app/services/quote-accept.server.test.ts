@@ -17,13 +17,31 @@ const totals = (id?: string) => ({
   totalPriceSet: { shopMoney: { amount: "205.20", currencyCode: "USD" } },
 });
 
+/** Shopify's answer to the buyer → company lookup (Customers → Companies). */
+const shopifyContact = {
+  customers: { nodes: [{ id: "gid://shopify/Customer/8", companyContactProfiles: [{
+    id: "gid://shopify/CompanyContact/80",
+    company: { id: "gid://shopify/Company/8", name: "Co" },
+    roleAssignments: { nodes: [{ companyLocation: { id: "gid://shopify/CompanyLocation/80", name: "HQ" } }] },
+  }] }] },
+};
+
 function mockAdmin(options: {
   createUserErrors?: { message: string }[];
-} = {}): AdminGraphqlClient & { calls: string[] } {
+  /** What Shopify returns for the buyer lookup (default: no customer). */
+  lookup?: unknown;
+} = {}): AdminGraphqlClient & { calls: string[]; inputs: unknown[] } {
   const calls: string[] = [];
+  const inputs: unknown[] = [];
   return {
     calls,
-    graphql: async (query) => {
+    inputs,
+    graphql: async (query, opts?: { variables?: Record<string, unknown> }) => {
+      if (query.includes("MannonBuyerCompanyLink")) {
+        calls.push("lookup");
+        return { json: async () => ({ data: options.lookup ?? { customers: { nodes: [] } } }) };
+      }
+      if (opts?.variables?.input) inputs.push(opts.variables.input);
       if (query.includes("draftOrderCalculate")) {
         calls.push("calculate");
         return {
@@ -159,15 +177,16 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     ).rejects.toBeInstanceOf(IllegalQuoteTransitionError);
   });
 
-  it("fails cleanly when the buyer has no company location (no Shopify call, no state change)", async () => {
+  it("fails cleanly when Shopify has no company contact for the buyer (lookup only, no order, no state change)", async () => {
     const { quote } = await counteredQuote({ withLocation: false });
     const admin = mockAdmin();
 
     await expect(
       acceptAndOrder(quote.id, admin, { currencyCode: "USD" }),
-    ).rejects.toBeInstanceOf(DraftOrderError);
+    ).rejects.toThrow(/finished setting up your company account in Shopify/);
 
-    expect(admin.calls).toEqual([]);
+    // One read-only lookup; nothing priced or created.
+    expect(admin.calls).toEqual(["lookup"]);
     const stored = await prisma.quote.findUnique({ where: { id: quote.id } });
     expect(stored!.status).toBe("COUNTERED");
   });
@@ -176,11 +195,26 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     const { quote } = await counteredQuote({ withContact: false });
     const admin = mockAdmin();
 
-    await expect(acceptAndOrder(quote.id, admin, { currencyCode: "USD" })).rejects.toThrow(/contact/);
+    await expect(acceptAndOrder(quote.id, admin, { currencyCode: "USD" })).rejects.toBeInstanceOf(DraftOrderError);
 
-    expect(admin.calls).toEqual([]);
+    expect(admin.calls).toEqual(["lookup"]);
     const stored = await prisma.quote.findUnique({ where: { id: quote.id } });
     expect(stored!.status).toBe("COUNTERED");
+  });
+
+  it("links an unlinked buyer from Shopify (Customers → Companies), then orders with Shopify's ids", async () => {
+    const { quote, buyer } = await counteredQuote({ withLocation: false, withContact: false });
+    const admin = mockAdmin({ lookup: shopifyContact });
+
+    const result = await acceptAndOrder(quote.id, admin, { currencyCode: "USD" });
+
+    expect(admin.calls).toEqual(["lookup", "calculate", "create"]);
+    expect(result.quote.status).toBe("ORDERED");
+    expect((admin.inputs[1] as { purchasingEntity: unknown }).purchasingEntity).toEqual({
+      purchasingCompany: { companyId: "gid://shopify/Company/8", companyLocationId: "gid://shopify/CompanyLocation/80", companyContactId: "gid://shopify/CompanyContact/80" },
+    });
+    const stored = await prisma.buyer.findUniqueOrThrow({ where: { id: buyer.id } });
+    expect(stored.shopifyCompanyLocationId).toBe("gid://shopify/CompanyLocation/80");
   });
 
   it("leaves the quote COUNTERED when Shopify rejects the create", async () => {

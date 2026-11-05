@@ -65,13 +65,14 @@ describe.skipIf(!hasDb)("quote-convert.server (DB)", () => {
     expect(await prisma.event.count({ where: { type: "QUOTE_CONVERTED" } })).toBe(1);
   });
 
-  it("refuses a buyer with no company contact before calling Shopify (companyContactId is ID!)", async () => {
+  it("refuses a buyer Shopify has no company contact for, after one read-only lookup (companyContactId is ID!)", async () => {
     const { quote } = await acceptedQuote();
     await prisma.buyer.update({ where: { id: quote.buyerId }, data: { shopifyContactId: null } });
-    let called = false;
-    const admin = { graphql: async () => { called = true; return { json: async () => ({}) }; } };
-    await expect(convertQuoteToOrder(quote.id, admin as never, { currencyCode: "USD" })).rejects.toThrow(/contact at their company/);
-    expect(called).toBe(false);
+    const queries: string[] = [];
+    const admin = { graphql: async (q: string) => { queries.push(q); return { json: async () => ({ data: { customers: { nodes: [] } } }) }; } };
+    await expect(convertQuoteToOrder(quote.id, admin as never, { currencyCode: "USD" })).rejects.toThrow(/Customers → Companies/);
+    expect(queries).toHaveLength(1);
+    expect(queries[0]).toContain("MannonBuyerCompanyLink");
   });
 
   it("blocks a non-accepted or already-converted quote", async () => {

@@ -212,6 +212,8 @@ Options: `--only=C,V` or `--skip=L,M` choose sections, `--no-ai` skips the
 ✦ Claude cases, `--headed` shows the browsers. Environment: `MANNON_LIVE_URL`
 (default `https://manosh.fly.dev`), `MANNON_STORE`, `MANNON_APP_HANDLE`,
 `MANNON_SKUS` (lines for the order pad), `MANNON_MAGIC_LINK` (run B without M),
+`MANNON_QA_EMAIL` (the shopper's email: use a company contact's, from Customers →
+Companies, so M3–M6 and B3–B4 can price and order the storefront request),
 `MANNON_CDP`, `DATABASE_URL`.
 
 The report lands in `qa-runs/<run>/REPORT.md` with `results.json` and

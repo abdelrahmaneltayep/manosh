@@ -102,10 +102,12 @@ export async function merchant(rec, ctx) {
       await rec.tc("M3", "Quote: Totals from Shopify", { action: "read the Totals from Shopify card", expected: "Subtotal, Tax, Total and 'Calculated by Shopify'" }, async () => {
         await f.getByText("Totals from Shopify").first().waitFor({ timeout: 20000 });
         const t = await textOf(f);
-        const unavailable = t.match(/Totals unavailable\s*(Shopify can[’']t price this quote yet:[^.]*\.)/);
+        const unavailable = t.match(/Totals unavailable\s*(Shopify can[’']t price this quote yet\.[^]*?try again\.)/);
         if (unavailable) {
           ctx.unpriceable = unavailable[1];
-          return { status: "FAIL", actual: `Shopify can't price it: "${unavailable[1]}" — a buyer who arrives from the storefront is never linked to a Shopify company, so no quote of theirs can be priced or ordered (see REPORT notes)`, evidence: await rec.shot(page, "quote-totals") };
+          // The app looked the buyer up in Shopify (Customers → Companies) and
+          // explains what to set up: a precondition of the store, not a defect.
+          return { status: "BLOCKED", actual: `the app says: "${unavailable[1]}" — run with MANNON_QA_EMAIL set to a company contact's email to price and order`, evidence: await rec.shot(page, "quote-totals") };
         }
         for (const w of ["Subtotal", "Total", "Calculated by Shopify"]) if (!t.includes(w)) throw new Error(`missing "${w}"`);
         const email = (t.match(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[a-z]{2,}/) || [null])[0];

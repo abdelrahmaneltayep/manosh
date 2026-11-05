@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "../db.server";
+import { ensureBuyerCompanyLink } from "./buyer-link.server";
 import { appendEvent } from "./events.server";
 import {
   acceptQuote,
@@ -67,19 +68,10 @@ export async function acceptAndOrder(
     throw new IllegalQuoteTransitionError(quote.status, "ACCEPTED");
   }
 
-  const companyLocationId = quote.buyer.shopifyCompanyLocationId;
-  if (!companyLocationId) {
-    throw new DraftOrderError(
-      "This buyer isn’t linked to a company location yet, so an order can’t be created.",
-    );
-  }
-  // Shopify requires a company contact on a B2B draft order (companyContactId is ID!).
-  const companyContactId = quote.buyer.shopifyContactId;
-  if (!companyContactId) {
-    throw new DraftOrderError(
-      "This buyer isn’t linked to a contact at their company yet, so an order can’t be created. Please contact your supplier.",
-    );
-  }
+  // The native purchasing entity, read from Shopify when the buyer isn't
+  // linked yet (Customers → Companies owns it). Nothing is written to Shopify.
+  const linked = await ensureBuyerCompanyLink(admin, quote.buyerId);
+  if (!linked.ok) throw new DraftOrderError(linked.buyerMessage);
 
   // F9 — enforce order rules at conversion too, so a countered quote that no
   // longer meets MOQ/pack/min-value can't slip through. Round line quantities up
@@ -137,11 +129,7 @@ export async function acceptAndOrder(
     paymentTerm: options.paymentTerm ?? null,
     now: options.now,
     taxExempt,
-    purchasingEntity: {
-      companyId: quote.company.shopifyCompanyId,
-      companyLocationId,
-      companyContactId,
-    },
+    purchasingEntity: linked.link,
     lines: quote.lines.map((line) => ({
       variantId: line.variantId,
       quantity: line.quantity,

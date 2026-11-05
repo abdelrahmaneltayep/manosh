@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { ensureBuyerCompanyLink } from "./buyer-link.server";
 import {
   buildDraftOrderInput,
   calculateDraftOrder,
@@ -36,22 +37,16 @@ export async function previewQuoteTotals(params: {
   const snapshot = readSnapshot(quote.totalsSnapshot);
   if (snapshot && !params.edits) return { ok: true, totals: snapshot, source: "snapshot" };
 
-  const companyLocationId = quote.buyer.shopifyCompanyLocationId;
-  const companyContactId = quote.buyer.shopifyContactId;
-  if (!companyLocationId || !companyContactId) {
-    return {
-      ok: false,
-      message:
-        "Shopify can’t price this quote yet: the buyer isn’t linked to a company location and contact. Link them in Customers → Companies.",
-    };
-  }
   if (quote.lines.length === 0) return { ok: false, message: "This quote has no line items." };
+  // The native purchasing entity, read from Shopify when the buyer isn't linked yet.
+  const linked = await ensureBuyerCompanyLink(params.admin, quote.buyerId);
+  if (!linked.ok) return { ok: false, message: `Shopify can’t price this quote yet. ${linked.merchantMessage}` };
 
   const edits = new Map((params.edits ?? []).map((e) => [e.id, e]));
   const input = buildDraftOrderInput({
     currencyCode: params.currencyCode,
     poReference: quote.poReference,
-    purchasingEntity: { companyId: quote.company.shopifyCompanyId, companyLocationId, companyContactId },
+    purchasingEntity: linked.link,
     lines: quote.lines.map((line) => ({
       variantId: line.variantId,
       quantity: edits.get(line.id)?.quantity ?? line.quantity,

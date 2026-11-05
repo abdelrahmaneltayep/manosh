@@ -142,7 +142,7 @@ describe.skipIf(!hasDb)("offers.server (DB)", () => {
     expect(await convertOffer("scale.myshopify.com", offer.id, admin, { currencyCode: "USD" })).toMatchObject({ error: expect.any(String) });
   });
 
-  it("refuses to convert when the buyer has no company contact, without calling Shopify", async () => {
+  it("refuses to convert when Shopify has no company contact for the buyer, after one read-only lookup", async () => {
     const shop = await scaleShop();
     const company = await prisma.company.create({ data: { shopId: shop.id, shopifyCompanyId: "gid://shopify/Company/2", name: "Beta" } });
     await prisma.buyer.create({ data: { companyId: company.id, email: "c@x.com", shopifyContactId: null, shopifyCompanyLocationId: "gid://shopify/CompanyLocation/2" } });
@@ -150,9 +150,9 @@ describe.skipIf(!hasDb)("offers.server (DB)", () => {
       data: { shopId: shop.id, buyerEmail: "c@x.com", companyId: company.id, status: "ACCEPTED", lineItems: [{ variantId: "gid://v/1", quantity: 1, listPrice: 10 }], listPriceTotal: 10, offeredTotal: 9 },
       select: { id: true },
     });
-    let called = false;
-    const admin: AdminGraphqlClient = { graphql: async () => { called = true; return { json: async () => ({}) }; } };
-    expect(await convertOffer("scale.myshopify.com", offer.id, admin, { currencyCode: "USD" })).toMatchObject({ error: expect.stringMatching(/contact at their company/) });
-    expect(called).toBe(false);
+    const queries: string[] = [];
+    const admin: AdminGraphqlClient = { graphql: async (q: string) => { queries.push(q); return { json: async () => ({ data: { customers: { nodes: [] } } }) }; } };
+    expect(await convertOffer("scale.myshopify.com", offer.id, admin, { currencyCode: "USD" })).toMatchObject({ error: expect.stringMatching(/Customers → Companies/) });
+    expect(queries.map((q) => q.includes("MannonBuyerCompanyLink"))).toEqual([true]);
   });
 });

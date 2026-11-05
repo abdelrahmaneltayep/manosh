@@ -32,6 +32,7 @@
  *   MANNON_PRODUCT_URL           a product page with the blocks (else auto-found)
  *   MANNON_APP_HANDLE            default mannon
  *   MANNON_CDP                   default http://127.0.0.1:9222
+ *   MANNON_QA_EMAIL              shopper email (a company contact's, for ordering)
  */
 import { chromium } from "playwright";
 import { spawn } from "node:child_process";
@@ -50,7 +51,9 @@ const APP_HANDLE = process.env.MANNON_APP_HANDLE || "mannon";
 const CDP = process.env.MANNON_CDP || "http://127.0.0.1:9222";
 const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
 const RUN = process.env.MANNON_QA_RUN || `sf${stamp}`;
-const EMAIL = `qa+${RUN}@example.com`;
+// MANNON_QA_EMAIL: send as a real company contact (Customers → Companies) so the
+// merchant and buyer steps can price and order the request. Default: a new address.
+const EMAIL = process.env.MANNON_QA_EMAIL || `qa+${RUN}@example.com`;
 const COMPANY = `QA Storefront ${RUN}`;
 const OUT = process.env.MANNON_QA_OUT || join(process.cwd(), "qa-storefront", RUN);
 mkdirSync(OUT, { recursive: true });

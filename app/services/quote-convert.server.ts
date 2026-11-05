@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import prisma from "../db.server";
+import { ensureBuyerCompanyLink } from "./buyer-link.server";
 import { appendEvent } from "./events.server";
 import { acceptQuote, markOrdered } from "./quote.server";
 import {
@@ -55,15 +56,10 @@ export async function convertQuoteToOrder(
   if (quote.convertedOrderId || quote.draftOrderId) throw new QuoteConvertError("This quote is already an order.");
   if (quote.lines.length === 0) throw new QuoteConvertError("This quote has no line items.");
 
-  const companyLocationId = quote.buyer.shopifyCompanyLocationId;
-  if (!companyLocationId) {
-    throw new QuoteConvertError("This buyer isn’t linked to a company location yet, so an order can’t be created.");
-  }
-  // Shopify requires a company contact on a B2B draft order (companyContactId is ID!).
-  const companyContactId = quote.buyer.shopifyContactId;
-  if (!companyContactId) {
-    throw new QuoteConvertError("This buyer isn’t linked to a contact at their company yet, so an order can’t be created.");
-  }
+  // The native purchasing entity, read from Shopify when the buyer isn't
+  // linked yet (Customers → Companies owns it). Nothing is written to Shopify.
+  const linked = await ensureBuyerCompanyLink(admin, quote.buyerId);
+  if (!linked.ok) throw new QuoteConvertError(linked.merchantMessage);
 
   // Build from the quote's lines with the AGREED prices, verbatim. price.toString()
   // is the negotiated unit price — Shopify calculates tax + totals on top.
@@ -71,11 +67,7 @@ export async function convertQuoteToOrder(
     currencyCode: opts.currencyCode,
     poReference: quote.poReference,
     paymentTermsTemplateId: opts.paymentTermsTemplateId,
-    purchasingEntity: {
-      companyId: quote.company.shopifyCompanyId,
-      companyLocationId,
-      companyContactId,
-    },
+    purchasingEntity: linked.link,
     lines: quote.lines.map((line) => ({
       variantId: line.variantId,
       quantity: line.quantity,

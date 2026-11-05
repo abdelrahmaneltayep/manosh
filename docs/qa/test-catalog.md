@@ -94,7 +94,7 @@ store, theme and Shopify Admin.
 |---|---|---|
 | M1 | Home and every nav page and tab: Quotes, Requests, Follow-ups, Quote forms, Languages, Price rules, Price lists, Offers, Wholesale, Catalogs, Catalog sharing, Order rules, Buyers, Reps, Credit, Analytics, General, Payments, Tax & VAT, ERP sync, Accounting, Agency, Pricing plans | each renders, no "Something went wrong", or SKIP when its feature is off |
 | M2 | Requests: this run's storefront request → Convert to quote | a quote is created, or the reason is shown |
-| M3 | Quote: Totals from Shopify card | Subtotal, Tax, Total "Calculated by Shopify" |
+| M3 | Quote: Totals from Shopify card | Subtotal, Tax, Total "Calculated by Shopify". The app links the buyer from Shopify (Customers → Companies) by email; when the shopper isn't a company contact it explains what to set up (BLOCKED; set `MANNON_QA_EMAIL` to a company contact's email to price and order live) |
 | M4 | Quote: change a unit price → Recalculate with these prices | totals update, "Not saved until you send the counter" |
 | M5 | Quote: ✦ Draft all lines with Claude → Use this price | a draft per line; nothing sent |
 | M6 | Quote: Send counter | "Counter sent to the buyer", status Countered |

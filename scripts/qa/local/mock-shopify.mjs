@@ -107,6 +107,19 @@ export function createMockShopify() {
       },
     }),
     MannonAppHandle: () => ({ currentAppInstallation: { app: { handle: "mannon" } } }),
+    // Customers → Companies: the seeded buyer and this run's storefront shopper
+    // (qa+…) are contacts at Acme with a location role, as if the merchant had
+    // added them in Shopify; anyone else has no customer record.
+    MannonBuyerCompanyLink: (v) => {
+      const email = (String(v.q || "").match(/^email:"(.*)"$/) || [])[1]?.replace(/\\(.)/g, "$1") || "";
+      if (!/^qa\+|^buyer@acme-wholesale\.example$/i.test(email)) return { customers: { nodes: [] } };
+      const n = [...email].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 100000, 7);
+      return { customers: { nodes: [{ id: `gid://shopify/Customer/${n}`, companyContactProfiles: [{
+        id: `gid://shopify/CompanyContact/${n}`,
+        company: { id: MOCK_COMPANY.id, name: MOCK_COMPANY.name },
+        roleAssignments: { nodes: [{ companyLocation: { id: MOCK_COMPANY.locationId, name: "Head office" } }] },
+      }] }] } };
+    },
     MannonCustomerEmail: () => ({ node: { email: "buyer@acme-wholesale.example" } }),
     FindCustomer: () => ({ customers: { nodes: [] } }),
     AddTags: (v) => ({ tagsAdd: { node: { id: v.id }, userErrors: [] } }),
