@@ -156,28 +156,53 @@ Growth and above; Free and Starter must not advertise AI.
 
 ---
 
-## Screenshots  (9 × 1600×900, upload the 2× set at 3200×1800)
+## Screenshots  (6 × 1600×900, 16:9 · capture at 2× and export 1600×900)
 
-Generated from `shots.html`; no pricing and no outcome claims in any frame.
+Rules this list follows (fetched from shopify.dev on 2026-11-05: App Store
+requirements 4.3.4, 4.4.3–4.4.5 and the listing best practices):
 
-| # | File | Headline | Caption pill |
-|---|---|---|---|
-| 1 | `01-hero.png` | Turn B2B price questions into closed deals. | Built on Shopify's native B2B — every price comes from Shopify. |
-| 2 | `02-quote-inbox.png` | Counter quotes line-by-line — Shopify builds the draft. | Priced by Shopify · one source of truth |
-| 3 | `03-branded-quote.png` | Send a branded quote in under a minute. | Priced by Shopify · tax handled by Shopify |
-| 4 | `04-buyer-accept.png` | Buyers accept quotes with no login. | Passwordless · one tap to accept |
-| 5 | `05-ai-order-pad.png` | Paste any list. Get a ready cart. | AI drafts · you confirm every time |
-| 6 | `06-draft-with-claude.png` | Claude drafts the reply. You send it. | Claude drafts · you confirm every time |
-| 7 | `07-reorder.png` | Reorder a past order in one tap. (the buyer portal's Reorder a past order cards — order number, date and total as Shopify reports them — plus a Countered quote) | One tap · re-priced live by Shopify |
-| 8 | `08-try-the-demo.png` | See the whole workflow. No install, no sign-up. (the landing page's Try before you install strip: live buyer portal + merchant tour) | Try the demo · manosh.fly.dev |
-| 9 | `09-draft-order.png` | Accept becomes a real Shopify draft order. (Shopify admin, Orders → Drafts: #D205, PO-DEMO-1042, Net 30, tax and total from Shopify) | Priced by Shopify · a real draft order |
+- **Only Mannon's own UI.** No browser window, no desktop, no Shopify admin chrome
+  (its top bar and sidebar carry Shopify's trademarks): crop to the app's frame.
+  Shopify's own pages (Orders → Drafts, the plan page) and Mannon's marketing site
+  are left out.
+- **3–6 desktop screenshots, each a different feature or state**, plus one of the
+  mobile buyer portal (Mannon's portal is mobile-friendly).
+- **No pricing, no stats, no outcome or speed claims, no reviews**, in the image or
+  its headline. The words "Shopify" and "B2B" only describe compatibility.
+- **No real personal data.** Use the dev store's sample company and contact
+  (Snowdevil, `karine.ruby@example.com`) or the public demo buyer; never a real
+  inbox, phone or address.
+- **Alt text on every image**, paste-ready below.
 
-Upload order: 1, 2, 3, 4, 9, 5, 6, 7, 8 — the draft order (#9) belongs right after the
-buyer accept (#4). Shopify's guidance is 3–6 screenshots; if trimming to 6, drop #2
-(its story is covered by #3), #5 (the order pad is in the screencast) and #7.
+Capture: Chrome at 1600×900 with device scale 2 (3200×1800), crop to the app frame,
+place it on a solid `#F6F5FF` background with the headline above in Inter Semibold,
+`#1C1D2B`. Export 1600×900 PNG. The headline is the only text added.
 
-**App icon:** monogram "M" on indigo `#4F46E5`, high contrast, legible at 48px,
-1200×1200 PNG.
+| # | Screen and state | How to get it | Headline (in the image) | Alt text |
+|---|---|---|---|---|
+| 1 | **Quote page** (`/app/quotes/:id`) with editable line prices and the **Totals from Shopify** card (subtotal, tax, total, "Calculated by Shopify") after **Recalculate with these prices** | Dev store: storefront request as `karine.ruby@example.com` → Requests → Convert to quote → lower one unit price → Recalculate | Counter each line. Shopify prices the quote. | Mannon quote page with editable unit prices and a Totals from Shopify card showing subtotal, tax and total. |
+| 2 | **✦ Draft with Claude** on the same quote: the suggested price, the reason and the message, with **Use this price** and **Send counter** visible | Same quote → ✦ Draft all lines with Claude (Growth) | Claude suggests a counter. You decide what to send. | A quote line with a Claude-drafted price, reason and buyer message, and Use this price and Send counter buttons. |
+| 3 | **Buyer portal accept**: Countered quote, Payment terms **Net 30**, and the "Accept this quote?" confirm panel with **Confirm & create order** | Buyers → Generate link → open in a private window → open the quote → Net 30 → Accept & create order | Buyers accept with a secure link. No password. | Buyer portal showing a countered quote, Net 30 payment terms and a confirm panel before the order is created. |
+| 4 | **Storefront product page** with the Mannon blocks: Request a Quote, Add to Quote and Make an Offer, with the Request a Quote form open | Dev store product page (blocks added via Requests → Add to theme). Crop to the product area; no browser bar | Quotes and offers from your product pages. | A product page with Request a Quote, Add to Quote and Make an Offer buttons and an open quote request form. |
+| 5 | **Order pad**: a pasted PO under "Paste a PO or email", **Read my order** results with matched lines, and **Request quote for these items** | Buyer portal → Open the order pad → paste e.g. "Please send 20x [SKU], 5x [SKU]" → Read my order | Paste a PO. Claude matches it to your catalog. | Buyer order pad with a pasted purchase order and the lines Claude matched, ready for the buyer to confirm. |
+| 6 | **Mobile buyer portal** (390 px wide): Your quotes and the **Reorder a past order** card, shown on the solid background with no device frame | Public demo: `https://manosh.fly.dev/demo` → Open the buyer demo, at phone width | Reorder a past order in one tap. | Buyer portal on a phone showing a countered quote and a card to reorder a past order. |
+
+**Upload order:** 1, 2, 3, 4, 5, 6. The core loop comes first (merchant counters,
+buyer accepts), then where requests come from (4), then the buyer-side tools (5, 6).
+
+**Left out on purpose** (from the earlier 9-shot plan): the marketing hero and
+"Try the demo" strip (not app UI), Shopify's Orders → Drafts page (Shopify admin
+chrome and trademarks), the separate quote inbox and branded-quote frames (too close
+to shot 1), and anything showing plan prices.
+
+**Feature media:** use the screencast below. If a still image is used instead, make
+it 1600×900 on a solid background with one focal point (the quote page from shot 1),
+alt text, no Shopify logo, and not repeating the app card subtitle.
+
+**App icon:** the Mannon logomark (indigo "M" with the lime dot) on `#4F46E5`, square
+with padding, 1200×1200 PNG. No words, no screenshot, no Shopify trademark. Shopify
+asks icons to avoid text; the single-letter mark is the logo, not a word, but if a
+reviewer flags it, use the mark without the letter's counter detail.
 
 ### Uploading the screencast
 
@@ -352,7 +377,7 @@ Shows a signed-in B2B buyer their wholesale quotes, which are stored on Mannon's
 - [ ] Support email filled in and monitored; privacy URL returns a page after deploy.
 - [ ] Cross-store discovery directory off for the review: `MANNON_FF_DISCOVERY` unset
       on Fly, `/discover` returns 404 (QA case C16; requirement 1.1.6).
-- [ ] Screenshots replaced with the 9-slide set in the upload order above; icon
-      uploaded at 1200×1200.
+- [ ] Six screenshots captured per the shot list above (1600×900, app UI only, alt
+      text pasted, no pricing or PII); icon uploaded at 1200×1200.
 - [ ] Languages = admin UI languages only; "Merchant must have online store" selected.
 - [ ] Dev-store click-through of steps 1–14 on the deployed build.
