@@ -1,0 +1,42 @@
+/* /pricing — plan cards, annual toggle, comparison, FAQ. */
+.pr-hero { padding: 72px 0 32px; text-align: center; }
+.pr-hero .l-wrap { display: flex; flex-direction: column; align-items: center; }
+.pr-hero .l-lead { margin: 0 auto 20px; }
+.pr-toggle { display: inline-flex; align-items: center; gap: 12px; font-weight: 700; font-size: 15px; margin-bottom: 8px; }
+.pr-toggle .off { color: var(--sub); }
+.pr-sw { position: relative; width: 48px; height: 28px; border-radius: 999px; background: var(--line); border: 0; cursor: pointer; transition: background 0.25s; padding: 0; }
+.pr-sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transition: transform 0.25s; }
+.pr-sw[aria-checked="true"] { background: var(--indigo); }
+.pr-sw[aria-checked="true"]::after { transform: translateX(20px); }
+.pr-save { background: #e6f6d8; color: #2f5a00; font-size: 12px; font-weight: 800; padding: 4px 9px; border-radius: 999px; }
+.pr-plans { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; align-items: stretch; }
+.pr-plan { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px 24px; display: flex; flex-direction: column; gap: 12px; position: relative; min-width: 0; }
+.pr-plan.rec { border-color: var(--indigo); box-shadow: 0 20px 60px rgba(79, 70, 229, 0.15); }
+.pr-plan .tag { position: absolute; top: -12px; left: 24px; background: var(--indigo); color: #fff; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 999px; }
+.pr-plan h2 { font-size: 20px; margin: 0; }
+.pr-plan .for { color: var(--sub); font-size: 14px; min-height: 40px; margin: 0; }
+.pr-plan .price { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: 6px; }
+.pr-plan .price small { font-size: 14px; font-weight: 600; color: var(--sub); letter-spacing: 0; }
+.pr-plan .per { font-size: 13px; color: var(--sub); min-height: 18px; }
+.pr-plan ul { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 8px; font-size: 14px; }
+.pr-plan li { display: flex; gap: 8px; align-items: flex-start; }
+.pr-plan li::before { content: "✓"; color: var(--indigo); font-weight: 800; flex: none; }
+.pr-plan .l-btn { margin-top: auto; }
+.pr-trust { text-align: center; color: var(--sub); font-size: 14px; margin-top: 18px; }
+.pr-tw { overflow-x: auto; }
+.pr-cmp { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; font-size: 14px; }
+.pr-cmp th, .pr-cmp td { padding: 12px 16px; border-bottom: 1px solid var(--line); text-align: center; vertical-align: middle; }
+.pr-cmp th { background: var(--chip); font-size: 13px; }
+.pr-cmp td:first-child, .pr-cmp th:first-child { text-align: left; font-weight: 700; }
+.pr-cmp tr.grp td { background: var(--bg); font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--indigo); text-align: left; }
+.pr-cmp .y { color: #2f5a00; font-weight: 800; }
+.pr-faq { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.pr-faq details { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; }
+.pr-faq summary { font-weight: 800; cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.pr-faq summary::after { content: "+"; color: var(--indigo); font-weight: 800; }
+.pr-faq details[open] summary::after { content: "–"; }
+.pr-faq p { margin: 10px 0 0; color: var(--sub); font-size: 15px; }
+.pr-flip { display: inline-block; }
+@media (prefers-reduced-motion: no-preference) { .pr-flip.go { animation: pr-flip 0.35s ease; } @keyframes pr-flip { 0% { opacity: 0; transform: translateY(8px); } 100% { opacity: 1; transform: none; } } }
+@media (max-width: 1000px) { .pr-plans { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 640px) { .pr-plans, .pr-faq { grid-template-columns: 1fr; } }

@@ -41,8 +41,15 @@ First run: `npx playwright install chromium` (CI: `--with-deps`).
 
 What is covered today:
 
-- `landing.e2e.ts`: title, pitch, the native-B2B line, the login form, both demo
-  entry points, the `?shop=` hand-off to `/app`, the privacy page.
+- `landing.e2e.ts`: the home page — title and headline, the nav (demo store,
+  pricing, no options list), the eight journey steps, the demo store section,
+  the features block, the native-B2B line, the login form, the links into
+  `/demo/store` and `/pricing`, the `?shop=` hand-off to `/app`, the privacy page.
+- `demo-store.e2e.ts`: the sample storefront product page — Add to Quote opens
+  the three-step request (merging quantities), a second product adds a line,
+  Escape closes the drawer, the guest price gate, the way back to Mannon.
+- `pricing.e2e.ts`: the four v3 plans and prices, the annual toggle, the
+  comparison table, the FAQ, the per-order-fee line.
 - `demo-hub.e2e.ts`: the two hub cards, Start the tour, and the buyer demo
   failing closed with a plain-language notice.
 - `demo-tour.e2e.ts`: the stepper by buttons, arrow keys and dots; Previous and

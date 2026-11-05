@@ -1,28 +1,45 @@
 import { describe, test } from "@e2e-dev/web";
 import { expect } from "e2e";
 
-// The public landing page: brand, the one-liner, the native-B2B line, and the
-// two ways into the demo. No login form unless ?login is present.
-describe("landing page", { tags: ["smoke", "public"] }, () => {
-  test("shows the pitch and the demo entry points", async ({ app, screen, browser }) => {
+// The public home page: the guided journey, the demo store section, the
+// features block, the merchant login, and the ?shop= hand-off.
+describe("home page", { tags: ["smoke", "public"] }, () => {
+  test("shows the journey, the demo store and the login", async ({ app, screen, browser }) => {
     await app.open("/");
     await expect(browser).toHaveTitle(/Mannon/);
-    await expect(screen.getByRole("heading", { level: 1 })).toHaveText("Wholesale quoting, without the email grind");
+    await expect(screen.getByRole("heading", { level: 1 })).toHaveText("From a buyer’s first click to a Shopify draft order");
+    // Nav: demo store, journey, features, pricing — and no list of design options.
+    const nav = screen.getByRole("navigation", "Main");
+    await expect(nav.getByRole("link", "Demo store")).toHaveAttribute("href", "/demo/store");
+    await expect(nav.getByRole("link", "Pricing")).toHaveAttribute("href", "/pricing");
+    await expect(nav.getByRole("link", /All options/)).toHaveCount(0);
+    // The eight steps and their progress bar.
+    const progress = screen.getByRole("navigation", "Journey steps");
+    await expect(progress.getByRole("link")).toHaveCount(8);
+    await expect(screen.getByRole("heading", "A buyer asks for a quote")).toBeVisible();
+    await expect(screen.getByRole("heading", "Weeks later: one-tap reorder")).toBeVisible();
+    // Demo store section and features block.
+    await expect(screen.getByRole("heading", "Shop it like a wholesale buyer")).toBeVisible();
+    await expect(screen.getByRole("heading", "Everything you need to quote, from storefront to draft order")).toBeVisible();
     await expect(screen.getByText("Built on Shopify’s native B2B — every price comes from Shopify.")).toBeVisible();
-    await expect(screen.getByRole("link", "Try the demo")).toBeVisible();
-    await expect(screen.getByRole("heading", { level: 2 }).filter({ hasText: "See the whole workflow" })).toBeVisible();
-    await expect(screen.getByRole("link", "Start the tour")).toBeVisible();
-    // The merchant login (shop domain → Shopify OAuth) sits beside the demo entry.
+    // The merchant login (shop domain → Shopify OAuth) sits in the closing section.
     await expect(screen.getByLabel("Shop domain")).toBeVisible();
     await expect(screen.getByRole("button", "Log in")).toBeVisible();
     await expect(screen.getByText("e.g. my-shop-domain.myshopify.com")).toBeVisible();
   });
 
-  test("Try the demo leads to the demo hub", async ({ app, screen, browser }) => {
+  test("Open the demo store leads to the demo store page", async ({ app, screen, browser }) => {
     await app.open("/");
-    await screen.getByRole("link", "Try the demo").tap();
-    await expect(browser).toHaveURL("/demo");
-    await expect(screen.getByRole("heading", { level: 1 })).toContainText("No install, no sign-up.");
+    await screen.getByRole("link", "Open the demo store").first().tap();
+    await expect(browser).toHaveURL("/demo/store");
+    await expect(screen.getByRole("heading", { level: 1 })).toHaveText("Harbor Blend Espresso, 1 kg");
+  });
+
+  test("Pricing in the nav opens the pricing page at the top", async ({ app, screen, browser }) => {
+    await app.open("/");
+    await screen.getByRole("navigation", "Main").getByRole("link", "Pricing").tap();
+    await expect(browser).toHaveURL("/pricing");
+    await expect(screen.getByRole("heading", { level: 1 })).toHaveText("Plans that grow with your wholesale");
   });
 
   test("a shop parameter hands off to the embedded app", async ({ app, browser }) => {

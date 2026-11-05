@@ -86,7 +86,7 @@ hmac() { printf '%s' "$1" | openssl dgst -sha256 -hmac "$SECRET" -binary | opens
 
 # --- 3+4) execute + verify ---------------------------------------------------
 echo "### A. Public pages (2.1.1 no web errors, 4.x listing links)" >> "$REPORT"
-tc "Landing page renders the pitch" "200" "Wholesale quoting" "" -- "$BASE/"
+tc "Landing page renders the pitch" "200" "Shopify draft order" "" -- "$BASE/"
 tc "Landing: ?shop= hands off to the embedded app (install path)" "30[1278]" "location: */app\?shop=" "" -- -i "$BASE/?shop=example.myshopify.com"
 tc "Embedded /app with a shop: OAuth redirect or App Bridge bounce (410), never 5xx" "30[1278]|40[01]|410" "" "" -- -i "$BASE/app?shop=example.myshopify.com"
 tc "Embedded /app without a shop fails closed (no 5xx)" "30[1278]|40[01]|410" "" "" -- -i "$BASE/app"
@@ -98,7 +98,8 @@ tc "POST to a page route → 405/404, not 5xx" "40[45]" "" "" -- -X POST "$BASE/
 tc "Demo hub" "200" "See the whole workflow" "" -- "$BASE/demo"
 tc "Merchant tour" "200" "tour-step" "" -- "$BASE/demo/tour"
 tc "Buyer demo fails closed without a demo store" "200" "isn’t available|isn't available|Welcome, Demo buyer" "" -- "$BASE/demo/buyer"
-tc "Public pricing page" "200|404" "" "" -- "$BASE/pricing"
+tc "Public pricing page: the v3 ladder" "200" "Growth" "\$79" -- "$BASE/pricing"
+tc "Demo store product page" "200" "Harbor Blend Espresso" "" -- "$BASE/demo/store"
 
 echo "### B. Buyer & rep portals (passwordless, fail closed)" >> "$REPORT"
 tc "Portal home without a session → sign-in, never a 5xx" "200|30[1278]" "" "" -- -i "$BASE/portal"

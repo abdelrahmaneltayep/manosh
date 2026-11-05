@@ -35,6 +35,7 @@ export default function DemoLayout() {
         </Link>
         <nav className="demo-head-links" aria-label="Demo">
           <Link to="/demo">Demo</Link>
+          <Link to="/demo/store">Demo store</Link>
           <Link to="/demo/tour">Merchant tour</Link>
           <Link to="/">
             Install on your store <span aria-hidden="true">→</span>

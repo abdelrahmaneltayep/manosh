@@ -25,6 +25,26 @@ export default function DemoHub() {
       <p className="demo-accent">Built on Shopify’s native B2B — every price comes from Shopify.</p>
 
       <div className="demo-cards">
+        <section className="demo-card" aria-labelledby="store-demo-h">
+          <span className="demo-card-kicker">Sample storefront</span>
+          <h2 id="store-demo-h">Shop the demo store</h2>
+          <p>
+            A sample wholesale product page with Mannon’s theme blocks switched on: Add to
+            Quote, Make an Offer, Request a Quote and the guest price gate.
+          </p>
+          <ul>
+            <li>Add products to a quote and send the three-step request</li>
+            <li>Volume breaks from the company catalog</li>
+            <li>Toggle the price gate guests see</li>
+          </ul>
+          <div className="demo-card-foot">
+            <Link className="demo-btn-secondary" to="/demo/store">
+              Open the demo store
+            </Link>
+            <span className="demo-note">Sample catalog · nothing is sent</span>
+          </div>
+        </section>
+
         <section className="demo-card" aria-labelledby="buyer-demo-h">
           <span className="demo-card-kicker">Live · buyer side</span>
           <h2 id="buyer-demo-h">Open the buyer portal</h2>

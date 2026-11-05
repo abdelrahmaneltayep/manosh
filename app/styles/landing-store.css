@@ -1,0 +1,84 @@
+/* /demo/store — a sample storefront product page with Mannon's blocks. */
+body { background: #fff; }
+.st-back { position: sticky; top: 0; z-index: 25; background: var(--indigo); color: #fff; font-size: 13px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px max(16px, env(safe-area-inset-left, 0px)); flex-wrap: wrap; }
+.st-back a { color: #fff; font-weight: 800; text-decoration: none; white-space: nowrap; }
+.st-back a:hover { text-decoration: underline; }
+.st-back span { color: #e4e2ff; }
+.st-ann { background: var(--ink); color: #fff; font-size: 13px; text-align: center; padding: 8px 16px; }
+.st-ann b { color: var(--lime); }
+.st-head { border-bottom: 1px solid var(--line); }
+.st-head .l-wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 20px; }
+.st-head .logo { font-weight: 800; font-size: 20px; letter-spacing: -0.02em; }
+.st-head nav { display: flex; gap: 22px; font-size: 14px; font-weight: 600; color: var(--sub); white-space: nowrap; }
+.st-head .l-note { white-space: nowrap; }
+.st-pdp { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; padding: 40px 0; }
+.st-gallery { display: grid; gap: 10px; }
+.st-gallery .main { border-radius: 16px; overflow: hidden; aspect-ratio: 1; background: #f4f4f6; }
+.st-gallery .main img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st-gallery .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.st-gallery .thumbs button { border: 2px solid transparent; border-radius: 12px; overflow: hidden; padding: 0; background: none; cursor: pointer; aspect-ratio: 1; }
+.st-gallery .thumbs button[aria-pressed="true"] { border-color: var(--indigo); }
+.st-gallery .thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st-crumb { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--sub); }
+.st-pdp h1 { font-size: 34px; margin: 6px 0 10px; letter-spacing: -0.02em; }
+.st-price { font-size: 20px; font-weight: 700; display: flex; gap: 10px; align-items: center; }
+.st-price .tier { font-size: 13px; font-weight: 600; background: var(--chip); padding: 3px 8px; border-radius: 999px; color: var(--indigo-ink); }
+.st-gate { background: var(--chip); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--indigo-ink); font-weight: 600; }
+.st-lbl { font-size: 13px; color: var(--sub); margin: 16px 0 6px; }
+.st-pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.st-pills button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+.st-pills button[aria-pressed="true"] { background: var(--ink); color: #fff; border-color: var(--ink); }
+.st-qty { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.st-qty button { border: 0; background: #fff; width: 40px; height: 40px; font-size: 18px; cursor: pointer; font: inherit; }
+.st-qty input { width: 56px; border: 0; text-align: center; font: inherit; }
+.st-acts { display: grid; gap: 10px; margin-top: 16px; }
+.st-btn { display: flex; justify-content: center; align-items: center; border-radius: 10px; padding: 13px; font-weight: 800; font-size: 15px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; font-family: inherit; text-decoration: none; }
+.st-btn.primary { background: var(--indigo); color: #fff; border-color: var(--indigo); }
+.st-btn.lime { background: var(--lime); border-color: var(--lime); }
+.st-breaks { margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; font-size: 14px; }
+.st-breaks div { display: flex; justify-content: space-between; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.st-breaks div:last-child { border-bottom: 0; }
+.st-breaks b { color: var(--indigo-ink); }
+.st-preview { font-size: 13px; color: var(--sub); margin-top: 14px; }
+.st-preview button { font: inherit; border: 0; background: none; color: var(--indigo-ink); font-weight: 700; cursor: pointer; text-decoration: underline; padding: 0; }
+.st-tab { position: fixed; right: 0; top: 45%; background: var(--indigo); color: #fff; font-weight: 800; writing-mode: vertical-rl; transform: rotate(180deg); padding: 14px 10px; border-radius: 0 10px 10px 0; cursor: pointer; border: 0; font-size: 14px; z-index: 20; font-family: inherit; }
+.st-ov { position: fixed; inset: 0; background: rgba(28, 29, 43, 0.45); z-index: 30; border: 0; padding: 0; }
+.st-dr { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100%); background: #fff; z-index: 31; display: flex; flex-direction: column; box-shadow: -20px 0 60px rgba(28, 29, 43, 0.2); }
+@media (prefers-reduced-motion: no-preference) { .st-dr { animation: st-in 0.3s ease; } @keyframes st-in { from { transform: translateX(100%); } to { transform: none; } } }
+.st-dr .hd { display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 22px; border-bottom: 1px solid var(--line); gap: 12px; }
+.st-dr .hd h2 { font-size: 18px; margin: 0; }
+.st-dr .x { border: 0; background: none; font-size: 22px; cursor: pointer; line-height: 1; }
+.st-stp { display: flex; gap: 6px; padding: 14px 22px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 700; color: var(--sub); list-style: none; margin: 0; }
+.st-stp li { display: flex; align-items: center; gap: 6px; }
+.st-stp i { width: 22px; height: 22px; border-radius: 50%; background: var(--line); display: grid; place-items: center; font-style: normal; font-size: 12px; color: var(--ink); }
+.st-stp li[aria-current="step"] { color: var(--ink); }
+.st-stp li[aria-current="step"] i { background: var(--indigo); color: #fff; }
+.st-stp li.done i { background: var(--lime); }
+.st-dr .bd { padding: 22px; overflow: auto; flex: 1; }
+.st-line { display: grid; grid-template-columns: 44px 1fr auto auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.st-line .th { width: 44px; height: 44px; border-radius: 8px; background: linear-gradient(135deg, #eef0ff, #eefbe9); overflow: hidden; }
+.st-line .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st-line .n b { display: block; }
+.st-line .n span { color: var(--sub); font-size: 12px; }
+.st-line input { width: 56px; border: 1px solid var(--line); border-radius: 7px; padding: 6px; text-align: center; font: inherit; }
+.st-line .del { border: 0; background: none; color: var(--danger); cursor: pointer; font: inherit; }
+.st-off { background: var(--chip); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: var(--indigo-ink); margin-top: 12px; }
+.st-frm { display: grid; gap: 12px; }
+.st-frm label { font-size: 13px; font-weight: 700; display: grid; gap: 5px; }
+.st-frm input, .st-frm textarea, .st-frm select { border: 1px solid var(--line); border-radius: 9px; padding: 10px; font: inherit; width: 100%; }
+.st-frm .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.st-sum { display: grid; gap: 8px; font-size: 14px; }
+.st-sum div { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.st-dr .ft { padding: 16px 22px; border-top: 1px solid var(--line); display: flex; gap: 10px; justify-content: space-between; }
+.st-done { text-align: center; padding: 30px 0; }
+.st-done .ok { width: 56px; height: 56px; border-radius: 50%; background: #e6f6d8; color: #2f5a00; display: grid; place-items: center; font-size: 26px; font-weight: 900; margin: 0 auto 12px; }
+.st-done .l-ctas { margin-top: 16px; }
+.st-also { padding: 30px 0 40px; border-top: 1px solid var(--line); }
+.st-also .g { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.st-also .p .im { aspect-ratio: 1; background: #f4f4f6; border-radius: 12px; overflow: hidden; }
+.st-also .p .im img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.st-also h3 { margin: 10px 0 2px; font-size: 14px; font-weight: 800; }
+.st-also .pr { font-size: 13px; color: var(--sub); }
+.st-also .st-btn { margin-top: 8px; padding: 9px; font-size: 13px; }
+@media (max-width: 640px) { .st-back span { display: none; } }
+@media (max-width: 860px) { .st-pdp { grid-template-columns: 1fr; } .st-also .g { grid-template-columns: 1fr 1fr; } .st-head nav { display: none; } }
