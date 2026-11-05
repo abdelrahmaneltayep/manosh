@@ -5,6 +5,9 @@
  *   npm run test:storefront                 shopper side only
  *   npm run test:storefront -- --admin      plus: check each submission landed in the admin
  *   npm run test:storefront -- --headed     watch the browser
+ *   npm run test:storefront -- --admin --gate-guests
+ *                                           first turn on price gating for guests
+ *                                           (Mannon → Price rules: logged-out visitors, hide price)
  *
  * Shopper side (a fresh browser, like a real visitor):
  *   1. opens the storefront (enters the store password if the store has one)
@@ -40,6 +43,7 @@ import { createInterface } from "node:readline";
 const args = new Set(process.argv.slice(2));
 const ADMIN = args.has("--admin");
 const HEADED = args.has("--headed");
+const GATE = args.has("--gate-guests");
 const STORE = (process.env.MANNON_STORE || "mannon-9iu9ewku.myshopify.com").replace(/^https?:\/\//, "").replace(/\/$/, "");
 const STORE_URL = /^(localhost|127\.)/.test(STORE) ? `http://${STORE}` : `https://${STORE}`;
 const APP_HANDLE = process.env.MANNON_APP_HANDLE || "mannon";
@@ -320,7 +324,7 @@ async function shopperSide() {
       await shot(gp, "price-gate-guest");
       if (!resp) record("T5", "Price gate for a guest", "FAIL", "the gate never asked the app (script blocked?)");
       else if (body && (body.hidePrice || body.hideAtc)) record("T5", "Price gate for a guest", ctaVisible ? "PASS" : "FAIL", `hidePrice=${body.hidePrice} hideAtc=${body.hideAtc} · CTA ${ctaVisible ? "shown" : "missing"}`);
-      else record("T5", "Price gate for a guest", "INFO", "gating is off for guests, so prices stay visible (turn it on in Mannon → Pricing & catalog to test hiding)");
+      else record("T5", "Price gate for a guest", GATE ? "FAIL" : "INFO", GATE ? "gating was turned on but the app still shows the price to guests" : "gating is off for guests, so prices stay visible (run with --gate-guests to turn it on)");
       await guest.close();
     } else record("T5", "Price gate for a guest", "SKIP", "block not on this product template");
 
@@ -370,39 +374,82 @@ async function attachChrome() {
   return { browser: null, why: tried.length ? tried.join("; ") : "no Chrome could be started" };
 }
 
-async function adminSide(appUrl) {
-  const appHost = appUrl ? new URL(appUrl).host : "manosh.fly.dev";
+async function attachAdmin() {
   const { browser, url, why } = await attachChrome();
   if (!browser) {
     record("A0", "Attach to your signed-in Chrome", "FAIL", `${why}. If Chrome with the ~/mannon-chrome profile is already open without a debug port, quit it and run again. To see what holds the port: lsof -nP -iTCP:9222 -sTCP:LISTEN`);
-    return;
+    return null;
   }
   record("A0", "Attach to your signed-in Chrome", "PASS", url);
+  return browser;
+}
+
+const storeHandle = () => STORE.replace(/\.myshopify\.com$/, "");
+
+/** Open a Mannon admin page and return its app iframe (waits for sign-in). */
+async function openAppPage(page, path, appHost) {
+  const url = `https://admin.shopify.com/store/${storeHandle()}/apps/${APP_HANDLE}${path}`;
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  if (/accounts\.shopify\.com|\/login/.test(page.url())) {
+    console.log("Sign in to Shopify in the Chrome window; waiting up to 5 minutes…");
+    await page.waitForURL(/admin\.shopify\.com\/store\//, { timeout: 300000 });
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+  }
+  const t0 = Date.now();
+  let frame = null;
+  while (!frame && Date.now() - t0 < 40000) { frame = page.frames().find((f) => f.url().includes(appHost)); if (!frame) await sleep(500); }
+  if (frame) { await frame.waitForLoadState("networkidle").catch(() => {}); await sleep(1500); }
+  return frame;
+}
+
+/** Mannon → Price rules: make sure an active "Logged-out visitors · hide price" rule exists. */
+async function gateGuests(browser, appHost) {
   const context = browser.contexts()[0] || (await browser.newContext());
   const page = await context.newPage();
-  const storeHandle = STORE.replace(/\.myshopify\.com$/, "");
-  const findIn = async (path, label, id, expectAtLeast) => {
-    await page.goto(`https://admin.shopify.com/store/${storeHandle}/apps/${APP_HANDLE}${path}`, { waitUntil: "domcontentloaded" });
-    if (/accounts\.shopify\.com|\/login/.test(page.url())) {
-      console.log("Sign in to Shopify in the Chrome window; waiting up to 5 minutes…");
-      await page.waitForURL(/admin\.shopify\.com\/store\//, { timeout: 300000 });
-      await page.goto(`https://admin.shopify.com/store/${storeHandle}/apps/${APP_HANDLE}${path}`, { waitUntil: "domcontentloaded" });
+  try {
+    const frame = await openAppPage(page, "/app/price-rules", appHost);
+    if (!frame) { record("G1", "Price gating for guests is on", "FAIL", "the Price rules page did not load (is the price-rules feature on for this shop?)"); await shot(page, "gate-no-page"); return; }
+    const existing = await frame.evaluate(() =>
+      Array.from(document.querySelectorAll("tr")).some((r) => /Logged-out visitors/.test(r.textContent || "") && /price/.test(r.textContent || "") && /Active/.test(r.textContent || "")),
+    );
+    if (existing) { record("G1", "Price gating for guests is on", "PASS", "an active Logged-out visitors rule already hides the price"); await shot(page, "gate-already-on"); return; }
+    const scope = frame.locator("select[name='scope']");
+    await scope.selectOption("LOGGED_OUT");
+    const hide = frame.getByLabel("Hide price", { exact: true });
+    if (!(await hide.isChecked())) await hide.check();
+    const add = frame.getByRole("button", { name: "Add rule" });
+    if (!(await add.count())) {
+      const note = ((await frame.locator(".Polaris-Banner").last().innerText().catch(() => "")) || "").replace(/\s+/g, " ").trim();
+      await shot(page, "gate-locked");
+      record("G1", "Price gating for guests is on", "FAIL", `the page will not add the rule: "${note || "no Add rule button"}" — deploy the latest build (the plan check on this page was fixed) and run again`);
+      return;
     }
+    await add.click();
+    await frame.getByText(/Rule saved\.|Targeting by|needs the/).first().waitFor({ timeout: 20000 }).catch(() => {});
+    await sleep(1000);
+    const saved = await frame.getByText("Rule saved.").count();
+    await shot(page, "gate-saved");
+    record("G1", "Price gating for guests is on", saved ? "PASS" : "FAIL", saved ? "added: Logged-out visitors · hide price · \"Request a Quote\"" : "no confirmation after Add rule (see the screenshot)");
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
+
+async function adminSide(browser, appUrl) {
+  const appHost = appUrl ? new URL(appUrl).host : "manosh.fly.dev";
+  const context = browser.contexts()[0] || (await browser.newContext());
+  const page = await context.newPage();
+  const findIn = async (path, label, id, expectAtLeast) => {
     let count = 0;
     for (let attempt = 0; attempt < 4 && count < expectAtLeast; attempt++) {
-      if (attempt) { await sleep(12000); await page.reload({ waitUntil: "domcontentloaded" }); }
-      const t0 = Date.now();
-      let frame = null;
-      while (!frame && Date.now() - t0 < 30000) { frame = page.frames().find((f) => f.url().includes(appHost)); if (!frame) await sleep(500); }
+      if (attempt) await sleep(12000);
+      const frame = await openAppPage(page, path, appHost);
       if (!frame) continue;
-      await frame.waitForLoadState("networkidle").catch(() => {});
-      await sleep(1500);
       // Count rows (table rows / list items / cards) that mention the run tag,
       // not raw text matches: one entry shows the tag in its email, company and note.
       count = await frame.evaluate((tag) => {
         const rows = Array.from(document.querySelectorAll("tr, li, [role='row'], .Polaris-ResourceItem, .Polaris-IndexTable__TableRow"));
         const hits = rows.filter((r) => (r.textContent || "").includes(tag));
-        // keep only the innermost matching rows so nested containers don't double count
         return hits.filter((r) => !hits.some((o) => o !== r && r.contains(o))).length;
       }, RUN).catch(() => 0);
       if (!count) {
@@ -425,17 +472,25 @@ async function adminSide(appUrl) {
     await shot(page, "admin-error");
   } finally {
     await page.close().catch(() => {});
-    await browser.close().catch(() => {}); // disconnects only; your Chrome stays open
   }
 }
 
 console.log(`Mannon storefront test · run ${RUN} · ${STORE_URL}`);
 console.log(`Submissions are tagged ${EMAIL} / "${COMPANY}"\n`);
-const { appUrl } = await shopperSide();
-if (ADMIN) {
-  console.log("");
-  try { await adminSide(appUrl); } catch (e) { record("AERR", "Admin side stopped", "FAIL", String(e.message || e).split("\n")[0]); }
+let adminBrowser = null;
+if (ADMIN || GATE) {
+  try { adminBrowser = await attachAdmin(); } catch (e) { record("A0", "Attach to your signed-in Chrome", "FAIL", String(e.message || e).split("\n")[0]); }
 }
+if (GATE && adminBrowser) {
+  try { await gateGuests(adminBrowser, "manosh.fly.dev"); } catch (e) { record("G1", "Price gating for guests is on", "FAIL", String(e.message || e).split("\n")[0]); }
+  console.log("");
+}
+const { appUrl } = await shopperSide();
+if (ADMIN && adminBrowser) {
+  console.log("");
+  try { await adminSide(adminBrowser, appUrl); } catch (e) { record("AERR", "Admin side stopped", "FAIL", String(e.message || e).split("\n")[0]); }
+}
+if (adminBrowser) await adminBrowser.close().catch(() => {}); // disconnects only; your Chrome stays open
 
 const counts = results.reduce((m, r) => ((m[r.status] = (m[r.status] || 0) + 1), m), {});
 const summary = `PASS ${counts.PASS || 0} · FAIL ${counts.FAIL || 0} · SKIP ${counts.SKIP || 0} · INFO ${counts.INFO || 0}`;

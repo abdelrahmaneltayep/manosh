@@ -153,6 +153,12 @@ of list) and Convert Cart to Quote from `/cart`, and reports what the price gate
 shows a guest. A hidden block's line quotes what the app answered, so a
 switched-off toggle or server flag reads differently from a broken block.
 
+Guest price gating (`--gate-guests`, implies the Chrome attachment): before the
+shopper side runs, opens Mannon → Price rules and adds "Logged-out visitors ·
+hide price · Request a Quote" unless an active rule like it is already there.
+The guest step then must show the price hidden and the call-to-action, or it
+fails. Delete the rule on that page to turn gating off again.
+
 Admin side (`--admin`): attaches to Chrome on port 9222 with the
 `~/mannon-chrome` profile (the screencast recorder's; it starts it if needed and
 waits for you to sign in) and looks for the run tag in Mannon → Quotes →
