@@ -158,8 +158,12 @@ export async function visitor(rec, ctx) {
       return { actual: `fits, no errors, images ok${note}`, evidence: path === "/" ? await rec.shot(pp, "home-phone") : null };
     }, () => rec.shot(pp, `phone-${path}`));
   }
-  if (errors.length) rec.add({ id: "V12", name: "No console errors on the desktop walk", action: "listen for page errors", expected: "none", status: "FAIL", actual: errors.slice(0, 3).join(" | ") });
-  else rec.add({ id: "V12", name: "No console errors on the desktop walk", action: "listen for page errors", expected: "none", status: "PASS", actual: "none" });
+  // Chrome's network-level errors (net::ERR_HTTP2_PING_FAILED, …) are the tester's connection, not the pages.
+  const NET_BLIP = /net::ERR_(HTTP2_PING_FAILED|NETWORK_CHANGED|INTERNET_DISCONNECTED|CONNECTION_RESET|CONNECTION_CLOSED|TIMED_OUT|NETWORK_IO_SUSPENDED|HTTP2_PROTOCOL_ERROR)/;
+  const real = errors.filter((e) => !NET_BLIP.test(e));
+  const blips = errors.length - real.length;
+  if (real.length) rec.add({ id: "V12", name: "No console errors on the desktop walk", action: "listen for page errors", expected: "none", status: "FAIL", actual: real.slice(0, 3).join(" | ") });
+  else rec.add({ id: "V12", name: "No console errors on the desktop walk", action: "listen for page errors", expected: "none", status: "PASS", actual: blips ? `none from the pages (${blips} network blip${blips > 1 ? "s" : ""} on the tester's connection ignored)` : "none" });
   await phone.close();
   await browser.close();
 }

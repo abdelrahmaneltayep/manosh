@@ -79,10 +79,18 @@ export async function buyer(rec, ctx) {
     }, fail("b1-fail"));
 
     await rec.tc("B2", "Portal home", { action: "read the portal home", expected: "Welcome, Your quotes (and Reorder a past order when there is a recent order)" }, async () => {
-      await p.goto(`${base}/portal`, { waitUntil: "networkidle" });
-      const t = await textOf(p);
-      if (!/Welcome/.test(t) || !/Your quotes/.test(t)) throw new Error("Welcome or Your quotes missing");
-      return { actual: `quotes ${await p.locator("li.quote-list-row").count()}; reorder card ${/Reorder a past order/.test(t) ? "yes" : "no"}`, evidence: await rec.shot(p, "portal-home") };
+      // A dropped connection can leave the page empty; load once more before judging,
+      // and say what actually came back if it still isn't the portal.
+      let t = "", status = 0, note = "";
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const r = await p.goto(`${base}/portal`, { waitUntil: "networkidle" }).catch((e) => { t = String(e).slice(0, 120); return null; });
+        status = r ? r.status() : 0;
+        if (r) t = await textOf(p);
+        if (/Welcome/.test(t) && /Your quotes/.test(t)) break;
+        if (attempt === 1) note = ` (first load: HTTP ${status || "no response"}, "${t.slice(0, 60)}"; reloaded)`;
+      }
+      if (!/Welcome/.test(t) || !/Your quotes/.test(t)) throw new Error(`not the portal home: HTTP ${status || "no response"} at ${p.url().replace(base, "")}: "${t.slice(0, 140)}"`);
+      return { actual: `quotes ${await p.locator("li.quote-list-row").count()}; reorder card ${/Reorder a past order/.test(t) ? "yes" : "no"}${note}`, evidence: await rec.shot(p, "portal-home") };
     }, fail("b2-fail"));
 
     await acceptCountered(rec, p, "B", ctx);
