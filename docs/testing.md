@@ -189,3 +189,34 @@ that pushes the backup back. `--dry-run` edits locally and pushes nothing.
 The template edits are covered by `scripts/storefront/theme-blocks.test.mjs`
 (Dawn and Horizon shaped templates).
 
+
+## Full app QA from your machine (`npm run qa:all`)
+
+One command walks every user flow in `docs/qa/test-catalog.md` and writes a
+qa-tester style report: for each case the action, the expected result, the
+actual result, a verdict (PASS / FAIL / BLOCKED / SKIP / INFO) and the evidence.
+
+```
+export MANNON_STOREFRONT_PASSWORD=your-storefront-password
+npm run qa:all -- --headed
+```
+
+Sections run in order: **P** prerequisites, **L** local layers (typecheck,
+Vitest, e2e, the tmux contract smoke; skipped without `DATABASE_URL`), **C** live
+HTTP contract, **V** visitor pages at desktop and phone width, **S** the
+storefront run (`npm run test:storefront`), **M** merchant pages in your
+signed-in Chrome (same Chrome as `--admin`), **B** buyer portal through the
+magic link M7 generates, **D** the public buyer demo.
+
+Options: `--only=C,V` or `--skip=L,M` choose sections, `--no-ai` skips the
+✦ Claude cases, `--headed` shows the browsers. Environment: `MANNON_LIVE_URL`
+(default `https://manosh.fly.dev`), `MANNON_STORE`, `MANNON_APP_HANDLE`,
+`MANNON_SKUS` (lines for the order pad), `MANNON_MAGIC_LINK` (run B without M),
+`MANNON_CDP`, `DATABASE_URL`.
+
+The report lands in `qa-runs/<run>/REPORT.md` with `results.json` and
+screenshots, and lists what the run created (tagged with the run id) and what
+is left to check by hand. The command exits 1 when any case FAILs. A case is
+BLOCKED, not FAILED, when its precondition is missing, for example no Countered
+quote for B3, or "We couldn't load the catalog" when Shopify is unreachable.
+It never approves a plan charge, uninstalls the app or edits the theme.

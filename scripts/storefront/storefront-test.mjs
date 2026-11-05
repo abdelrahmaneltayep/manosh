@@ -49,10 +49,10 @@ const STORE_URL = /^(localhost|127\.)/.test(STORE) ? `http://${STORE}` : `https:
 const APP_HANDLE = process.env.MANNON_APP_HANDLE || "mannon";
 const CDP = process.env.MANNON_CDP || "http://127.0.0.1:9222";
 const stamp = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12);
-const RUN = `sf${stamp}`;
+const RUN = process.env.MANNON_QA_RUN || `sf${stamp}`;
 const EMAIL = `qa+${RUN}@example.com`;
 const COMPANY = `QA Storefront ${RUN}`;
-const OUT = join(process.cwd(), "qa-storefront", RUN);
+const OUT = process.env.MANNON_QA_OUT || join(process.cwd(), "qa-storefront", RUN);
 mkdirSync(OUT, { recursive: true });
 
 const results = [];
@@ -519,5 +519,6 @@ const md = [
   "Clean-up: decline or delete the entries tagged with the run tag in Mannon → Quotes → Requests and Mannon → Offers.",
 ].join("\n");
 writeFileSync(join(OUT, "report.md"), md);
+writeFileSync(join(OUT, "results.json"), JSON.stringify({ run: RUN, email: EMAIL, company: COMPANY, results, api }, null, 2));
 console.log(`\n${summary}\nReport and screenshots: ${OUT}`);
 process.exit(counts.FAIL ? 1 : 0);
