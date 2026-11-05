@@ -103,3 +103,18 @@ hash is stored (`OrgInvite.codeHash`), it expires after `ORG_INVITE_TTL_DAYS`
 merchant redeems it inside their Mannon (Agency → Join an organization), so the
 store that joins is always the signed-in one and is only linked with its owner's
 consent. Each linked store keeps its own data and its own Growth subscription.
+
+## Protected customer data (Partner Dashboard declaration)
+
+What Mannon reads from Shopify's Admin API, so the declaration matches the code:
+
+| Declared | Why | Where |
+|---|---|---|
+| Protected customer data (Level 1) | App functionality: find a buyer's company contact, read past orders for one-tap reorder, create B2B draft orders for accepted quotes | `buyer-link.server.ts`, `reorder.server.ts`, `draft-order.server.ts` |
+| Email | App functionality: read a customer's email to address a quote; search customers by exact email to link a buyer to their company and to tag approved wholesale customers | `account-quotes.server.ts` (`defaultEmailAddress`), `buyer-link.server.ts`, `wholesale-shopify.server.ts` |
+
+Not requested, because no Admin API query reads them: **name, phone, address**.
+Buyer names in Mannon come from what buyers enter in Mannon's own forms.
+Customer data is deleted on `customers/redact` and exported on
+`customers/data_request` (`gdpr.server.ts`). Add a field here before any query
+starts reading it.
