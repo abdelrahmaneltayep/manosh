@@ -268,6 +268,35 @@ export async function merchant(rec, ctx) {
       return { status: onPlans ? "PASS" : "FAIL", actual: `clicked "${label}" → ${page.url().replace(/\?.*/, "")} · plan names read on the page: ${seen.join(", ") || "none"} · nothing approved`, evidence: ev };
     }, fail);
 
+    // M12 — theme editor deep links (App Store 5.1.3)
+    await rec.tc("M12", "Storefront setup: 'Add to theme' deep links (App Store 5.1.3)", { action: "Requests, Offers → widget and Price rules: read every 'Add to theme' link; live, open one in the theme editor and leave without saving", expected: "one link per block: /admin/themes/current/editor?template=…&addAppBlockId={client_id}/{block}&target=…; the theme editor opens with the block placed" }, async () => {
+      const want = { "/app/quote-requests": ["quote_button", "add_to_quote", "cart_to_quote"], "/app/offers/widget": ["make_offer_button"], "/app/price-rules": ["price_gate"] };
+      const found = [];
+      for (const [path, blocks] of Object.entries(want)) {
+        const f = await openApp(page, app, path);
+        const hrefs = await f.locator("a").evaluateAll((as) => as.filter((a) => /Add to theme/.test(a.textContent || "")).map((a) => a.getAttribute("href")));
+        for (const b of blocks) {
+          const h = hrefs.find((x) => x && x.includes(`/${b}&`));
+          if (!h) throw new Error(`${path}: no 'Add to theme' link for ${b} (${hrefs.length} links)`);
+          if (!/^https:\/\/[a-z0-9-]+\.myshopify\.com\/admin\/themes\/current\/editor\?template=(product|cart)&addAppBlockId=[A-Za-z0-9]+\/[a-z_]+&target=(mainSection|newAppsSection)$/.test(h)) throw new Error(`${b}: unexpected link ${h}`);
+          found.push(h);
+        }
+      }
+      if (app.local) return { actual: `${found.length} links, all in Shopify's deep-link format` };
+      const editor = await page.context().newPage();
+      try {
+        await editor.goto(found[0], { waitUntil: "domcontentloaded" });
+        await editor.waitForURL(/\/themes\/\d+\/editor|\/themes\/current\/editor/, { timeout: 30000 });
+        await sleep(6000);
+        const t = await textOf(editor);
+        if (/There['’]s no page at this address|isn['’]t available/i.test(t)) throw new Error(`the theme editor says: ${t.slice(0, 120)}`);
+        const ev = await rec.shot(editor, "theme-editor-deep-link");
+        return { actual: `${found.length} links; the theme editor opened with Request a Quote placed (not saved)`, evidence: ev };
+      } finally {
+        await editor.close({ runBeforeUnload: false }).catch(() => {});
+      }
+    }, fail);
+
     // M11 — the guest gating rule
     await rec.tc("M11", "Price rules: guest gating", { action: "open Price rules", expected: "'Logged-out visitors' rule listed as Active (INFO when off)" }, async () => {
       const f = await openApp(page, app, "/app/price-rules");

@@ -43,7 +43,8 @@ What is covered today:
 
 - `landing.e2e.ts`: the home page — title and headline, the nav (demo store,
   pricing, no options list), the eight journey steps, the demo store section,
-  the features block, the native-B2B line, the login form, the links into
+  the features block, the native-B2B line, the App Store install link with no
+  shop-domain field anywhere (App Store 2.3.1, also `/auth/login`), the links into
   `/demo/store` and `/pricing`, the `?shop=` hand-off to `/app`, the privacy page.
 - `demo-store.e2e.ts`: the sample storefront product page — Add to Quote opens
   the three-step request (merging quantities), a second product adds a line,

@@ -1,9 +1,9 @@
 import type { HeadersFunction, LinksFunction, LoaderFunctionArgs, MetaFunction } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useLoaderData } from "@remix-run/react";
+import { Link, useLoaderData } from "@remix-run/react";
 import { useEffect } from "react";
 
-import { login } from "../../shopify.server";
+import { APP_STORE_URL } from "../../lib/app-store";
 import { isDemoEnabled } from "../../services/demo.server";
 import { FeaturesBlock, LandingFooter, LandingHeader, useReveal } from "../../components/landing";
 import landingStyles from "../../styles/landing.css?url";
@@ -12,7 +12,9 @@ import homeStyles from "../../styles/landing-home.css?url";
 /**
  * Public home (manosh.fly.dev): the guided journey from a buyer's first click
  * to a Shopify draft order, the demo store section, the features block, and
- * the merchant login. ?shop= still hands off to the embedded app.
+ * where merchants open or install Mannon (the Shopify admin or the App Store;
+ * never a typed shop domain, App Store 2.3.1). ?shop= still hands off to the
+ * embedded app.
  */
 
 export const links: LinksFunction = () => [
@@ -36,7 +38,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (url.searchParams.get("shop")) {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
-  return { showForm: Boolean(login), buyerLive: isDemoEnabled() };
+  return { buyerLive: isDemoEnabled() };
 };
 
 const STEPS = [
@@ -51,7 +53,7 @@ const STEPS = [
 ] as const;
 
 export default function Home() {
-  const { showForm, buyerLive } = useLoaderData<typeof loader>();
+  const { buyerLive } = useLoaderData<typeof loader>();
   const buyerHref = buyerLive ? "/demo/buyer" : "/demo";
   useReveal();
   useProgress();
@@ -177,21 +179,13 @@ export default function Home() {
             <Link className="l-btn ghost" to="/pricing">See pricing</Link>
           </div>
 
-          {showForm && (
-            <div className="h-login rv d3">
-              <span className="l-kicker">Already a merchant?</span>
-              <Form method="post" action="/auth/login">
-                <label>
-                  Shop domain
-                  <input type="text" name="shop" placeholder="my-shop-domain.myshopify.com" aria-describedby="shop-hint" />
-                </label>
-                <div className="row">
-                  <button className="l-btn sm" type="submit">Log in</button>
-                  <span id="shop-hint" className="l-note">e.g. my-shop-domain.myshopify.com</span>
-                </div>
-              </Form>
-            </div>
-          )}
+          <div className="h-login rv d3">
+            <span className="l-kicker">Already a merchant?</span>
+            <p className="l-note" style={{ margin: "8px 0 12px" }}>
+              Open Mannon from your Shopify admin under <strong>Apps → Mannon</strong>. New to Mannon? Install it from the Shopify App Store.
+            </p>
+            <a className="l-btn sm" href={APP_STORE_URL}>Install from the Shopify App Store</a>
+          </div>
         </div>
       </section>
 

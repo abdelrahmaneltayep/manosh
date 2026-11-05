@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { storefrontBlockLinks } from "../lib/theme-deep-links";
+import { StorefrontSetupCard } from "../components/StorefrontSetupCard";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
@@ -57,7 +59,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
   });
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
-  return { isGrowth: status.plan === GROWTH_PLAN, features: quoteWidgetFeatures(status.plan), config, requests, access };
+  const themeLinks = storefrontBlockLinks(session.shop, process.env.SHOPIFY_API_KEY, ["quote_button", "add_to_quote", "cart_to_quote"]);
+  return { isGrowth: status.plan === GROWTH_PLAN, features: quoteWidgetFeatures(status.plan), config, requests, access, themeLinks };
 };
 
 type ActionResult =
@@ -252,11 +255,13 @@ export default function QuoteRequests() {
               )}
               <InlineStack gap="200" blockAlign="center">
                 <Button variant="primary" submit loading={busy}>Save settings</Button>
-                <Text as="span" tone="subdued" variant="bodySm">Then add the “Request a Quote” app block in your theme editor (Online Store → Customize).</Text>
+                <Text as="span" tone="subdued" variant="bodySm">Then add the blocks to your theme below.</Text>
               </InlineStack>
             </BlockStack>
           </Form>
         </Card>
+
+        <StorefrontSetupCard title="Add quote requests to your storefront" links={data.themeLinks} />
 
         {/* Reply to new requests with a personal (Claude-drafted) note */}
         {newRequests.length > 0 && (

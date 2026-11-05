@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { storefrontBlockLinks } from "../lib/theme-deep-links";
+import { StorefrontSetupCard } from "../components/StorefrontSetupCard";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { useActionData, useFetcher, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
@@ -40,6 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hideAtcUntilOffer: cfg?.hideAtcUntilOffer ?? false,
     surfaces: { button: surfaces.button ?? true, banner: surfaces.banner ?? false, inlineForm: surfaces.inlineForm ?? true, exitPopup: surfaces.exitPopup ?? false },
     access,
+    themeLinks: storefrontBlockLinks(session.shop, process.env.SHOPIFY_API_KEY, ["make_offer_button"]),
   };
 };
 
@@ -148,11 +151,13 @@ export default function OfferWidget() {
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
 
+        <StorefrontSetupCard title="Add Make an Offer to your storefront" links={data.themeLinks} />
+
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">Where buyers can make an offer</Text>
             <Text as="p" tone="subdued" variant="bodyMd">
-              The storefront surface ships as a theme app extension (added in your theme editor).
+              The storefront surface ships as a theme app extension: add it with the button below.
               Growth includes the button + inline form; Scale adds the banner and exit popup.
             </Text>
             <Checkbox label="Product/cart button" checked={s.button} onChange={(v) => setS({ ...s, button: v })} />

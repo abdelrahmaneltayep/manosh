@@ -1,4 +1,5 @@
 import { Link } from "@remix-run/react";
+import { APP_STORE_URL } from "../lib/app-store";
 import { useEffect } from "react";
 
 /**
@@ -37,7 +38,7 @@ export function useReveal() {
 }
 
 export function LandingHeader({ cta }: { cta?: { to: string; label: string } }) {
-  const button = cta ?? { to: "/auth/login", label: "Install on Shopify" };
+  const button = cta ?? { to: APP_STORE_URL, label: "Install on Shopify" };
   return (
     <header className="l-top">
       <div className="l-wrap">
@@ -51,9 +52,15 @@ export function LandingHeader({ cta }: { cta?: { to: string; label: string } }) 
           <Link to="/#features">Features</Link>
           <Link to="/pricing">Pricing</Link>
         </nav>
-        <Link className="l-btn sm" to={button.to}>
-          {button.label}
-        </Link>
+        {/^https?:/.test(button.to) ? (
+          <a className="l-btn sm" href={button.to}>
+            {button.label}
+          </a>
+        ) : (
+          <Link className="l-btn sm" to={button.to}>
+            {button.label}
+          </Link>
+        )}
       </div>
     </header>
   );

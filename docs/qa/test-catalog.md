@@ -66,7 +66,7 @@ store, theme and Shopify Admin.
 |---|---|---|
 | V1 | Home: headline, nav (Demo store, The journey, Features, Pricing), no "All options" | as listed |
 | V2 | Home: 8 journey steps; clicking a progress pill scrolls to that step | step in view, pill highlighted |
-| V3 | Home: demo store section, features block, merchant login form | visible |
+| V3 | Home: demo store section, features block, "Install from the Shopify App Store" | visible; no field asking for a shop domain (App Store 2.3.1) |
 | V4 | Home → Open the demo store | lands on `/demo/store` |
 | V5 | Home → Pricing | lands on `/pricing` at the top |
 | V6 | Pricing: annual toggle | Growth shows $24.17 and "$290 billed yearly" |
@@ -103,6 +103,7 @@ store, theme and Shopify Admin.
 | M9 | Analytics: page and ✦ Claude insights section | renders, or an upgrade note |
 | M10 | Pricing plans → Choose Growth (review 1.2.2) | Shopify's plan page opens and lists all four plans; nothing approved |
 | M11 | Price rules: guest gating rule present | listed as Active |
+| M12 | Requests, Offers → widget, Price rules: "Add to theme" (App Store 5.1.3) | one deep link per block in Shopify's format; live, the theme editor opens with the block placed (left unsaved) |
 
 ## B — Buyer in the passwordless portal (magic link from M7)
 | ID | Case | Expected |

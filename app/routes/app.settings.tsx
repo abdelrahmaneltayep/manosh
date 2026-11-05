@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { storefrontBlockLinks } from "../lib/theme-deep-links";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
 import {
@@ -164,6 +165,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const access = claudeAccess(shopClaude ?? { plan: "FREE" }, new Date());
 
   return {
+    themeLinks: storefrontBlockLinks(session.shop, process.env.SHOPIFY_API_KEY, ["quote_button"]),
     access,
     claudeEnabled: shopClaude?.claudeEnabled ?? true,
     tolerancePercent: settings ? Math.round(settings.autoApproveTolerance * 100) : 0,
@@ -649,10 +651,18 @@ export default function Settings() {
           <Banner tone="info" title="Recommended: add the Request-a-Quote button to your theme">
             <p>
               Turn any product page into a B2B lead source — no code. Enable the
-              widget, then add the app block in your theme editor.
+              widget, then add the block to your theme: the theme editor opens with
+              it placed, and nothing changes until you click Save.
             </p>
             <Box paddingBlockStart="200">
-              <Button url="/app/quote-requests" variant="primary">Set up the widget</Button>
+              <InlineStack gap="200">
+                <Button url="/app/quote-requests" variant="primary">Set up the widget</Button>
+                {data.themeLinks[0]?.url && (
+                  <Button url={data.themeLinks[0].url} target="_blank" accessibilityLabel="Add Request a Quote to your theme (opens the theme editor in a new tab)">
+                    Add to theme
+                  </Button>
+                )}
+              </InlineStack>
             </Box>
           </Banner>
         )}

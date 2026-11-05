@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { storefrontBlockLinks } from "../lib/theme-deep-links";
+import { StorefrontSetupCard } from "../components/StorefrontSetupCard";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import {
@@ -32,7 +34,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Same plan source as the save path (the shop's stored v3 plan), so the form
   // never locks a scope the server would accept, or the other way round.
   const { plan, legacy } = await priceRulePlanFor(session.shop);
-  return { rules, plan, legacy };
+  return { rules, plan, legacy, themeLinks: storefrontBlockLinks(session.shop, process.env.SHOPIFY_API_KEY, ["price_gate"]) };
 };
 
 type ActionResult = { ok: boolean; message?: string; error?: string };
@@ -63,7 +65,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
 };
 
 export default function PriceRules() {
-  const { rules, plan, legacy } = useLoaderData<typeof loader>();
+  const { rules, plan, legacy, themeLinks } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
@@ -89,6 +91,8 @@ export default function PriceRules() {
         <Banner tone="info" title="Hide price or Add-to-Cart, show “Request a Quote” instead">
           <p>Rules are evaluated on the storefront by the theme app block. A hidden price is never sent to the browser — only the decision to hide it and your call-to-action label.</p>
         </Banner>
+
+        <StorefrontSetupCard title="Add the price gate to your storefront" links={themeLinks} />
 
         <Card>
           <BlockStack gap="300">

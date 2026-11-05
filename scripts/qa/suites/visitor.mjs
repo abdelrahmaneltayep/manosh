@@ -40,12 +40,14 @@ export async function visitor(rec, ctx) {
       return { actual: `8 steps; step 6 in view; pill class "${on}"`, evidence: await rec.shot(page, "home-step-6") };
     }, fail);
 
-    await rec.tc("V3", "Home: demo store section, features, login", { action: "look for the section headings and the Shop domain field", expected: "'Shop it like a wholesale buyer', the features heading, a Shop domain field and Log in" }, async () => {
+    await rec.tc("V3", "Home: demo store section, features, how to install (2.3.1)", { action: "look for the section headings, the App Store link and any shop-domain field", expected: "'Shop it like a wholesale buyer', the features heading, 'Install from the Shopify App Store'; no field asking for a myshopify.com domain" }, async () => {
       for (const h of ["Shop it like a wholesale buyer", "Everything you need to quote, from storefront to draft order"]) {
         if (!(await page.getByRole("heading", { name: h }).count())) throw new Error(`missing heading "${h}"`);
       }
-      const login = await page.getByLabel("Shop domain").count();
-      return { status: login ? "PASS" : "FAIL", actual: login ? "both sections and the login form are there" : "no Shop domain field" };
+      const shopField = await page.locator('input[name="shop"]').count();
+      if (shopField) throw new Error("the page asks for a shop domain (App Store 2.3.1)");
+      const store = await page.getByRole("link", { name: "Install from the Shopify App Store" }).getAttribute("href");
+      return { actual: `both sections; App Store link ${store}; no shop-domain field` };
     }, fail);
 
     await rec.tc("V4", "Home → Open the demo store", { action: "click 'Open the demo store'", expected: "lands on /demo/store" }, async () => {

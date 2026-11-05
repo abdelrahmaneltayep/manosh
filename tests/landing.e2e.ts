@@ -22,10 +22,18 @@ describe("home page", { tags: ["smoke", "public"] }, () => {
     await expect(screen.getByRole("heading", "Shop it like a wholesale buyer")).toBeVisible();
     await expect(screen.getByRole("heading", "Everything you need to quote, from storefront to draft order")).toBeVisible();
     await expect(screen.getByText("Built on Shopify’s native B2B — every price comes from Shopify.")).toBeVisible();
-    // The merchant login (shop domain → Shopify OAuth) sits in the closing section.
-    await expect(screen.getByLabel("Shop domain")).toBeVisible();
-    await expect(screen.getByRole("button", "Log in")).toBeVisible();
-    await expect(screen.getByText("e.g. my-shop-domain.myshopify.com")).toBeVisible();
+    // Merchants open Mannon from the Shopify admin or install from the App Store;
+    // nobody is asked to type a shop domain (App Store requirement 2.3.1).
+    await expect(screen.getByRole("link", "Install from the Shopify App Store")).toHaveAttribute("href", "https://apps.shopify.com/mannon");
+    await expect(screen.getByLabel("Shop domain")).toHaveCount(0);
+    await expect(screen.getByText(/myshopify\.com/)).toHaveCount(0);
+  });
+
+  test("/auth/login explains how to open Mannon and asks for no shop domain", async ({ app, screen }) => {
+    await app.open("/auth/login");
+    await expect(screen.getByRole("heading", "Open Mannon from Shopify")).toBeVisible();
+    await expect(screen.getByRole("textbox")).toHaveCount(0);
+    await expect(screen.getByRole("link", "Install from the Shopify App Store")).toBeVisible();
   });
 
   test("Open the demo store leads to the demo store page", async ({ app, screen, browser }) => {
