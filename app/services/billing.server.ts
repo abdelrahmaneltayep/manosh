@@ -210,8 +210,12 @@ export function resolveActivePlan(
 ): BillingStatus {
   const active = appSubscriptions.find((sub) => sub.status === "ACTIVE");
   const name = active?.name ?? null;
-  const plan =
-    name === STARTER_PLAN || name === GROWTH_PLAN ? (name as PlanName) : null;
+  // Shopify reports the plan's display name ("Mannon Growth", "Scale (annual)"),
+  // so read the tier word the same way the stored plan does. The gating view has
+  // two paid levels: Scale includes everything Growth has; Free is unpaid.
+  const tier = resolveV3PlanFromName(name).plan;
+  const plan: PlanName | null =
+    tier === "SCALE" || tier === "GROWTH" ? GROWTH_PLAN : tier === "STARTER" ? STARTER_PLAN : null;
 
   return {
     plan,
@@ -258,7 +262,13 @@ export async function requireBilling(
   try {
     // Managed pricing: no plans filter — count ANY active app subscription and
     // map it to a tier by name (reconcileShopPlanV3 → resolveV3PlanFromName).
-    const { hasActivePayment, appSubscriptions } = await billing.check({ isTest });
+    // For a read, `isTest` only decides whether TEST subscriptions count
+    // (shopify-api: `isTest || !subscription.test`); it never hides live ones.
+    // Shopify bills development stores (including App Store review stores)
+    // with test subscriptions under managed pricing, so a read must include
+    // them, or a plan chosen there never takes effect (and reconcile would
+    // record the paid shop as CANCELLED). Shopify decides what is a test charge.
+    const { hasActivePayment, appSubscriptions } = await billing.check({ isTest: true });
     return resolveActivePlan(hasActivePayment, appSubscriptions);
   } catch (error) {
     // A billing.check() failure (API error, an unrecognized plan handle in the
@@ -269,7 +279,7 @@ export async function requireBilling(
     // (requirePlan) keep their own stricter handling.
     console.error(`[requireBilling] billing.check failed (isTest=${isTest}):`, error);
     captureException(error);
-    return { ...UNKNOWN_BILLING_STATUS };
+    return { ...UNKNOWN_BILLING_STATUS, unverified: true };
   }
 }
 
@@ -340,6 +350,9 @@ export async function reconcileShopPlan(
     select: { id: true, plan: true, legacyPlan: true, legacyPriceCents: true },
   });
   if (!shop) return planEnumFor(status);
+  // Shopify's billing couldn't be read: keep what we have. Never downgrade or
+  // cancel a plan on a failed read.
+  if (status.unverified) return shop.plan;
 
   // Pricing v3: resolve from the raw subscription name (v3 handles + legacy
   // names), persisting grandfathering so nobody's price is ever silently raised.

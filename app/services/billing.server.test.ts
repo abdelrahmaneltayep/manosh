@@ -159,11 +159,22 @@ describe("requireBilling (skeleton — reads, never enforces)", () => {
       appSubscriptions: [{ name: GROWTH_PLAN, status: "ACTIVE" }],
     });
 
-    const status = await requireBilling({ check }, { isTest: true });
+    const status = await requireBilling({ check }, { isTest: false });
 
     expect(status.plan).toBe(GROWTH_PLAN);
-    // Managed pricing: no plans filter — count any active subscription.
+    // Managed pricing: no plans filter — count any active subscription, and
+    // include test subscriptions even in production: Shopify bills development
+    // and review stores with them.
     expect(check).toHaveBeenCalledWith({ isTest: true });
+  });
+
+  it("reads managed-pricing display names: Scale and 'Mannon Growth' unlock Growth features", async () => {
+    const forName = (name: string) =>
+      requireBilling({ check: vi.fn().mockResolvedValue({ hasActivePayment: true, appSubscriptions: [{ name, status: "ACTIVE", id: "s" }] }) });
+    expect((await forName("Scale")).plan).toBe(GROWTH_PLAN);
+    expect((await forName("Mannon Growth")).plan).toBe(GROWTH_PLAN);
+    expect((await forName("Starter (annual)")).plan).toBe(STARTER_PLAN);
+    expect((await forName("Free")).plan).toBeNull();
   });
 
   it("reports trial for a store with no active payment", async () => {
@@ -191,6 +202,7 @@ describe("requireBilling (skeleton — reads, never enforces)", () => {
       onTrial: true,
       activeSubscriptionName: null,
       activeSubscriptionId: null,
+      unverified: true,
     });
   });
 });
@@ -300,6 +312,14 @@ describe.skipIf(!hasDb)("reconcileShopPlan (DB)", () => {
   it("is idempotent — no event when nothing changed", async () => {
     const shop = await seedShop("d.myshopify.com", "STARTER");
     await reconcileShopPlan("d.myshopify.com", statusFor(STARTER_PLAN, "s3"));
+    expect(await prisma.event.count({ where: { shopId: shop.id } })).toBe(0);
+  });
+
+  it("keeps a paid plan when Shopify's billing couldn't be read", async () => {
+    const shop = await seedShop("f.myshopify.com", "GROWTH");
+    const next = await reconcileShopPlan("f.myshopify.com", { ...statusFor(null), unverified: true });
+    expect(next).toBe("GROWTH");
+    expect((await prisma.shop.findUnique({ where: { id: shop.id } }))!.plan).toBe("GROWTH");
     expect(await prisma.event.count({ where: { shopId: shop.id } })).toBe(0);
   });
 

@@ -29,6 +29,12 @@ export interface BillingStatus {
   activeSubscriptionName: string | null;
   /** The active subscription's Shopify id — needed to cancel it. */
   activeSubscriptionId: string | null;
+  /**
+   * True when Shopify's billing couldn't be read (API error). The page still
+   * renders as unpaid, but nothing may be persisted from this status: a failed
+   * read must never cancel a paying merchant's plan.
+   */
+  unverified?: boolean;
 }
 
 // --- plan gating -------------------------------------------------------------
