@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import prisma from "../db.server";
-import { listPriceRules, savePriceRule, deletePriceRule, evaluatePriceVisibility, ScopeNotAllowedError } from "./price-visibility.server";
+import { listPriceRules, savePriceRule, deletePriceRule, evaluatePriceVisibility, ScopeNotAllowedError, priceRulePlanFor } from "./price-visibility.server";
 
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -20,6 +20,15 @@ describe.skipIf(!hasDb)("price-visibility.server (DB)", () => {
     expect(r).toHaveProperty("id");
     expect(await listPriceRules("pv.myshopify.com")).toHaveLength(1);
     await expect(savePriceRule("pv.myshopify.com", { scope: "PRODUCT", scopeRef: "gid://p/1", hidePrice: true, hideAtc: false })).rejects.toBeInstanceOf(ScopeNotAllowedError);
+  });
+
+  it("a Scale shop (v3 plan) can gate guests and target by tag; Free cannot", async () => {
+    await prisma.shop.create({ data: { shopifyDomain: "pv.myshopify.com", plan: "SCALE" } });
+    expect(await priceRulePlanFor("pv.myshopify.com")).toEqual({ plan: "SCALE", legacy: false });
+    expect(await savePriceRule("pv.myshopify.com", { scope: "LOGGED_OUT", hidePrice: true, hideAtc: false })).toHaveProperty("id");
+    expect(await savePriceRule("pv.myshopify.com", { scope: "CUSTOMER_TAG", scopeRef: "wholesale", hidePrice: true, hideAtc: false })).toHaveProperty("id");
+    await prisma.shop.update({ where: { shopifyDomain: "pv.myshopify.com" }, data: { plan: "FREE" } });
+    await expect(savePriceRule("pv.myshopify.com", { scope: "LOGGED_OUT", hidePrice: true, hideAtc: false })).rejects.toBeInstanceOf(ScopeNotAllowedError);
   });
 
   it("requires a reference for targeted scopes (Growth)", async () => {

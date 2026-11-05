@@ -10,7 +10,7 @@ import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { GROWTH_PLAN } from "../lib/billing";
 import { priceRuleScopeAllowed, type PriceScope } from "../lib/price-visibility";
-import { QUOTE_CAPTURE_ENABLED, listPriceRules, savePriceRule, deletePriceRule, ScopeNotAllowedError } from "../services/price-visibility.server";
+import { QUOTE_CAPTURE_ENABLED, listPriceRules, savePriceRule, deletePriceRule, ScopeNotAllowedError, priceRulePlanFor } from "../services/price-visibility.server";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -27,9 +27,12 @@ const needsRef = (s: PriceScope) => s === "CUSTOMER_TAG" || s === "PRODUCT" || s
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!QUOTE_CAPTURE_ENABLED()) throw new Response("Not found", { status: 404 });
-  const status = await requireBilling(billing, { isTest: IS_TEST });
+  await requireBilling(billing, { isTest: IS_TEST });
   const rules = await listPriceRules(session.shop);
-  return { rules, plan: status.plan };
+  // Same plan source as the save path (the shop's stored v3 plan), so the form
+  // never locks a scope the server would accept, or the other way round.
+  const { plan, legacy } = await priceRulePlanFor(session.shop);
+  return { rules, plan, legacy };
 };
 
 type ActionResult = { ok: boolean; message?: string; error?: string };
@@ -60,7 +63,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
 };
 
 export default function PriceRules() {
-  const { rules, plan } = useLoaderData<typeof loader>();
+  const { rules, plan, legacy } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
@@ -72,8 +75,8 @@ export default function PriceRules() {
   const [ctaLabel, setCtaLabel] = useState("Request a Quote");
   const [priority, setPriority] = useState("0");
 
-  const scopeOptions = SCOPES.map((s) => ({ label: SCOPE_LABEL[s] + (priceRuleScopeAllowed(plan, s) ? "" : " (Growth)"), value: s, disabled: !priceRuleScopeAllowed(plan, s) }));
-  const scopeLocked = !priceRuleScopeAllowed(plan, scope);
+  const scopeOptions = SCOPES.map((s) => ({ label: SCOPE_LABEL[s] + (priceRuleScopeAllowed(plan, s, legacy) ? "" : s === "ALL" || s === "LOGGED_OUT" ? " (Starter)" : " (Growth)"), value: s, disabled: !priceRuleScopeAllowed(plan, s, legacy) }));
+  const scopeLocked = !priceRuleScopeAllowed(plan, scope, legacy);
 
   return (
     <Page>
@@ -143,7 +146,11 @@ export default function PriceRules() {
                 <Box minWidth="16rem"><TextField label="Button label" name="ctaLabel" value={ctaLabel} onChange={setCtaLabel} autoComplete="off" /></Box>
               </InlineStack>
               {scopeLocked ? (
-                <Banner tone="info"><p>Targeting by tag, product, or collection needs the Growth plan. Pick “Everyone” or “Logged-out visitors”, or <a href={`/app/settings?upgrade=${GROWTH_PLAN}`}>upgrade to Growth</a>.</p></Banner>
+                scope === "ALL" || scope === "LOGGED_OUT" ? (
+                  <Banner tone="info"><p>Price rules come with the Starter plan and above. <a href="/app/plans">See plans</a>.</p></Banner>
+                ) : (
+                  <Banner tone="info"><p>Targeting by tag, product, or collection needs the Growth plan. Pick “Everyone” or “Logged-out visitors”, or <a href={`/app/settings?upgrade=${GROWTH_PLAN}`}>upgrade to Growth</a>.</p></Banner>
+                )
               ) : (
                 <Box><Button submit variant="primary" disabled={busy}>Add rule</Button></Box>
               )}

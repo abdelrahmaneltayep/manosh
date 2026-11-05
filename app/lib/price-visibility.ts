@@ -6,6 +6,7 @@
 // booleans + a CTA label, so a hidden price can't leak through our markup/JSON
 // (§5.2). Enforced by the `VisibilityDecision` type and covered by tests.
 
+import { effectivePlanHandle, meetsPlan } from "./billing-v3";
 export type PriceScope = "ALL" | "LOGGED_OUT" | "CUSTOMER_TAG" | "PRODUCT" | "COLLECTION";
 
 export interface PriceRuleLite {
@@ -99,14 +100,15 @@ export function evaluateVisibility(rules: PriceRuleLite[], ctx: StorefrontContex
 }
 
 /**
- * Plan gate for a scope (pure). On the 2-tier ladder: broad audience scopes
- * (ALL, LOGGED_OUT) are Starter; targeted scopes (customer tag / product /
- * collection) are Growth — matching §5.2 "logged-out: starter · by
- * tag/product/collection: growth".
+ * Plan gate for a scope (pure). Broad audience scopes (ALL, LOGGED_OUT) need
+ * Starter or above; targeted scopes (customer tag / product / collection) need
+ * Growth or above. Reads the v3 ladder (billing-v3) so Scale, and a trial
+ * (which grants Starter-level access), are covered; legacy "Starter"/"Growth"
+ * subscription names still work. Free and cancelled shops get no rules.
  */
-export function priceRuleScopeAllowed(plan: string | null | undefined, scope: PriceScope): boolean {
-  const isGrowth = plan === "GROWTH" || plan === "Growth";
-  const paid = isGrowth || plan === "STARTER" || plan === "Starter";
-  if (scope === "ALL" || scope === "LOGGED_OUT") return paid;
-  return isGrowth; // CUSTOMER_TAG / PRODUCT / COLLECTION
+export function priceRuleScopeAllowed(plan: string | null | undefined, scope: PriceScope, legacy = false): boolean {
+  if (!plan) return false;
+  const handle = effectivePlanHandle(String(plan).toUpperCase(), legacy);
+  if (scope === "ALL" || scope === "LOGGED_OUT") return meetsPlan(handle, "starter");
+  return meetsPlan(handle, "growth"); // CUSTOMER_TAG / PRODUCT / COLLECTION
 }

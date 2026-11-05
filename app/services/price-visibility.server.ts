@@ -35,9 +35,10 @@ async function shopIdFor(shopDomain: string): Promise<string | null> {
   const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { id: true } });
   return shop?.id ?? null;
 }
-async function planFor(shopDomain: string): Promise<string | null> {
-  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { plan: true } });
-  return shop?.plan ?? null;
+/** The shop's stored plan + grandfathering flag — the single input to the scope gate. */
+export async function priceRulePlanFor(shopDomain: string): Promise<{ plan: string | null; legacy: boolean }> {
+  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { plan: true, legacyPlan: true } });
+  return { plan: shop?.plan ?? null, legacy: Boolean(shop?.legacyPlan) };
 }
 
 export interface PriceRuleRow {
@@ -80,8 +81,8 @@ export interface PriceRuleInput {
 export async function savePriceRule(shopDomain: string, input: PriceRuleInput): Promise<{ id: string } | { error: string }> {
   const shopId = await shopIdFor(shopDomain);
   if (!shopId) return { error: "Unknown shop." };
-  const plan = await planFor(shopDomain);
-  if (!priceRuleScopeAllowed(plan, input.scope)) throw new ScopeNotAllowedError(input.scope);
+  const { plan, legacy } = await priceRulePlanFor(shopDomain);
+  if (!priceRuleScopeAllowed(plan, input.scope, legacy)) throw new ScopeNotAllowedError(input.scope);
 
   // Targeted scopes need a reference; broad ones must not carry one.
   const needsRef = input.scope === "CUSTOMER_TAG" || input.scope === "PRODUCT" || input.scope === "COLLECTION";

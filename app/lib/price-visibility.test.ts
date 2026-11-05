@@ -69,6 +69,25 @@ describe("evaluateVisibility — THE INVARIANT: no price in the decision", () =>
   });
 });
 
+describe("priceRuleScopeAllowed gate (v3 ladder)", () => {
+  it("Scale and Growth get every scope", () => {
+    for (const plan of ["SCALE", "GROWTH", "Growth"]) {
+      expect(priceRuleScopeAllowed(plan, "LOGGED_OUT")).toBe(true);
+      expect(priceRuleScopeAllowed(plan, "CUSTOMER_TAG")).toBe(true);
+      expect(priceRuleScopeAllowed(plan, "COLLECTION")).toBe(true);
+    }
+  });
+  it("a trial gets Starter-level rules; Free and cancelled get none", () => {
+    expect(priceRuleScopeAllowed("TRIAL", "LOGGED_OUT")).toBe(true);
+    expect(priceRuleScopeAllowed("TRIAL", "PRODUCT")).toBe(false);
+    expect(priceRuleScopeAllowed("FREE", "ALL")).toBe(false);
+    expect(priceRuleScopeAllowed("CANCELLED", "LOGGED_OUT")).toBe(false);
+  });
+  it("a grandfathered legacy Starter shop maps up to Growth", () => {
+    expect(priceRuleScopeAllowed("STARTER", "PRODUCT", true)).toBe(true);
+  });
+});
+
 describe("priceRuleScopeAllowed gate (2-tier)", () => {
   it("broad scopes are Starter; targeted scopes are Growth", () => {
     expect(priceRuleScopeAllowed("STARTER", "ALL")).toBe(true);
