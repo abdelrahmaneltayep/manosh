@@ -213,7 +213,9 @@ export async function merchant(rec, ctx) {
     await rec.tc("M9", "Analytics and ✦ Claude insights", { action: "open Analytics; click Explain with Claude when allowed", expected: "KPI cards render; insights render or an upgrade note" }, async () => {
       const f = await openApp(page, app, "/app/analytics");
       const t = await textOf(f);
-      if (!/Win rate|Open pipeline|Last 30 days/.test(t)) throw new Error("no KPI cards");
+      if (/Come back after a few quotes/.test(t)) return { actual: "the designed empty state: 'Come back after a few quotes' (fewer than 5 quotes sent)", evidence: await rec.shot(page, "analytics") };
+      if (/Quote analytics is a Growth feature/.test(t)) return { status: "INFO", actual: "upgrade note: analytics is a Growth feature on this plan" };
+      if (!/Win rate|Open pipeline|Last 30 days/.test(t)) throw new Error("no KPI cards, empty state or upgrade note");
       const explain = f.getByRole("button", { name: /Explain with Claude/ }).first();
       if (ctx.ai && (await explain.count())) {
         await explain.click();
@@ -223,9 +225,12 @@ export async function merchant(rec, ctx) {
     }, fail);
 
     // M10 — Pricing plans → Choose Growth opens Shopify's plan page (review 1.2.2)
-    await rec.tc("M10", "Pricing plans → Choose Growth opens Shopify's plan page (review 1.2.2)", { action: "Pricing plans → Choose Growth; read Shopify's page; leave without approving", expected: "Shopify's plan page lists Free, Starter, Growth and Scale; no 'There's no page at this address'" }, async () => {
+    await rec.tc("M10", "Pricing plans → Choose Growth opens Shopify's plan page (review 1.2.2)", { action: "Pricing plans → Choose Growth (or Switch to Growth on Scale); read Shopify's page; leave without approving", expected: "Shopify's plan page lists Free, Starter, Growth and Scale; no 'There's no page at this address'" }, async () => {
       const f = await openApp(page, app, "/app/plans");
-      const choose = f.getByRole("button", { name: /Choose Growth|Choose Scale|Choose Starter/ }).first();
+      // Any plan change (upgrade or switch down) opens Shopify's plan page; nothing is approved here.
+      let choose = f.getByRole("button", { name: "Choose Growth", exact: true });
+      for (const n of ["Switch to Growth", "Choose Scale", "Choose Starter", "Switch to Starter"]) if (!(await choose.count())) choose = f.getByRole("button", { name: n, exact: true });
+      choose = choose.first();
       if (!(await choose.count())) {
         const t = await textOf(f);
         return { status: "INFO", actual: `no Choose button (${(t.match(/Current plan[^.]*|You're on[^.]*/i) || ["plan page shown"])[0]})` };
