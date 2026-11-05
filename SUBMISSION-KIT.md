@@ -288,6 +288,26 @@ NOTES
 
 ---
 
+## Network access request  (customer account UI extension `customer-account-quotes`)
+
+Paste as the reason when requesting network access for checkout and customer
+account UI extensions. Accurate to `extensions/customer-account-quotes/src/QuotesBlock.tsx`
+and `app/routes/api.account.quotes.tsx`; update it if either changes.
+
+```
+Mannon's customer account block ("Your quotes", target customer-account.order-index.block.render) shows a signed-in B2B buyer the wholesale quotes they have with the merchant: status, item count, estimated total and date, with a link to accept or reorder in Mannon's buyer portal. Quotes live in Mannon's database, not in Shopify, so the block must fetch them from Mannon's server.
+
+The block makes one read-only GET request to https://manosh.fly.dev/api/account/quotes. It sends nothing but Shopify's customer account session token in the Authorization header. The server verifies the token and takes the customer's identity only from its subject, so no email or id from the browser is trusted and a buyer can only see their own quotes. The response contains no payment data and nothing is written; any action happens on Mannon's portal after the buyer clicks through. No third-party services are called from the extension.
+```
+
+Short version, if the form asks for one:
+
+```
+Shows a signed-in B2B buyer their wholesale quotes, which are stored on Mannon's server, by making one read-only request to https://manosh.fly.dev/api/account/quotes authenticated with Shopify's customer account session token. The server identifies the buyer only from the verified token; nothing is written and no third parties are called.
+```
+
+---
+
 ## Pre-submission checklist (dashboard side)
 
 - [ ] Protected customer data access: Level 1 + **Email** only (deselect Name; no
@@ -326,7 +346,9 @@ NOTES
       and the theme extension on 2026-07. Verified 2026-09-19: the "Your quotes" block
       renders on the dev store's new customer account.
 - [ ] Network access approved for the `customer-account-quotes` extension (works on
-      the dev store without it; production stores need the approval).
+      the dev store without it; production stores need the approval). Request it
+      under Partner Dashboard → Mannon → API access, with the reason in
+      "Network access request" below.
 - [ ] Support email filled in and monitored; privacy URL returns a page after deploy.
 - [ ] Cross-store discovery directory off for the review: `MANNON_FF_DISCOVERY` unset
       on Fly, `/discover` returns 404 (QA case C16; requirement 1.1.6).
