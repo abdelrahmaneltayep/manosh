@@ -89,6 +89,17 @@ async function settled(locator, timeout = 20000) {
   return "";
 }
 
+/** Click submit and wait for this form's own POST response (no race with the page's message). */
+async function submitAndWait(page, form, pathFrag) {
+  const respP = page.waitForResponse((r) => r.url().includes(pathFrag) && r.request().method() === "POST", { timeout: 25000 }).catch(() => null);
+  await form.locator("[type='submit']").click();
+  const resp = await respP;
+  if (!resp) return null;
+  let body = null;
+  try { body = await resp.json(); } catch { /* not json */ }
+  return { status: resp.status(), body };
+}
+
 /** Fill any merchant-built required fields (cf_*) with sample values. */
 async function fillCustomFields(form) {
   const fields = form.locator("[name^='cf_']");
@@ -224,9 +235,8 @@ async function shopperSide() {
       if (await form.locator("[name='note']").count()) await form.locator("[name='note']").fill(`Storefront test ${RUN}: Request a Quote`);
       await fillCustomFields(form);
       await sleep(1600); // stay above the 1.2 s anti-bot threshold
-      await form.locator("[type='submit']").click();
+      const res = await submitAndWait(page, form, "/api/quote-request");
       const msg = await settled(form.locator(".mannon-qw-msg"));
-      const res = lastApi("/api/quote-request");
       const ok = res && res.status === 200 && res.body?.ok && !/wrong|error/i.test(msg);
       await shot(page, "request-a-quote");
       record("T1", "Request a Quote: send from the product page", ok ? "PASS" : "FAIL", `"${msg || "no message"}" · API ${res ? `${res.status} ok=${res.body?.ok}` : "not called"}`);
@@ -244,9 +254,8 @@ async function shopperSide() {
       await form.locator("[name='email']").fill(EMAIL);
       await form.locator("[name='note']").fill(`Storefront test ${RUN}: Add to Quote · ${COMPANY}`);
       await sleep(1600);
-      await form.locator("[type='submit']").click();
+      const res = await submitAndWait(page, form, "/api/quote-request");
       const msg = await settled(form.locator(".mannon-cap-msg"));
-      const res = lastApi("/api/quote-request");
       const ok = res && res.status === 200 && res.body?.ok && /Thanks/i.test(msg);
       await shot(page, "add-to-quote");
       record("T2", "Add to Quote: drawer, then send", ok ? "PASS" : "FAIL", `${rows} line(s), launcher "${launcher}" · "${msg || "no message"}"`);
@@ -268,9 +277,8 @@ async function shopperSide() {
       if (await form.locator("[name='note']").count()) await form.locator("[name='note']").fill(`Storefront test ${RUN}: Make an Offer · ${COMPANY}`);
       await fillCustomFields(form);
       await sleep(1600);
-      await form.locator("[type='submit']").click();
+      const res = await submitAndWait(page, form, "/api/offer");
       const msg = await settled(form.locator(".mannon-mao-msg"));
-      const res = lastApi("/api/offer");
       const ok = res && res.status === 200 && res.body?.ok && !/wrong|error/i.test(msg);
       await shot(page, "make-an-offer");
       record("T3", "Make an Offer: 80% of list", ok ? "PASS" : "FAIL", `offer ${offer} on list ${list || "?"} · outcome ${res?.body?.outcome || "?"} · "${msg || "no message"}"`);
@@ -298,9 +306,8 @@ async function shopperSide() {
         await form.locator("[name='email']").fill(EMAIL);
         await form.locator("[name='note']").fill(`Storefront test ${RUN}: Cart to Quote · ${COMPANY}`);
         await sleep(1600);
-        await form.locator("[type='submit']").click();
+        const res = await submitAndWait(page, form, "/api/quote-request");
         const msg = await settled(form.locator(".mannon-cap-msg"));
-        const res = lastApi("/api/quote-request");
         const ok = res && res.status === 200 && res.body?.ok && /Thanks/i.test(msg);
         await shot(page, "cart-to-quote");
         record("T4", "Convert Cart to Quote from /cart", ok ? "PASS" : "FAIL", `${rows} cart line(s) · "${msg || "no message"}"`);
