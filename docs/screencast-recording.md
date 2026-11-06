@@ -1,158 +1,220 @@
-# Review screencast — what to record
+# Review screencast — what to record, step by step
 
-The screencast Shopify asks for with the submission (App Store requirement
-4.5.3): how to set up Mannon and use its core features, step by step, with the
-result of each step on screen, in English or with English subtitles. It follows
-the reviewer testing instructions in `SUBMISSION-KIT.md` step for step, so the
-reviewer can watch what they are about to do.
+The screencast Shopify asks for with the submission (App Store requirement 4.5.3):
+how to set up Mannon and use its core features, step by step, with the result of
+each step on screen, in English or with English subtitles. It follows the reviewer
+testing instructions in `SUBMISSION-KIT.md`.
 
-**Your part:** record the 12 clips below as separate files, without narration.
-**My part:** trim the waits, add an English caption for every step (these are
-the subtitles), zoom in on each result, add a title and an end card, and export
-one 1920×1080 MP4 of about 5–6 minutes.
+**You record** 12 short clips, without sound. **I edit** them into one video: I cut
+the waiting, add an English caption to every step (the subtitles), zoom in on each
+result, add a title and an end card, and export a 1920×1080 MP4.
 
----
-
-## Before you record (once)
-
-1. **Notifications off:** macOS Focus → Do Not Disturb. Slack, Chrome and calendar
-   pop-ups must not appear in the video.
-2. **A clean Chrome window:** use the `~/mannon-chrome` profile, with only the tabs
-   you need. Hide the bookmarks bar (⌘⇧B), set zoom to 100% and make the window
-   about 1920×1080.
-3. **macOS screen recording:** press ⌘⇧5, choose **Record Selected Portion**, and draw
-   the area around the Chrome window. Under **Options**, turn on **Show Mouse Clicks**
-   and set the microphone to **None**.
-4. **Store setup** (already true on `mannon-9iu9ewku`):
-   - The storefront password is already entered in the Chrome you record with
-     (open the store once before recording), so it never appears on screen.
-   - **Customers → Companies:** Snowdevil has a location, and the contact
-     `karine.ruby@example.com` is assigned to it.
-   - The product **Harbor Blend Espresso, 1 kg** exists.
-   - The guest price-gating rule is on. That's fine: it shows the price gate.
-5. **Have these ready to paste:**
-   - Email: `karine.ruby@example.com`
-   - Company: `Snowdevil`
-   - The PO for clip 9:
-     ```
-     Hi team, please send for next week:
-     24x HB-ESP-1KG
-     6x sku-managed-1
-     2x sku-hosted-1
-     Thanks!
-     ```
-
-**While recording:** move the mouse slowly, and after every click that shows a
-result (a confirmation, a total, a status), **hold still for 2 seconds**. Don't
-worry about pauses or mistakes; stop the clip and redo it, and I cut the rest.
-Never type a password on camera.
+Record the clips **in order (01 → 12)**. Some depend on the one before: clip 05
+uses the request from clip 04, and clips 07 and 09 use the link from clip 06.
 
 ---
 
-## The clips
+## Part A — Get ready (once, about 10 minutes)
 
-Save them as `clip-01.mov`, `clip-02.mov`, and so on. Times are rough; take as long as you need.
+**A1. Turn off notifications**
+1. Click the Control Centre icon (top-right of the menu bar).
+2. Click **Focus** → **Do Not Disturb**.
 
-### Clip 01 — Open Mannon in Shopify Admin (~30 s)
-1. Shopify Admin → **Apps → Mannon**. The Home dashboard opens.
-2. Click slowly through the left navigation: **Quotes, Quote forms, Pricing &
-   catalog, Buyers, Analytics, Settings, Pricing plans**. Let each page load.
+**A2. Prepare Chrome**
+1. Open the Chrome you use for Mannon (the `~/mannon-chrome` profile) and close every tab except one.
+2. Press **⌘⇧B** to hide the bookmarks bar.
+3. Press **⌘0** to set the zoom to 100%.
+4. Make the window large: double-click its title bar, or drag it to roughly 1920×1080.
 
-On screen: every page loads inside Shopify Admin.
+**A3. Open the storefront once (so the password is never typed on camera)**
+1. In that Chrome, go to `https://mannon-9iu9ewku.myshopify.com`.
+2. Type the storefront password and press Enter.
+3. Open a private window (**⌘⇧N**), go to the same address, enter the password there too, then close the private window.
 
-### Clip 02 — The B2B company comes from Shopify (~20 s)
-1. **Customers → Companies → Snowdevil.**
-2. Show the location and the contact `karine.ruby@example.com` assigned to it.
+**A4. Check the store is ready (look only, change nothing)**
+1. Shopify Admin → **Customers → Companies → Snowdevil**: there is a location, and the
+   contact `karine.ruby@example.com` is assigned to it.
+2. Shopify Admin → **Products**: **Harbor Blend Espresso, 1 kg** is there and Active.
 
-On screen: Mannon uses Shopify's own companies, locations and contacts.
+**A5. Set up the screen recorder**
+1. Press **⌘⇧5**. A toolbar appears at the bottom of the screen.
+2. Click **Record Selected Portion** (the dotted rectangle with a circle).
+3. Drag the frame so it covers the Chrome window exactly.
+4. Click **Options** and set: **Save to → Desktop**, **Microphone → None**, tick **Show Mouse Clicks**.
+5. Press **Esc** to close the toolbar for now. macOS remembers the frame and options.
 
-### Clip 03 — Add the storefront block (~30 s)
-1. **Mannon → Quotes → Requests.** Scroll to **Add quote requests to your storefront**.
-2. Click **Add to theme** next to **Request a Quote**. The theme editor opens in a
-   new tab with the block placed on the product page. Hold 2 s.
-3. **Don't click Save:** your theme already has the block, and saving would add it
-   twice. Close the tab (choose **Leave** if asked).
+**A6. Keep this text ready to paste** (in Notes or TextEdit, outside the recording frame)
+```
+karine.ruby@example.com
+Snowdevil
+Hi team, please send for next week:
+24x HB-ESP-1KG
+6x sku-managed-1
+2x sku-hosted-1
+Thanks!
+```
 
-On screen: one click places the block; nothing changes until the merchant saves.
-
-### Clip 04 — A buyer asks for a quote on the storefront (~40 s)
-1. Open `https://mannon-9iu9ewku.myshopify.com/products/harbor-blend-espresso-1-kg`.
-2. Show the buttons **Request a Quote, Make an offer, Add to Quote**, and that the
-   price is hidden for logged-out visitors.
-3. Click **Request a Quote**. Fill in the email `karine.ruby@example.com`, the company
-   `Snowdevil` and quantity `24`. Click **Send request**.
-
-On screen: "Thanks — we got your request and will reply with pricing."
-
-### Clip 05 — Convert, recalculate, draft with Claude, send the counter (~70 s)
-1. **Mannon → Quotes → Requests.** In the row with `karine.ruby@example.com`, click
-   **Convert to quote**.
-2. On the quote, point at **Totals from Shopify** (subtotal, tax, total). Hold 2 s.
-3. Change the **Unit price** (for example 21.50 → 20.00), then click **Recalculate with
-   these prices**. Hold on the new totals and "Not saved until you send the counter".
-4. Click **✦ Draft all lines with Claude**. Wait for the suggestion, hold 2 s, then
-   click **Use this price**.
-5. Click **Send counter**.
-
-On screen: "Counter sent to the buyer"; status **Countered**.
-
-### Clip 06 — Send the buyer their sign-in link (~15 s)
-1. **Mannon → Buyers.** In the row with `karine.ruby@example.com`, click **Generate link**.
-2. Hold on **Magic link ready to send**, then copy the link.
-
-### Clip 07 — The buyer accepts on Net 30 (~50 s)
-1. Open a **private window** (⌘⇧N) and paste the link. Click **Continue** (no password).
-2. On the portal home, open the **Countered** quote.
-3. Choose **Payment terms → Net 30** and click **Accept & create order**. Hold on the
-   confirm panel ("Nothing is written until you confirm").
-4. Click **Confirm & create order**.
-
-On screen: status **Ordered**, with subtotal, tax and total from Shopify.
-
-### Clip 08 — The draft order in Shopify (~20 s)
-1. Back in Shopify Admin: **Orders → Drafts**. Open the newest draft.
-2. Show the company **Snowdevil**, payment terms **Net 30**, the agreed prices, and
-   Shopify's tax and total.
-
-### Clip 09 — Order pad: paste a PO, Claude reads it (~40 s)
-1. In the buyer's private window: portal home → **Open the order pad**.
-2. Paste the PO from step 5 of the setup into **Paste a PO or email**. Click **Read my order**.
-3. Hold on the matched lines under **Your order**. Point at **Request quote for these
-   items** but **don't click it**.
-
-On screen: Claude's matches; nothing is ordered until the buyer confirms.
-
-### Clip 10 — One-tap reorder, from the public demo (~35 s)
-1. New private window: `https://manosh.fly.dev/demo` → **Open the buyer demo**.
-2. On **Reorder a past order**, click **Reorder**, then **Send reorder**.
-
-On screen: the new quote shows **Ordered**, or "waiting for your supplier" when it's
-over the auto-approve tolerance.
-
-### Clip 11 — Make an Offer and price rules (~40 s, optional)
-1. On the espresso product page, click **Make an offer**, enter a price below list
-   and send it.
-2. **Mannon → Pricing & catalog → Offers:** open the offer and show **Send counter**
-   (sending it is optional).
-3. **Price rules:** show the **Logged-out visitors · hide price** rule.
-
-### Clip 12 — Plans are billed by Shopify (~25 s)
-1. **Mannon → Pricing plans.** Click any **Choose …** or **Switch to …** button. Your
-   store is on Growth, so it shows **Choose Scale**.
-2. Shopify's own plan page opens and lists the plans. Hold 2 s, then go back without
-   approving, or approve: the dev store uses test charges.
+### How every clip works
+- **To start:** set up the starting screen described in the clip, press **⌘⇧5**, then click **Record**.
+- **During the clip:** move the mouse slowly. Wherever you see **⏸ Hold 2 s**, stop moving for two seconds so the viewer can read the result.
+- **To stop:** click the **⏹ stop button** in the menu bar, or press **⌘⌃Esc**.
+- **Afterwards:** a file called "Screen Recording … .mov" appears on the Desktop. Rename it to the clip's name, e.g. `clip-01.mov`.
+- **If something goes wrong:** stop, delete that file, and record the clip again. Only that clip.
 
 ---
 
-## Sending me the clips
+## Part B — The clips
 
-The clips are too large for chat, so put them in **one Google Drive folder** and share
-it with "anyone with the link can view". Send me the link: I'll fetch them through the
-Drive connector, edit them here with ffmpeg, and send back:
+### Clip 01 — Open Mannon in Shopify Admin (about 30 s)
+**Starting screen:** Shopify Admin home (`admin.shopify.com/store/mannon-9iu9ewku`).
 
-- `mannon-review-screencast.mp4` (1920×1080, about 5–6 min, English captions burned
-  in, plus a separate `.srt` subtitle file), for the submission.
-- If you want, a promotional 2–3 minute cut for the listing (Shopify asks that
-  screen recording be no more than a quarter of that one).
+1. Start recording.
+2. In the left sidebar, click **Apps**, then **Mannon**. Wait until the Mannon Home page loads. ⏸ Hold 2 s.
+3. In Mannon's navigation, click each of these in turn, waiting for each page to load: **Quotes** → **Quote forms** → **Pricing & catalog** → **Buyers** → **Analytics** → **Settings** → **Pricing plans**.
+4. Click **Home** to come back. ⏸ Hold 2 s.
+5. Stop recording. Rename to `clip-01.mov`.
 
-If a clip goes wrong, just re-record that clip; the others stay as they are.
+### Clip 02 — The B2B company comes from Shopify (about 20 s)
+**Starting screen:** Shopify Admin.
+
+1. Start recording.
+2. In the left sidebar, click **Customers**, then **Companies**.
+3. Click **Snowdevil**.
+4. Scroll so the location and the contact `karine.ruby@example.com` are both visible. ⏸ Hold 2 s.
+5. Stop recording. Rename to `clip-02.mov`.
+
+### Clip 03 — Add the storefront button to the theme (about 30 s)
+**Starting screen:** Mannon open in Shopify Admin.
+
+1. Start recording.
+2. Click **Quotes**, then the **Requests** tab at the top.
+3. Scroll down to the card **Add quote requests to your storefront**. ⏸ Hold 2 s on the three steps.
+4. Click **Add to theme** next to **Request a Quote**. A new tab opens with the theme editor, and the block is already placed on the product page. ⏸ Hold 2 s.
+5. **Do not click Save** (your theme already has this block; saving would add a second one).
+6. Close that tab (**⌘W**). If Chrome asks "Leave site?", click **Leave**.
+7. Stop recording. Rename to `clip-03.mov`.
+
+### Clip 04 — A buyer asks for a quote on the storefront (about 40 s)
+**Starting screen:** a new tab with `https://mannon-9iu9ewku.myshopify.com/products/harbor-blend-espresso-1-kg`, scrolled to the top.
+
+1. Start recording.
+2. Move the mouse slowly over the buttons **Request a Quote**, **Make an offer** and **Add to Quote**. ⏸ Hold 2 s. (The price is hidden because the store hides prices from logged-out visitors; that's a Mannon feature.)
+3. Click **Request a Quote**. A form opens.
+4. Fill it in:
+   - **Email:** paste `karine.ruby@example.com`
+   - **Company:** paste `Snowdevil`
+   - **Quantity:** `24`
+5. Click **Send request**.
+6. ⏸ Hold 2 s on "Thanks — we got your request and will reply with pricing."
+7. Stop recording. Rename to `clip-04.mov`.
+
+### Clip 05 — Turn the request into a quote, price it, counter it (about 70 s)
+**Starting screen:** Mannon → **Quotes → Requests**.
+
+1. Start recording.
+2. Find the newest row with `karine.ruby@example.com` (the one you just sent) and click **Convert to quote**. The quote page opens.
+3. Point at the card **Totals from Shopify** (subtotal, tax, total). ⏸ Hold 2 s.
+4. Click the **Unit price** box, change it (e.g. from `21.50` to `20.00`), then click **Recalculate with these prices**.
+5. ⏸ Hold 2 s on the new totals and the note "Not saved until you send the counter".
+6. Click **✦ Draft all lines with Claude**. Wait for the suggestion (a few seconds). ⏸ Hold 2 s.
+7. Click **Use this price**.
+8. Click **Send counter**.
+9. ⏸ Hold 2 s on "Counter sent to the buyer".
+10. Stop recording. Rename to `clip-05.mov`.
+
+### Clip 06 — Send the buyer their sign-in link (about 15 s)
+**Starting screen:** Mannon open in Shopify Admin.
+
+1. Start recording.
+2. Click **Buyers**.
+3. In the row with `karine.ruby@example.com`, click **Generate link**.
+4. ⏸ Hold 2 s on **Magic link ready to send**.
+5. Click the link text to select it and copy it (**⌘C**).
+6. Stop recording. Rename to `clip-06.mov`.
+
+### Clip 07 — The buyer accepts the quote on Net 30 (about 50 s)
+**Starting screen:** a new private window (**⌘⇧N**) with an empty tab.
+
+1. Start recording.
+2. Paste the link into the address bar (**⌘V**) and press Enter.
+3. ⏸ Hold 2 s on "You're signing in as karine.ruby@example.com" (no password), then click **Continue**.
+4. On the portal home, under **Your quotes**, click the newest quote marked **Countered**.
+5. Under **Payment terms**, choose **Net 30**.
+6. Click **Accept & create order**. ⏸ Hold 2 s on the confirm panel ("Nothing is written until you confirm").
+7. Click **Confirm & create order**.
+8. ⏸ Hold 2 s on the status **Ordered** with the subtotal, tax and total.
+9. Stop recording. Rename to `clip-07.mov`. **Keep this private window open** for clip 09.
+
+### Clip 08 — The order is a real Shopify draft order (about 20 s)
+**Starting screen:** Shopify Admin (the normal window).
+
+1. Start recording.
+2. In the left sidebar, click **Orders**, then **Drafts**.
+3. Click the newest draft (top of the list).
+4. Scroll slowly to show: the company **Snowdevil**, the line with your agreed price, the **Net 30** payment terms, and the tax and total. ⏸ Hold 2 s.
+5. Stop recording. Rename to `clip-08.mov`.
+
+### Clip 09 — Paste a purchase order; Claude reads it (about 40 s)
+**Starting screen:** the private window from clip 07, on the portal home (click the **Mannon** logo at the top to get there).
+
+1. Start recording.
+2. Click **Open the order pad**.
+3. Scroll to **Paste a PO or email** and click in the box.
+4. Paste the PO from A6 (the five lines starting "Hi team, please send…").
+5. Click **Read my order**. Wait a few seconds.
+6. Scroll down to **Your order**. ⏸ Hold 2 s on the matched lines.
+7. Move the mouse to **Request quote for these items**, but **do not click it**. ⏸ Hold 2 s.
+8. Stop recording. Rename to `clip-09.mov`. You can close the private window now.
+
+### Clip 10 — One-tap reorder, on the public demo (about 35 s)
+**Starting screen:** a new private window (**⌘⇧N**) with an empty tab.
+
+1. Start recording.
+2. Go to `https://manosh.fly.dev/demo` and press Enter.
+3. Click **Open the buyer demo**. The demo buyer's portal opens.
+4. Under **Reorder a past order**, click **Reorder**.
+5. ⏸ Hold 2 s on the order lines, then click **Send reorder**.
+6. ⏸ Hold 2 s on the result (**Ordered**, or a note that it waits for the supplier).
+7. Stop recording. Rename to `clip-10.mov`. Close the private window.
+
+### Clip 11 — Make an Offer and price rules (about 40 s, optional)
+**Starting screen:** the espresso product page from clip 04.
+
+1. Start recording.
+2. Click **Make an offer**. Fill in:
+   - **Email:** paste `karine.ruby@example.com`
+   - **Quantity:** `24`
+   - **Your offer (per unit):** `18`
+3. Click **Send offer**. ⏸ Hold 2 s on the message (your offer rules may answer it straight away; any answer is fine).
+4. Switch to the Shopify Admin tab: Mannon → **Pricing & catalog** → **Offers** tab. ⏸ Hold 2 s on the new offer in the list.
+5. Click the **Price rules** tab. ⏸ Hold 2 s on the rule **Logged-out visitors · hide price**.
+6. Stop recording. Rename to `clip-11.mov`.
+
+### Clip 12 — Plans are billed by Shopify (about 25 s)
+**Starting screen:** Mannon open in Shopify Admin.
+
+1. Start recording.
+2. Click **Pricing plans**. ⏸ Hold 2 s on the four plans (Growth is marked as your current plan).
+3. Click **Choose Scale** (your store is on Growth, so that is the button you will see).
+4. Shopify's own plan page opens. ⏸ Hold 2 s.
+5. Go back without approving (browser **Back**, or **⌘[**).
+6. Stop recording. Rename to `clip-12.mov`.
+
+---
+
+## Part C — Send me the clips
+
+1. On the Desktop you now have `clip-01.mov` … `clip-12.mov` (clip 11 is optional).
+2. Open Google Drive, create a folder **Mannon screencast**, and drag the clips into it.
+3. Right-click the folder → **Share** → **General access: Anyone with the link** (Viewer) → **Copy link**.
+4. Send me the link.
+
+I'll fetch the clips through the Drive connector, edit them here, and send back:
+- `mannon-review-screencast.mp4` (1920×1080, about 5–6 minutes, English captions burned in) and `mannon-review-screencast.srt` (the same captions as a subtitle file), for the submission.
+- If you want, a promotional 2–3 minute cut for the listing (Shopify asks that screen recording be no more than a quarter of that one).
+
+## Afterwards
+
+The clips create real test data on the dev store: one quote request and quote, one
+draft order (payment pending, Net 30), one demo reorder and, with clip 11, one offer.
+They're harmless, and you can delete the draft order under **Orders → Drafts** whenever you like.
