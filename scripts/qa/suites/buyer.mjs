@@ -123,6 +123,18 @@ export async function buyer(rec, ctx) {
         const problem = await portalProblem(p);
         if (problem) return { status: "BLOCKED", actual: `the order pad says: "${problem}"` };
         const ta = (await p.getByPlaceholder(/please send/i).count()) ? p.getByPlaceholder(/please send/i).first() : p.locator("textarea").last();
+        // First, only a PO number (a real mistake seen while recording): the pad must
+        // explain that it needs the item lines, right under the box, and add nothing.
+        await ta.fill("#PO-DEMO-1044");
+        await p.getByRole("button", { name: "Read my order" }).click();
+        const hint = p.getByText(/We didn.t find any products in that text/).first();
+        await hint.waitFor({ timeout: 60000 });
+        const below = await p.evaluate(() => {
+          const btn = [...document.querySelectorAll("button")].find((b) => /Read my order/.test(b.textContent || ""));
+          const msg = [...document.querySelectorAll("[role=alert]")].find((e) => /didn.t find any products/.test(e.textContent || ""));
+          return !!(btn && msg && msg.getBoundingClientRect().top > btn.getBoundingClientRect().top);
+        });
+        if (!below) throw new Error("the 'no products found' message is not under the Read my order box");
         await ta.fill(po);
         const start = new Date().toISOString();
         await p.getByRole("button", { name: "Read my order" }).click();

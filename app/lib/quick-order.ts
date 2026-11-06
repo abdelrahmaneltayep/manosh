@@ -17,7 +17,7 @@ export interface ResolvedLine {
   price: string;
 }
 
-export type UnresolvedReason = "missing-sku" | "invalid-quantity" | "unknown-sku";
+export type UnresolvedReason = "missing-sku" | "invalid-quantity" | "unknown-sku" | "no-match";
 
 export interface UnresolvedRow {
   sku: string;
@@ -35,6 +35,8 @@ export const UNRESOLVED_MESSAGE: Record<UnresolvedReason, string> = {
   "missing-sku": "No SKU on this line",
   "invalid-quantity": "Quantity must be a whole number of 1 or more",
   "unknown-sku": "We couldn’t find this SKU in the catalog",
+  // A line from a pasted PO or email that Claude couldn't match to a catalog product.
+  "no-match": "We couldn’t match this to a product in the catalog",
 };
 
 // Minimal catalog shape the pure resolver needs (a CatalogItem satisfies it).

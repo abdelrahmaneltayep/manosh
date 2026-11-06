@@ -115,7 +115,7 @@ store, theme and Shopify Admin.
 | B3 | Open the Countered quote, choose Net 30, Accept & create order | a confirm panel appears; nothing written yet |
 | B4 | Confirm & create order | status Ordered with Shopify's subtotal, tax and total |
 | B5 | Order pad: paste two SKU lines → Add pasted lines | lines appear in "Your order" |
-| B6 | Order pad: paste a PO → ✦ Read my order | Claude's matches appear; nothing ordered until "Request quote for these items". Locally a "made-up" line comes back from mock Claude with an invented id and must be listed as not matched |
+| B6 | Order pad: paste a PO → ✦ Read my order | Pasting only a PO number explains, under the box, that the item lines are needed. Then Claude's matches appear; nothing ordered until "Request quote for these items". Locally a "made-up" line comes back from mock Claude with an invented id and must be listed as not matched |
 | B7 | Request a quote page | renders with the catalog |
 | B8 | Invoices and Team pages | render |
 | B9 | Language: العربية then English | page turns right-to-left, then back |

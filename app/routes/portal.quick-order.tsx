@@ -89,6 +89,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 type MergeResult = {
   kind: "merge";
+  /** Which box produced it, so its messages show under that box. */
+  source: "csv" | "ai";
+  /** A one-line explanation when nothing in the text matched (AI only). */
+  summary?: string;
   resolved: Array<{ variantId: string; qty: number }>;
   unresolved: Array<{ raw: string; reason: keyof typeof UNRESOLVED_MESSAGE }>;
   errors: string[];
@@ -175,6 +179,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
     );
     return {
       kind: "merge",
+      source: "csv",
       resolved: resolved.map((l) => ({ variantId: l.variantId, qty: l.quantity })),
       unresolved: unresolved.map((u) => ({ raw: u.raw, reason: u.reason })),
       errors,
@@ -196,8 +201,13 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
     }
     return {
       kind: "merge",
+      source: "ai",
+      // Nothing matched (e.g. only a PO number was pasted): say what the box needs.
+      summary: validated.matched.length === 0
+        ? "We didn’t find any products in that text. Paste the item lines from the PO or email, for example “24x A-1” or “10 blue gadgets”, not just the PO number."
+        : undefined,
       resolved: validated.matched.map((l) => ({ variantId: l.variantId, qty: l.quantity })),
-      unresolved: validated.unmatched.map((raw) => ({ raw, reason: "unknown-sku" as const })),
+      unresolved: validated.unmatched.map((raw) => ({ raw, reason: "no-match" as const })),
       errors: [],
     };
   }
@@ -300,6 +310,28 @@ export default function OrderPad() {
         ]
       : [];
   const mergeError = merge.data && "kind" in merge.data && merge.data.kind === "error" ? merge.data.error : null;
+  const mergeSource = merge.data && "kind" in merge.data && merge.data.kind === "merge" ? merge.data.source : null;
+  const mergeSummary = merge.data && "kind" in merge.data && merge.data.kind === "merge" ? merge.data.summary ?? null : null;
+  // Which box the last server result came from (an error has no source: show it under the box last used).
+  const [lastBox, setLastBox] = useState<"csv" | "ai" | null>(null);
+  const box = mergeSource ?? lastBox;
+  const mergeMessages = (
+    <>
+      {mergeError && <p className="error" role="alert">{mergeError}</p>}
+      {(mergeSummary || mergeErrors.length > 0) && (
+        <div className="quick-order-unresolved" role="alert">
+          {mergeSummary ? <p style={{ margin: 0 }}>{mergeSummary}</p> : <strong>Some lines need attention:</strong>}
+          {mergeErrors.length > 0 && (
+            <ul>
+              {mergeErrors.slice(0, 8).map((e, i) => (
+                <li key={i}>{e}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </>
+  );
   const saveMsg = save.data && "kind" in save.data && save.data.kind === "saved" ? save.data.message : null;
   const saveErr = save.data && "kind" in save.data && save.data.kind === "error" ? save.data.error : null;
 
@@ -462,7 +494,7 @@ export default function OrderPad() {
         <>
           <h2 className="portal-subhead">Upload CSV {data.isGrowth ? "" : "(Growth)"}</h2>
           {data.isGrowth ? (
-            <merge.Form method="post">
+            <merge.Form method="post" onSubmit={() => setLastBox("csv")}>
               <input type="hidden" name="intent" value="import-csv" />
               <textarea
                 className="quick-order-input"
@@ -481,20 +513,14 @@ export default function OrderPad() {
           )}
         </>
       )}
-      {mergeError && <p className="error" role="alert">{mergeError}</p>}
-      {mergeErrors.length > 0 && (
-        <div className="quick-order-unresolved" role="alert">
-          <strong>Some lines need attention:</strong>
-          <ul>
-            {mergeErrors.slice(0, 8).map((e, i) => (
-              <li key={i}>{e}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {box !== "ai" && mergeMessages}
 
       <h2 className="portal-subhead">Paste a PO or email</h2>
-      <merge.Form method="post">
+      <p className="muted" id="po-hint" style={{ marginTop: 0 }}>
+        Paste the items from a purchase order or an email, with quantities. Claude matches them
+        to the catalog; nothing is ordered until you confirm.
+      </p>
+      <merge.Form method="post" onSubmit={() => setLastBox("ai")}>
         <input type="hidden" name="intent" value="ai-parse" />
         <textarea
           className="quick-order-input"
@@ -503,11 +529,13 @@ export default function OrderPad() {
           value={blob}
           onChange={(e) => setBlob(e.target.value)}
           placeholder="Hi — please send 10 of A-1 and 4 blue gadgets…"
+          aria-describedby="po-hint"
         />
         <button type="submit" className="portal-button" disabled={merge.state !== "idle"}>
           Read my order
         </button>
       </merge.Form>
+      {box === "ai" && mergeMessages}
 
       {/* Cart + live subtotal */}
       <h2 className="portal-subhead">Your order ({cartLines.length} item{cartLines.length === 1 ? "" : "s"})</h2>
