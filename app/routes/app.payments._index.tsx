@@ -21,6 +21,9 @@ import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { flexPayAllowed, GROWTH_PLAN } from "../lib/billing";
 import { listPlansForShop, listEligibleOrders, getDefaultDepositPct, setDefaultDepositPct } from "../services/payments.server";
+import { upgradeUrl } from "../lib/upgrade";
+import { formatMoney } from "../lib/format";
+import { DisclosureCard } from "../components/DisclosureCard";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_FLEX_PAY === "true";
@@ -65,6 +68,12 @@ const STATUS_TONE: Record<string, "success" | "attention" | "critical"> = {
   ACTIVE: "attention",
   OVERDUE: "critical",
 };
+const STATUS_LABELS: Record<string, string> = { COMPLETED: "Completed", ACTIVE: "Active", OVERDUE: "Overdue" };
+const TYPE_LABELS: Record<string, string> = {
+  DEPOSIT: "Deposit + balance",
+  INSTALLMENTS: "Installments",
+  PAYLINK: "Pay-by-link",
+};
 
 export default function Payments() {
   const data = useLoaderData<typeof loader>();
@@ -85,63 +94,58 @@ export default function Payments() {
             never stores card data. Flexible payments are included on Growth.
           </p>
           <Box paddingBlockStart="200">
-            <Button url="/app/settings?upgrade=Growth" variant="primary">See Growth</Button>
+            <Button url={upgradeUrl("growth")} variant="primary">See Growth</Button>
           </Box>
         </Banner>
       </Page>
     );
   }
 
+  const firstRun = data.eligible.length === 0 && data.plans.length === 0 && !data.overdueOnly;
+
   return (
     <Page>
       <TitleBar title="Payments" />
+      <SectionTabs active="payments" />
       <BlockStack gap="500">
         {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
 
-        <Text as="p" tone="subdued" variant="bodyMd">
-          Take a deposit, split an order into installments, or send a secure
-          pay-by-link. Every payment is captured by Shopify checkout — Mannon never
-          sees card details.
-        </Text>
-
-        {/* Default deposit policy */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="default-deposit" />
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">Default deposit policy</Text>
-              <InlineStack gap="300" blockAlign="end" wrap>
-                <Box minWidth="200px">
-                  <TextField label="Default deposit %" name="depositPct" type="number" value={deposit} onChange={setDeposit} min={0} max={100} suffix="%" autoComplete="off" helpText="Pre-fills the deposit when you set up a plan. Leave blank for none." />
-                </Box>
-                <Button submit loading={busy}>Save policy</Button>
-              </InlineStack>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        {/* Orders needing a plan */}
+        {/* 1. Orders needing a plan */}
         <Card padding="0">
-          <Box padding="400"><Text as="h2" variant="headingMd">Orders ready for a payment plan</Text></Box>
+          <Box padding="400">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">Orders ready for a payment plan</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Take a deposit, split an order into installments, or send a secure pay-by-link. Shopify
+                checkout captures every payment — Mannon never sees card details.
+              </Text>
+            </BlockStack>
+          </Box>
           {data.eligible.length === 0 ? (
-            <EmptyState heading="No orders waiting" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>Accepted orders without a payment plan show up here.</p>
+            <EmptyState
+              heading="No orders waiting"
+              action={{ content: "View quotes", url: "/app/quotes" }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>When a buyer accepts a quote, the order shows up here so you can set up a payment plan.</p>
             </EmptyState>
           ) : (
-            <IndexTable resourceName={{ singular: "order", plural: "orders" }} itemCount={data.eligible.length} selectable={false} headings={[{ title: "Company" }, { title: "Total" }, { title: "" }]}>
+            <IndexTable resourceName={{ singular: "order", plural: "orders" }} itemCount={data.eligible.length} selectable={false} headings={[{ title: "Company" }, { title: "Total" }, { title: "Actions", hidden: true }]}>
               {data.eligible.map((o, i) => (
                 <IndexTable.Row id={o.quoteId} key={o.quoteId} position={i}>
                   <IndexTable.Cell>{o.companyName}</IndexTable.Cell>
-                  <IndexTable.Cell>{o.currency} {o.total}</IndexTable.Cell>
-                  <IndexTable.Cell><Button url={`/app/payments/${o.quoteId}`} size="micro">Set up plan</Button></IndexTable.Cell>
+                  <IndexTable.Cell>{formatMoney(o.total, o.currency)}</IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Button url={`/app/payments/${o.quoteId}`} size="micro" accessibilityLabel={`Set up a payment plan for ${o.companyName}`}>Set up plan</Button>
+                  </IndexTable.Cell>
                 </IndexTable.Row>
               ))}
             </IndexTable>
           )}
         </Card>
 
-        {/* Existing plans + overdue filter */}
+        {/* 2. Existing plans + overdue filter */}
         <Card padding="0">
           <Box padding="400">
             <InlineStack align="space-between" blockAlign="center">
@@ -153,23 +157,54 @@ export default function Payments() {
             </InlineStack>
           </Box>
           {data.plans.length === 0 ? (
-            <EmptyState heading={data.overdueOnly ? "Nothing overdue" : "No plans yet"} image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>{data.overdueOnly ? "No installments are overdue." : "Set up a plan on an order above."}</p>
+            <EmptyState
+              heading={data.overdueOnly ? "Nothing overdue" : "No payment plans yet"}
+              action={data.overdueOnly ? { content: "Show all plans", url: "/app/payments" } : undefined}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>
+                {data.overdueOnly
+                  ? "Every installment is paid or not yet due."
+                  : "Plans you set up on an order above are tracked here until they're paid in full."}
+              </p>
             </EmptyState>
           ) : (
-            <IndexTable resourceName={{ singular: "plan", plural: "plans" }} itemCount={data.plans.length} selectable={false} headings={[{ title: "Company" }, { title: "Type" }, { title: "Status" }, { title: "Remaining" }, { title: "" }]}>
+            <IndexTable resourceName={{ singular: "plan", plural: "plans" }} itemCount={data.plans.length} selectable={false} headings={[{ title: "Company" }, { title: "Type" }, { title: "Status" }, { title: "Remaining" }, { title: "Actions", hidden: true }]}>
               {data.plans.map((p, i) => (
                 <IndexTable.Row id={p.quoteId} key={p.quoteId} position={i}>
                   <IndexTable.Cell>{p.companyName}</IndexTable.Cell>
-                  <IndexTable.Cell>{p.type}</IndexTable.Cell>
-                  <IndexTable.Cell><Badge tone={STATUS_TONE[p.status] ?? "attention"}>{p.status}</Badge></IndexTable.Cell>
-                  <IndexTable.Cell>{p.currency} {p.remaining}</IndexTable.Cell>
-                  <IndexTable.Cell><Button url={`/app/payments/${p.quoteId}`} size="micro">Manage</Button></IndexTable.Cell>
+                  <IndexTable.Cell>{TYPE_LABELS[p.type] ?? p.type}</IndexTable.Cell>
+                  <IndexTable.Cell><Badge tone={STATUS_TONE[p.status] ?? "attention"}>{STATUS_LABELS[p.status] ?? p.status}</Badge></IndexTable.Cell>
+                  <IndexTable.Cell>{formatMoney(p.remaining, p.currency)}</IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Button url={`/app/payments/${p.quoteId}`} size="micro" accessibilityLabel={`Manage the payment plan for ${p.companyName}`}>Manage</Button>
+                  </IndexTable.Cell>
                 </IndexTable.Row>
               ))}
             </IndexTable>
           )}
         </Card>
+
+        {/* 3. Setup: default deposit policy */}
+        <DisclosureCard
+          title="Default deposit policy"
+          subtitle={
+            data.defaultDepositPct != null
+              ? `New plans start with a ${Math.round(data.defaultDepositPct * 100)}% deposit.`
+              : "Pre-fill a deposit percentage when you set up a plan."
+          }
+          defaultOpen={firstRun}
+        >
+          <Form method="post">
+            <input type="hidden" name="intent" value="default-deposit" />
+            <InlineStack gap="300" blockAlign="end" wrap>
+              <Box minWidth="200px">
+                <TextField label="Default deposit %" name="depositPct" type="number" value={deposit} onChange={setDeposit} min={0} max={100} suffix="%" autoComplete="off" helpText="Pre-fills the deposit when you set up a plan. Leave blank for none." />
+              </Box>
+              <Button submit loading={busy}>Save policy</Button>
+            </InlineStack>
+          </Form>
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

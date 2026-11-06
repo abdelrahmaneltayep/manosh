@@ -47,6 +47,7 @@ export type {
   FeatureAccess,
   GrowthFeature,
 } from "../lib/billing";
+import { upgradeUrl } from "../lib/upgrade";
 
 // Typed const so the enum member keeps its literal type (`Every30Days`) inside
 // the object literals below — otherwise TS widens it to `BillingInterval` and
@@ -297,7 +298,7 @@ export async function requirePlan(
 ): Promise<BillingStatus> {
   const status = await requireBilling(billing, { isTest: options.isTest });
   if (!featureAccess(status, required).allowed) {
-    throw redirect(options.redirectTo ?? `/app/settings?upgrade=${required}`);
+    throw redirect(options.redirectTo ?? upgradeUrl(required));
   }
   return status;
 }

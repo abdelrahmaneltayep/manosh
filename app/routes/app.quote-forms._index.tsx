@@ -1,9 +1,9 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { useState } from "react";
-import { Form, useActionData, useLoaderData, useNavigation, Link } from "@remix-run/react";
+import { useActionData, useLoaderData, useNavigation, useSubmit, Link } from "@remix-run/react";
 import {
-  Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Button, Box, TextField, Select, IndexTable, EmptyState,
+  Page, Card, BlockStack, Text, Badge, Banner, Button, Box, TextField, Select, IndexTable, EmptyState, Modal, FormLayout,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
@@ -12,6 +12,8 @@ import { requireBilling } from "../services/billing.server";
 import { quoteFormFeatures, GROWTH_PLAN } from "../lib/billing";
 import { SURFACES } from "../lib/quote-form";
 import { QUOTE_CAPTURE_ENABLED, listForms, saveForm, deleteForm, MultipleFormsError } from "../services/quote-form.server";
+import { upgradeUrl } from "../lib/upgrade";
+import { ConfirmAction } from "../components/ConfirmAction";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -61,74 +63,102 @@ export default function QuoteForms() {
   const [name, setName] = useState("");
   const [surface, setSurface] = useState("PRODUCT");
 
-  // Below Growth a shop keeps a single form — lock "Create" once one exists.
+  // Below Growth a shop keeps a single form — "Create form" shows as disabled
+  // and names the plan that unlocks it (BFS 4.3.7), instead of a dead end.
   const createLocked = !features.multipleForms && forms.length >= 1;
+  const [createOpen, setCreateOpen] = useState(false);
+  const submit = useSubmit();
+  const create = () => {
+    const fd = new FormData();
+    fd.set("intent", "create");
+    fd.set("name", name);
+    fd.set("surface", surface);
+    submit(fd, { method: "post" });
+  };
 
   return (
-    <Page>
+    <Page
+      primaryAction={{
+        content: "Create form",
+        onAction: () => setCreateOpen(true),
+        disabled: createLocked,
+        helpText: createLocked ? "Multiple forms are on Growth" : undefined,
+      }}
+    >
       <TitleBar title="Quote forms" />
       <SectionTabs active="quote-forms" />
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Create a quote form"
+        primaryAction={{ content: "Create and edit", onAction: create, loading: busy }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setCreateOpen(false) }]}
+      >
+        <Modal.Section>
+          <FormLayout>
+            <TextField label="Form name" value={name} onChange={setName} autoComplete="off" placeholder="Request a quote" />
+            <Select
+              label="Where it shows"
+              options={SURFACES.map((x) => ({ label: x.label, value: x.value }))}
+              value={surface}
+              onChange={setSurface}
+              helpText="You can add fields and change this in the next step."
+            />
+          </FormLayout>
+        </Modal.Section>
+      </Modal>
       <BlockStack gap="400">
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
+        {createLocked && (
+          <Banner tone="info" title="Multiple forms are on the Growth plan" action={{ content: "See plans", url: upgradeUrl(GROWTH_PLAN) }}>
+            <p>Your plan includes one quote form. Growth lets you run different forms on different pages.</p>
+          </Banner>
+        )}
 
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Your quote forms</Text>
-            {forms.length === 0 ? (
-              <EmptyState heading="Build your first quote form" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-                <p>Add the fields buyers fill in when they request a quote. Attach it to a product, collection, cart, or standalone page.</p>
-              </EmptyState>
-            ) : (
-              <IndexTable
-                resourceName={{ singular: "form", plural: "forms" }}
-                itemCount={forms.length}
-                selectable={false}
-                headings={[{ title: "Name" }, { title: "Surface" }, { title: "Fields" }, { title: "Status" }, { title: "" }]}
-              >
-                {forms.map((f, i) => (
-                  <IndexTable.Row id={f.id} key={f.id} position={i}>
-                    <IndexTable.Cell><Link to={`/app/quote-forms/${f.id}`}>{f.name}</Link></IndexTable.Cell>
-                    <IndexTable.Cell>{SURFACE_LABEL[f.surface] ?? f.surface}</IndexTable.Cell>
-                    <IndexTable.Cell>{f.fields.length}</IndexTable.Cell>
-                    <IndexTable.Cell><Badge tone={f.active ? "success" : undefined}>{f.active ? "Active" : "Draft"}</Badge></IndexTable.Cell>
-                    <IndexTable.Cell>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="delete" />
-                        <input type="hidden" name="id" value={f.id} />
-                        <Button submit variant="tertiary" tone="critical" size="micro" disabled={busy}>Delete</Button>
-                      </Form>
-                    </IndexTable.Cell>
-                  </IndexTable.Row>
-                ))}
-              </IndexTable>
-            )}
-          </BlockStack>
+        <Card padding="0">
+          {forms.length === 0 ? (
+            <EmptyState
+              heading="Create your first quote form"
+              action={{ content: "Create form", onAction: () => setCreateOpen(true) }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>Choose the fields buyers fill in when they ask for a quote, and where the form shows: a product, collection, cart or its own page.</p>
+            </EmptyState>
+          ) : (
+            <IndexTable
+              resourceName={{ singular: "form", plural: "forms" }}
+              itemCount={forms.length}
+              selectable={false}
+              headings={[{ title: "Name" }, { title: "Where it shows" }, { title: "Fields" }, { title: "Status" }, { title: "Actions" }]}
+            >
+              {forms.map((f, i) => (
+                <IndexTable.Row id={f.id} key={f.id} position={i}>
+                  <IndexTable.Cell><Link to={`/app/quote-forms/${f.id}`}>{f.name}</Link></IndexTable.Cell>
+                  <IndexTable.Cell>{SURFACE_LABEL[f.surface] ?? f.surface}</IndexTable.Cell>
+                  <IndexTable.Cell>{f.fields.length}</IndexTable.Cell>
+                  <IndexTable.Cell><Badge tone={f.active ? "success" : undefined}>{f.active ? "Active" : "Draft"}</Badge></IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <ConfirmAction
+                      label="Delete"
+                      size="micro"
+                      variant="tertiary"
+                      title={`Delete “${f.name}”?`}
+                      message="The form comes off your storefront and its fields are deleted. Requests already received stay in your inbox."
+                      confirmLabel="Delete form"
+                      fields={{ intent: "delete", id: f.id }}
+                    />
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          )}
         </Card>
-
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">New form</Text>
-            {createLocked ? (
-              <Banner tone="info" title="Multiple forms are a Growth feature">
-                <p>Your plan includes one quote form. Upgrade to Growth to run different forms on different surfaces.</p>
-                <Box paddingBlockStart="200">
-                  <Button url={`/app/settings?upgrade=${GROWTH_PLAN}`} variant="primary">See Growth</Button>
-                </Box>
-              </Banner>
-            ) : (
-              <Form method="post">
-                <InlineStack gap="300" blockAlign="end" wrap>
-                  <Box minWidth="16rem"><TextField label="Form name" name="name" value={name} onChange={setName} autoComplete="off" placeholder="Request a quote" /></Box>
-                  <Box minWidth="14rem">
-                    <Select label="Surface" name="surface" options={SURFACES.map((s) => ({ label: s.label, value: s.value }))} value={surface} onChange={setSurface} />
-                  </Box>
-                  <Button submit variant="primary" disabled={busy}>Create &amp; edit</Button>
-                </InlineStack>
-              </Form>
-            )}
-          </BlockStack>
-        </Card>
+        <Box paddingBlockStart="100">
+          <Text as="p" tone="subdued" variant="bodySm">
+            A form shows on your storefront once it’s active and the Request a Quote block is in your theme (Quotes → Requests → Storefront button).
+          </Text>
+        </Box>
       </BlockStack>
     </Page>
   );

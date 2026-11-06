@@ -34,6 +34,9 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftPortalTranslations, UnsupportedLocaleError } from "../services/i18n-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { ConfirmAction } from "../components/ConfirmAction";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_I18N === "true";
@@ -170,7 +173,7 @@ export default function I18nSettings() {
 
   return (
     <Page>
-      <TitleBar title="Languages & currencies" />
+      <TitleBar title="Languages" />
       <SectionTabs active="languages" />
       <BlockStack gap="500">
         {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
@@ -206,11 +209,13 @@ export default function I18nSettings() {
           </Form>
         </Card>
 
-        {/* FX rates */}
-        <Card>
+        {/* FX rates — advanced; most stores use Shopify's live rates. */}
+        <DisclosureCard
+          title="Exchange rates"
+          subtitle={data.rates.length ? `${data.rates.length} fixed rate${data.rates.length === 1 ? "" : "s"}. A quote keeps the rate it was sent with.` : "Optional. Set a fixed contract rate from your store currency; otherwise Shopify's live rate is used."}
+          defaultOpen={false}
+        >
           <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Exchange rates</Text>
-            <Text as="p" tone="subdued" variant="bodySm">Fixed contract rates from your store currency. A quote locks the rate at issue.</Text>
             <Form method="post">
               <input type="hidden" name="intent" value="rate" />
               <InlineStack gap="300" blockAlign="end" wrap>
@@ -228,26 +233,30 @@ export default function I18nSettings() {
                     <IndexTable.Cell>{r.rate}</IndexTable.Cell>
                     <IndexTable.Cell><Badge>{r.source}</Badge></IndexTable.Cell>
                     <IndexTable.Cell>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="rate-delete" />
-                        <input type="hidden" name="id" value={r.id} />
-                        <Button submit variant="tertiary" tone="critical" size="micro" loading={busy}>Remove</Button>
-                      </Form>
+                      <ConfirmAction
+                        label="Remove"
+                        size="micro"
+                        variant="tertiary"
+                        title={`Remove the ${r.base} → ${r.quote} rate?`}
+                        message="New quotes use Shopify's live rate for this currency. Quotes already sent keep their rate."
+                        confirmLabel="Remove rate"
+                        fields={{ intent: "rate-delete", id: r.id }}
+                      />
                     </IndexTable.Cell>
                   </IndexTable.Row>
                 ))}
               </IndexTable>
             )}
           </BlockStack>
-        </Card>
+        </DisclosureCard>
 
-        {/* Custom translations (Growth) */}
-        <Card>
+        {/* Custom translations (Growth) — advanced wording overrides. */}
+        <DisclosureCard
+          title="Custom translations"
+          subtitle="Change the buyer portal's wording per language. Most stores keep Mannon's translations."
+          badge={!data.contractRates ? <Badge tone="info">Growth</Badge> : undefined}
+        >
           <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h2" variant="headingMd">Custom translations</Text>
-              {!data.contractRates && <Badge tone="info">Growth</Badge>}
-            </InlineStack>
             {data.contractRates ? (
               <BlockStack gap="300">
                 {/* Claude draft assist — pre-fills the JSON editor below. */}
@@ -297,7 +306,7 @@ export default function I18nSettings() {
                     )}
                   </BlockStack>
                 ) : (
-                  <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />
+                  <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />
                 )}
 
                 <Form method="post">
@@ -312,7 +321,7 @@ export default function I18nSettings() {
               <Text as="p" tone="subdued" variant="bodySm">Editing custom portal strings per language is a Growth feature.</Text>
             )}
           </BlockStack>
-        </Card>
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

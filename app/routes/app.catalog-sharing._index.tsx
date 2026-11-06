@@ -19,6 +19,8 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { GROWTH_PLAN, catalogSharingAllowed, CATALOG_SHARE_UPGRADE_MESSAGE } from "../lib/billing";
@@ -46,6 +48,7 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -161,6 +164,14 @@ const VIS_OPTIONS = [
 ];
 /** "Listed" is offered only while the discovery directory is on (MANNON_FF_DISCOVERY). */
 const visOptions = (discovery: boolean) => (discovery ? VIS_OPTIONS : VIS_OPTIONS.filter((o) => o.value !== "LISTED"));
+const CATALOG_FIELD_ID = "public-catalog-source";
+
+/** Move focus to the create form's first field (EmptyState action). */
+function focusField(id: string) {
+  const el = document.getElementById(id);
+  el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  el?.focus();
+}
 
 export default function CatalogSharing() {
   const data = useLoaderData<typeof loader>();
@@ -186,7 +197,7 @@ export default function CatalogSharing() {
         <Banner tone="info" title="Publish a shareable wholesale catalog">
           <p>{data.upgradeMessage}</p>
           <Box paddingBlockStart="200">
-            <Button url={`/app/settings?upgrade=${GROWTH_PLAN}`} variant="primary">See Growth</Button>
+            <Button url={upgradeUrl(GROWTH_PLAN)} variant="primary">See Growth</Button>
           </Box>
         </Banner>
       </Page>
@@ -194,25 +205,119 @@ export default function CatalogSharing() {
   }
 
   const catalogOptions = data.catalogs.map((c) => ({ label: `${c.name} (${c.itemCount} items)`, value: c.id }));
+  const firstRun = data.publicCatalogs.length === 0;
+  const newLeads = data.leads.filter((l) => l.status === "NEW").length;
 
   return (
     <Page>
       <TitleBar title="Catalog sharing" />
+      <SectionTabs active="catalog-sharing" />
       <BlockStack gap="400">
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
 
+        {/* 1. The inbox: access requests (only once there's a page to request from) */}
+        {!firstRun && (
+          <Card padding="0">
+            <Box padding="400">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Access requests</Text>
+                {newLeads > 0 && <Badge tone="attention">{`${newLeads} new`}</Badge>}
+              </InlineStack>
+            </Box>
+            {data.leads.length === 0 ? (
+              <Box paddingInline="400" paddingBlockEnd="400">
+                <Text as="p" tone="subdued" variant="bodyMd">
+                  No requests yet. When a visitor asks for access on a live catalog, they appear here.
+                  Approving one creates their account and unlocks their prices.
+                </Text>
+              </Box>
+            ) : (
+              <IndexTable
+                resourceName={{ singular: "request", plural: "requests" }}
+                itemCount={data.leads.length}
+                selectable={false}
+                headings={[{ title: "Company" }, { title: "Email" }, { title: "Catalog" }, { title: "Received" }, { title: "Status" }, { title: "Actions", hidden: true }]}
+              >
+                {data.leads.map((lead, i) => (
+                  <IndexTable.Row id={lead.id} key={lead.id} position={i}>
+                    <IndexTable.Cell>{lead.companyName ?? "—"}</IndexTable.Cell>
+                    <IndexTable.Cell>{lead.email}</IndexTable.Cell>
+                    <IndexTable.Cell>{lead.catalogTitle}</IndexTable.Cell>
+                    <IndexTable.Cell>{formatDate(lead.createdAt)}</IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <Badge tone={lead.status === "APPROVED" ? "success" : lead.status === "DECLINED" ? undefined : "attention"}>
+                        {lead.status === "NEW" ? "New" : lead.status === "APPROVED" ? "Approved" : "Declined"}
+                      </Badge>
+                    </IndexTable.Cell>
+                    <IndexTable.Cell>
+                      {lead.status === "NEW" && (
+                        <InlineStack gap="200" wrap={false}>
+                          <Form method="post">
+                            <input type="hidden" name="intent" value="approve-lead" />
+                            <input type="hidden" name="leadId" value={lead.id} />
+                            <Button submit size="slim" variant="primary" disabled={busy} accessibilityLabel={`Approve ${lead.email}`}>Approve</Button>
+                          </Form>
+                          <ConfirmAction
+                            label="Decline"
+                            title={`Decline ${lead.email}?`}
+                            message="They won’t get an account or see your prices. You can’t approve this request later."
+                            confirmLabel="Decline request"
+                            fields={{ intent: "decline-lead", leadId: lead.id }}
+                            size="slim"
+                            disabled={busy}
+                          />
+                        </InlineStack>
+                      )}
+                    </IndexTable.Cell>
+                  </IndexTable.Row>
+                ))}
+              </IndexTable>
+            )}
+          </Card>
+        )}
+
+        {/* 2. The list */}
         <Card>
           <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Publish a catalog</Text>
-            <Text as="p" tone="subdued" variant="bodyMd">
-              Turn one of your custom catalogs (F11) into a branded public page new buyers
-              can browse and request access to. Prices are hidden by default; hidden SKUs
-              never appear.
-            </Text>
+            <Text as="h2" variant="headingMd">Your public catalogs</Text>
+            {firstRun ? (
+              <EmptyState
+                heading="No public catalogs yet"
+                action={
+                  data.catalogs.length === 0
+                    ? { content: "Create a catalog", url: "/app/catalogs" }
+                    : { content: "Publish a catalog", onAction: () => focusField(CATALOG_FIELD_ID) }
+                }
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+              >
+                <p>
+                  New buyers can’t find your wholesale range until you publish a catalog as a shareable page.
+                  {data.catalogs.length === 0 ? " Start by creating a catalog to publish." : ""}
+                </p>
+              </EmptyState>
+            ) : (
+              <BlockStack gap="400">
+                {data.publicCatalogs.map((pc) => (
+                  <PublicCatalogCard key={pc.id} pc={pc} publicUrl={`${data.appUrl}/catalog/${data.shop}/${pc.slug}`} busy={busy} discovery={data.discoveryEnabled} />
+                ))}
+              </BlockStack>
+            )}
+          </BlockStack>
+        </Card>
+
+        {/* 3. Create */}
+        <Card>
+          <BlockStack gap="300">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">Publish a catalog</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Pick one of your catalogs and give its public page a title. It starts as a draft.
+              </Text>
+            </BlockStack>
             {data.catalogs.length === 0 ? (
-              <Banner tone="warning">
-                Create a custom catalog first (Catalogs), then publish it here.
+              <Banner tone="warning" action={{ content: "Go to catalogs", url: "/app/catalogs" }}>
+                <p>Create a catalog first, then publish it here.</p>
               </Banner>
             ) : (
               <Form method="post">
@@ -220,7 +325,7 @@ export default function CatalogSharing() {
                 <BlockStack gap="200">
                   <InlineStack gap="300" blockAlign="end" wrap>
                     <Box minWidth="16rem">
-                      <Select label="Catalog" options={catalogOptions} value={catalogId} onChange={setCatalogId} name="catalogId" />
+                      <Select id={CATALOG_FIELD_ID} label="Catalog" options={catalogOptions} value={catalogId} onChange={setCatalogId} name="catalogId" />
                     </Box>
                     <Box minWidth="16rem">
                       <TextField label="Public title" value={title} onChange={setTitle} name="title" autoComplete="off" placeholder="e.g. Spring 2026 wholesale" />
@@ -267,7 +372,7 @@ export default function CatalogSharing() {
                       )}
                     </BlockStack>
                   ) : (
-                    <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
+                    <UpgradeToClaude access={access} upgradeUrl={upgradeUrl("growth")} />
                   )}
                 </BlockStack>
               </Form>
@@ -275,63 +380,23 @@ export default function CatalogSharing() {
           </BlockStack>
         </Card>
 
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Your public catalogs</Text>
-            {data.publicCatalogs.length === 0 ? (
-              <EmptyState heading="No public catalogs yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-                <p>Publish a catalog above to get a shareable wholesale page.</p>
-              </EmptyState>
-            ) : (
-              <BlockStack gap="400">
-                {data.publicCatalogs.map((pc) => (
-                  <PublicCatalogCard key={pc.id} pc={pc} publicUrl={`${data.appUrl}/catalog/${data.shop}/${pc.slug}`} busy={busy} discovery={data.discoveryEnabled} />
-                ))}
-              </BlockStack>
-            )}
+        {/* 4. Explanation, one click away (open on first run) */}
+        <DisclosureCard
+          title="How catalog sharing works"
+          subtitle="Turn a catalog into a branded public page new buyers can browse and ask to join."
+          defaultOpen={firstRun}
+        >
+          <BlockStack gap="200">
+            <Text as="p" variant="bodyMd">
+              Publishing turns one of your catalogs into a public page with its own link. Prices are
+              hidden by default, and products hidden in the catalog never appear.
+            </Text>
+            <Text as="p" variant="bodyMd">
+              Visitors can request access. When you approve a request, the buyer gets an account and a
+              secure sign-in link by email, and their prices unlock in the portal.
+            </Text>
           </BlockStack>
-        </Card>
-
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Access requests</Text>
-            {data.leads.length === 0 ? (
-              <Text as="p" tone="subdued" variant="bodyMd">
-                No requests yet. When a visitor asks for access, they’ll appear here — approving
-                one provisions their account and unlocks their prices.
-              </Text>
-            ) : (
-              <IndexTable
-                resourceName={{ singular: "request", plural: "requests" }}
-                itemCount={data.leads.length}
-                selectable={false}
-                headings={[{ title: "Company" }, { title: "Email" }, { title: "Catalog" }, { title: "Received" }, { title: "Status" }, { title: "" }]}
-              >
-                {data.leads.map((lead, i) => (
-                  <IndexTable.Row id={lead.id} key={lead.id} position={i}>
-                    <IndexTable.Cell>{lead.companyName ?? "—"}</IndexTable.Cell>
-                    <IndexTable.Cell>{lead.email}</IndexTable.Cell>
-                    <IndexTable.Cell>{lead.catalogTitle}</IndexTable.Cell>
-                    <IndexTable.Cell>{formatDate(lead.createdAt)}</IndexTable.Cell>
-                    <IndexTable.Cell>
-                      <Badge tone={lead.status === "APPROVED" ? "success" : lead.status === "DECLINED" ? undefined : "attention"}>
-                        {lead.status === "NEW" ? "New" : lead.status === "APPROVED" ? "Approved" : "Declined"}
-                      </Badge>
-                    </IndexTable.Cell>
-                    <IndexTable.Cell>
-                      {lead.status === "NEW" && (
-                        <InlineStack gap="200">
-                          <Form method="post"><input type="hidden" name="intent" value="approve-lead" /><input type="hidden" name="leadId" value={lead.id} /><Button submit size="slim" variant="primary" disabled={busy}>Approve</Button></Form>
-                          <Form method="post"><input type="hidden" name="intent" value="decline-lead" /><input type="hidden" name="leadId" value={lead.id} /><Button submit size="slim" disabled={busy}>Decline</Button></Form>
-                        </InlineStack>
-                      )}
-                    </IndexTable.Cell>
-                  </IndexTable.Row>
-                ))}
-              </IndexTable>
-            )}
-          </BlockStack>
-        </Card>
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );
@@ -347,17 +412,19 @@ function PublicCatalogCard({ pc, publicUrl, busy, discovery }: { pc: PublicCatal
       <BlockStack gap="200">
         <InlineStack align="space-between" blockAlign="center" wrap>
           <InlineStack gap="200" blockAlign="center">
-            <Text as="span" variant="headingSm">{pc.title}</Text>
+            <Text as="h3" variant="headingSm">{pc.title}</Text>
             <Badge tone={pc.status === "LIVE" ? "success" : undefined}>{pc.status === "LIVE" ? "Live" : "Draft"}</Badge>
             {pc.newLeadCount > 0 && <Badge tone="attention">{`${pc.newLeadCount} new request${pc.newLeadCount === 1 ? "" : "s"}`}</Badge>}
           </InlineStack>
           <Text as="span" tone="subdued" variant="bodySm">from {pc.catalogName}</Text>
         </InlineStack>
 
-        {pc.status === "LIVE" && (
+        {pc.status === "LIVE" ? (
           <Text as="p" variant="bodySm">
             Public link: <PolarisLink url={publicUrl} target="_blank">{publicUrl}</PolarisLink>
           </Text>
+        ) : (
+          <Text as="p" tone="subdued" variant="bodySm">Draft. Nobody can see this page until you publish it.</Text>
         )}
 
         <Form method="post">
@@ -370,17 +437,25 @@ function PublicCatalogCard({ pc, publicUrl, busy, discovery }: { pc: PublicCatal
             <Box minWidth="16rem">
               <Select label="Visibility" name="visibility" options={visOptions(discovery)} value={visibility} onChange={(v) => setVisibility(v as typeof visibility)} />
             </Box>
-            <Button submit disabled={busy}>Save</Button>
+            <Button submit disabled={busy} accessibilityLabel={`Save settings for ${pc.title}`}>Save settings</Button>
           </InlineStack>
         </Form>
 
         <InlineStack gap="200">
           {pc.status === "LIVE" ? (
-            <Form method="post"><input type="hidden" name="intent" value="unpublish" /><input type="hidden" name="id" value={pc.id} /><Button submit disabled={busy}>Unlist</Button></Form>
+            <Form method="post"><input type="hidden" name="intent" value="unpublish" /><input type="hidden" name="id" value={pc.id} /><Button submit disabled={busy}>Unlist catalog</Button></Form>
           ) : (
-            <Form method="post"><input type="hidden" name="intent" value="publish" /><input type="hidden" name="id" value={pc.id} /><Button submit variant="primary" disabled={busy}>Publish</Button></Form>
+            <Form method="post"><input type="hidden" name="intent" value="publish" /><input type="hidden" name="id" value={pc.id} /><Button submit variant="primary" disabled={busy}>Publish catalog</Button></Form>
           )}
-          <Form method="post"><input type="hidden" name="intent" value="delete" /><input type="hidden" name="id" value={pc.id} /><Button submit tone="critical" variant="tertiary" disabled={busy}>Delete</Button></Form>
+          <ConfirmAction
+            label="Delete"
+            title={`Delete ${pc.title}?`}
+            message="The public page and its link stop working. Your catalog itself isn’t affected."
+            confirmLabel="Delete public catalog"
+            fields={{ intent: "delete", id: pc.id }}
+            variant="tertiary"
+            disabled={busy}
+          />
         </InlineStack>
       </BlockStack>
     </Box>

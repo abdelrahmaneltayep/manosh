@@ -15,9 +15,11 @@ import {
   TextField,
   Select,
   IndexTable,
-  EmptyState,
+  Divider,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { GROWTH_PLAN } from "../lib/billing";
@@ -36,6 +38,7 @@ import {
   importCsvRows,
   PriceListNotFoundError,
 } from "../services/price-list.server";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_PRICELISTS === "true";
@@ -157,14 +160,15 @@ export default function PriceListEditor() {
   const err = actionData && !actionData.ok ? actionData.error : null;
   const msg = actionData && actionData.ok ? actionData.message : null;
   const assigned = data.companies.filter((c) => c.assignedListId === data.list.id);
+  const cur = data.list.currency;
 
   return (
     <Page
       backAction={{ content: "Price lists", url: "/app/price-lists" }}
       title={data.list.name}
-      subtitle={`Currency ${data.list.currency}`}
+      subtitle={`Currency ${cur}`}
     >
-      <TitleBar title="Price list" />
+      <TitleBar title={data.list.name} />
       <BlockStack gap="500">
         {err && (
           <Banner tone="critical" title="Couldn’t save">
@@ -173,161 +177,217 @@ export default function PriceListEditor() {
         )}
         {msg && <Banner tone="success" title={msg} />}
 
-        {/* Entries */}
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">
-              Prices
-            </Text>
+        {/* 1. Prices: the list first, then the add form */}
+        <Card padding="0">
+          <Box padding="400">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">
+                Prices
+              </Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Buyers of assigned companies pay these prices instead of your regular price.
+              </Text>
+            </BlockStack>
+          </Box>
+          {data.entries.length === 0 ? (
+            <Box paddingInline="400" paddingBlockEnd="400">
+              <Text as="p" tone="subdued">
+                No prices yet, so assigned buyers still see your regular prices. Add a price below
+                {data.isGrowth ? " or import a CSV file." : "."}
+              </Text>
+            </Box>
+          ) : (
+            <IndexTable
+              resourceName={{ singular: "price", plural: "prices" }}
+              itemCount={data.entries.length}
+              selectable={false}
+              headings={[{ title: "Variant" }, { title: "Price" }, { title: "Actions", hidden: true }]}
+            >
+              {data.entries.map((e, i) => (
+                <IndexTable.Row id={e.id} key={e.id} position={i}>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" breakWord>
+                      {e.variantId}
+                    </Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {cur} {Number(e.price).toFixed(2)}
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <ConfirmAction
+                      label="Delete"
+                      title="Delete this price?"
+                      message="Buyers on this list will pay your regular price for this variant again."
+                      confirmLabel="Delete price"
+                      fields={{ intent: "delete-entry", entryId: e.id }}
+                      size="micro"
+                      variant="tertiary"
+                    />
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          )}
+          <Divider />
+          <Box padding="400">
             <Form method="post">
               <input type="hidden" name="intent" value="add-entry" />
               <InlineGrid columns={{ xs: 1, sm: "2fr 1fr auto" }} gap="200">
                 <TextField
-                  label="Variant id"
+                  label="Variant ID"
                   name="variantId"
                   value={variantId}
                   onChange={setVariantId}
                   autoComplete="off"
                   placeholder="gid://shopify/ProductVariant/123"
+                  helpText="Saving a variant that’s already on the list updates its price."
                 />
-                <TextField
-                  label="Price"
-                  name="price"
-                  value={price}
-                  onChange={setPrice}
-                  autoComplete="off"
-                  prefix="$"
-                />
+                <TextField label="Price" name="price" value={price} onChange={setPrice} autoComplete="off" prefix={cur} />
                 <Box paddingBlockStart="600">
                   <Button submit loading={submitting}>
-                    Add / update
+                    Save price
                   </Button>
                 </Box>
               </InlineGrid>
             </Form>
+          </Box>
+        </Card>
 
-            {data.entries.length === 0 ? (
+        {/* 2. Who gets this list */}
+        <Card>
+          <BlockStack gap="300">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">
+                Companies
+              </Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                A company can have one price list. Assigning this list replaces any list it had before.
+              </Text>
+            </BlockStack>
+            {assigned.length === 0 ? (
               <Text as="p" tone="subdued">
-                No prices yet. Add one above, or import a CSV (Growth).
+                Not assigned yet, so no buyer sees these prices. Assign a company below.
               </Text>
             ) : (
-              <IndexTable
-                resourceName={{ singular: "entry", plural: "entries" }}
-                itemCount={data.entries.length}
-                selectable={false}
-                headings={[{ title: "Variant" }, { title: "Price" }, { title: "" }]}
-              >
-                {data.entries.map((e, i) => (
-                  <IndexTable.Row id={e.id} key={e.id} position={i}>
-                    <IndexTable.Cell>
-                      <Text as="span" variant="bodySm" breakWord>
-                        {e.variantId}
-                      </Text>
-                    </IndexTable.Cell>
-                    <IndexTable.Cell>
-                      {data.list.currency} {Number(e.price).toFixed(2)}
-                    </IndexTable.Cell>
-                    <IndexTable.Cell>
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="delete-entry" />
-                        <input type="hidden" name="entryId" value={e.id} />
-                        <Button size="slim" tone="critical" variant="plain" submit>
-                          Delete
-                        </Button>
-                      </Form>
-                    </IndexTable.Cell>
-                  </IndexTable.Row>
+              <BlockStack gap="200">
+                {assigned.map((c) => (
+                  <InlineStack key={c.id} align="space-between" blockAlign="center">
+                    <Text as="span">{c.name}</Text>
+                    <ConfirmAction
+                      label="Remove"
+                      title={`Remove ${c.name}?`}
+                      message={`${c.name}’s buyers will see your regular prices again.`}
+                      confirmLabel="Remove company"
+                      fields={{ intent: "unassign-company", companyId: c.id }}
+                      size="micro"
+                      variant="tertiary"
+                    />
+                  </InlineStack>
                 ))}
-              </IndexTable>
+              </BlockStack>
             )}
-          </BlockStack>
-        </Card>
-
-        {/* Volume breaks (Growth) */}
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h2" variant="headingMd">
-                Volume breaks
+            {data.companies.length === 0 ? (
+              <Text as="p" tone="subdued">
+                You don’t have any companies yet. Companies appear here once you add B2B buyers.
               </Text>
-              <Badge tone="info">Growth</Badge>
-            </InlineStack>
-            {!data.isGrowth ? (
-              <Banner tone="warning">
-                <p>Upgrade to Growth to add quantity-break pricing.</p>
-                <Box paddingBlockStart="200">
-                  <Button url="/app/settings" variant="primary">
-                    Upgrade to Growth
-                  </Button>
-                </Box>
-              </Banner>
             ) : (
-              <>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="add-break" />
-                  <InlineGrid columns={{ xs: 1, sm: "2fr 1fr 1fr auto" }} gap="200">
-                    <TextField label="Variant id" name="variantId" value={bVariant} onChange={setBVariant} autoComplete="off" placeholder="gid://…/ProductVariant/123" />
-                    <TextField label="Min qty" name="minQty" type="number" min={1} value={bMinQty} onChange={setBMinQty} autoComplete="off" />
-                    <TextField label="Price" name="price" value={bPrice} onChange={setBPrice} autoComplete="off" prefix="$" />
-                    <Box paddingBlockStart="600">
-                      <Button submit loading={submitting}>
-                        Add break
-                      </Button>
-                    </Box>
-                  </InlineGrid>
-                </Form>
-                {data.breaks.length === 0 ? (
-                  <Text as="p" tone="subdued">
-                    No volume breaks yet.
-                  </Text>
-                ) : (
-                  <IndexTable
-                    resourceName={{ singular: "break", plural: "breaks" }}
-                    itemCount={data.breaks.length}
-                    selectable={false}
-                    headings={[{ title: "Variant" }, { title: "Min qty" }, { title: "Price" }, { title: "" }]}
-                  >
-                    {data.breaks.map((b, i) => (
-                      <IndexTable.Row id={b.id} key={b.id} position={i}>
-                        <IndexTable.Cell>
-                          <Text as="span" variant="bodySm" breakWord>
-                            {b.variantId}
-                          </Text>
-                        </IndexTable.Cell>
-                        <IndexTable.Cell>{b.minQty}+</IndexTable.Cell>
-                        <IndexTable.Cell>
-                          {data.list.currency} {Number(b.price).toFixed(2)}
-                        </IndexTable.Cell>
-                        <IndexTable.Cell>
-                          <Form method="post">
-                            <input type="hidden" name="intent" value="delete-break" />
-                            <input type="hidden" name="breakId" value={b.id} />
-                            <Button size="slim" tone="critical" variant="plain" submit>
-                              Delete
-                            </Button>
-                          </Form>
-                        </IndexTable.Cell>
-                      </IndexTable.Row>
-                    ))}
-                  </IndexTable>
-                )}
-              </>
+              <Form method="post">
+                <input type="hidden" name="intent" value="assign-company" />
+                <InlineGrid columns={{ xs: 1, sm: "1fr auto" }} gap="200">
+                  <Select
+                    label="Company"
+                    name="companyId"
+                    options={data.companies.map((c) => ({ label: c.name, value: c.id }))}
+                    value={assignCo}
+                    onChange={setAssignCo}
+                  />
+                  <Box paddingBlockStart="600">
+                    <Button submit loading={submitting}>
+                      Assign company
+                    </Button>
+                  </Box>
+                </InlineGrid>
+              </Form>
             )}
           </BlockStack>
         </Card>
 
-        {/* CSV */}
-        <Card>
+        {/* 3. Advanced options, one click away */}
+        <DisclosureCard
+          title="Volume breaks"
+          subtitle="Charge a lower price when a buyer orders at least a set quantity."
+          badge={<Badge tone="info">Growth</Badge>}
+          defaultOpen={data.breaks.length > 0}
+        >
+          {!data.isGrowth ? (
+            <Banner tone="info" action={{ content: "Upgrade to Growth", url: upgradeUrl("growth") }}>
+              <p>Volume breaks come with the Growth plan.</p>
+            </Banner>
+          ) : (
+            <BlockStack gap="300">
+              {data.breaks.length === 0 ? (
+                <Text as="p" tone="subdued">
+                  No volume breaks yet, so every quantity pays the same price. Add one below.
+                </Text>
+              ) : (
+                <IndexTable
+                  resourceName={{ singular: "volume break", plural: "volume breaks" }}
+                  itemCount={data.breaks.length}
+                  selectable={false}
+                  headings={[{ title: "Variant" }, { title: "Min quantity" }, { title: "Price" }, { title: "Actions", hidden: true }]}
+                >
+                  {data.breaks.map((b, i) => (
+                    <IndexTable.Row id={b.id} key={b.id} position={i}>
+                      <IndexTable.Cell>
+                        <Text as="span" variant="bodySm" breakWord>
+                          {b.variantId}
+                        </Text>
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>{b.minQty}+</IndexTable.Cell>
+                      <IndexTable.Cell>
+                        {cur} {Number(b.price).toFixed(2)}
+                      </IndexTable.Cell>
+                      <IndexTable.Cell>
+                        <ConfirmAction
+                          label="Delete"
+                          title="Delete this volume break?"
+                          message={`Orders of ${b.minQty} or more will no longer get this price.`}
+                          confirmLabel="Delete break"
+                          fields={{ intent: "delete-break", breakId: b.id }}
+                          size="micro"
+                          variant="tertiary"
+                        />
+                      </IndexTable.Cell>
+                    </IndexTable.Row>
+                  ))}
+                </IndexTable>
+              )}
+              <Form method="post">
+                <input type="hidden" name="intent" value="add-break" />
+                <InlineGrid columns={{ xs: 1, sm: "2fr 1fr 1fr auto" }} gap="200">
+                  <TextField label="Variant ID" name="variantId" value={bVariant} onChange={setBVariant} autoComplete="off" placeholder="gid://shopify/ProductVariant/123" />
+                  <TextField label="Min quantity" name="minQty" type="number" min={1} value={bMinQty} onChange={setBMinQty} autoComplete="off" />
+                  <TextField label="Price" name="price" value={bPrice} onChange={setBPrice} autoComplete="off" prefix={cur} />
+                  <Box paddingBlockStart="600">
+                    <Button submit loading={submitting}>
+                      Add break
+                    </Button>
+                  </Box>
+                </InlineGrid>
+              </Form>
+            </BlockStack>
+          )}
+        </DisclosureCard>
+
+        <DisclosureCard
+          title="Import and export"
+          subtitle="Download prices as a CSV file, or update many prices at once."
+          badge={<Badge tone="info">Import: Growth</Badge>}
+        >
           <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h2" variant="headingMd">
-                CSV
-              </Text>
-              <Badge tone="info">Import: Growth</Badge>
-            </InlineStack>
             <InlineStack gap="200">
               <Button url={`/app/price-lists/${data.list.id}/csv`} download>
-                Export entries
+                Export prices
               </Button>
               <Button url={`/app/price-lists/${data.list.id}/csv?template=1`} download variant="plain">
                 Download template
@@ -344,7 +404,7 @@ export default function PriceListEditor() {
                     onChange={setCsv}
                     autoComplete="off"
                     multiline={4}
-                    helpText="A row with min_qty sets a volume break; without it, a fixed entry."
+                    helpText="A row with min_qty sets a volume break; without it, a fixed price."
                   />
                   <InlineStack>
                     <Button submit loading={submitting}>
@@ -355,65 +415,24 @@ export default function PriceListEditor() {
               </Form>
             ) : (
               <Text as="p" tone="subdued">
-                CSV import is a Growth feature. Export and the template are available
-                on any plan.
+                Importing comes with the Growth plan. Export and the template work on any plan.
               </Text>
             )}
           </BlockStack>
-        </Card>
+        </DisclosureCard>
 
-        {/* Assignment */}
-        <Card>
+        <DisclosureCard
+          title="Apply by customer tag"
+          subtitle="Give this list to every buyer with a Shopify customer tag."
+          badge={<Badge tone="info">Growth</Badge>}
+          defaultOpen={data.tags.length > 0}
+        >
           <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">
-              Assign to companies
-            </Text>
-            {data.companies.length === 0 ? (
-              <Text as="p" tone="subdued">
-                No companies yet.
+            {data.tags.length > 0 && (
+              <Text as="p" variant="bodySm">
+                Applied to tags: {data.tags.join(", ")}
               </Text>
-            ) : (
-              <Form method="post">
-                <input type="hidden" name="intent" value="assign-company" />
-                <InlineGrid columns={{ xs: 1, sm: "1fr auto" }} gap="200">
-                  <Select
-                    label="Company"
-                    name="companyId"
-                    options={data.companies.map((c) => ({ label: c.name, value: c.id }))}
-                    value={assignCo}
-                    onChange={setAssignCo}
-                  />
-                  <Box paddingBlockStart="600">
-                    <Button submit loading={submitting}>
-                      Assign
-                    </Button>
-                  </Box>
-                </InlineGrid>
-              </Form>
             )}
-            {assigned.length > 0 && (
-              <BlockStack gap="0">
-                {assigned.map((c) => (
-                  <InlineStack key={c.id} align="space-between" blockAlign="center">
-                    <Text as="span">{c.name}</Text>
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="unassign-company" />
-                      <input type="hidden" name="companyId" value={c.id} />
-                      <Button size="slim" variant="plain" tone="critical" submit>
-                        Remove
-                      </Button>
-                    </Form>
-                  </InlineStack>
-                ))}
-              </BlockStack>
-            )}
-
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h3" variant="headingSm">
-                Auto-apply by customer tag
-              </Text>
-              <Badge tone="info">Growth</Badge>
-            </InlineStack>
             {data.isGrowth ? (
               <Form method="post">
                 <input type="hidden" name="intent" value="save-tag" />
@@ -428,23 +447,18 @@ export default function PriceListEditor() {
                   />
                   <Box paddingBlockStart="600">
                     <Button submit loading={submitting}>
-                      Map tag
+                      Save tag
                     </Button>
                   </Box>
                 </InlineGrid>
               </Form>
             ) : (
-              <Text as="p" tone="subdued">
-                Tag-based auto-apply is a Growth feature.
-              </Text>
-            )}
-            {data.tags.length > 0 && (
-              <Text as="p" tone="subdued" variant="bodySm">
-                Applied to tags: {data.tags.join(", ")}
-              </Text>
+              <Banner tone="info" action={{ content: "Upgrade to Growth", url: upgradeUrl("growth") }}>
+                <p>Applying a list by customer tag comes with the Growth plan.</p>
+              </Banner>
             )}
           </BlockStack>
-        </Card>
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

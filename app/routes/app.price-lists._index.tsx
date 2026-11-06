@@ -18,6 +18,7 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { DisclosureCard } from "../components/DisclosureCard";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import {
@@ -31,9 +32,18 @@ import {
   createPriceList,
   PriceListCapError,
 } from "../services/price-list.server";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_PRICELISTS === "true";
+const NAME_FIELD_ID = "price-list-name";
+
+/** Move focus to the create form's first field (EmptyState action). */
+function focusField(id: string) {
+  const el = document.getElementById(id);
+  el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  el?.focus();
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
@@ -89,6 +99,7 @@ export default function PriceLists() {
   const [name, setName] = useState("");
 
   const error = actionData && "ok" in actionData && !actionData.ok ? actionData.error : null;
+  const firstRun = data.lists.length === 0;
 
   return (
     <Page>
@@ -101,74 +112,44 @@ export default function PriceLists() {
           </Banner>
         )}
 
-        {/* Usage / cap */}
-        <Card>
-          <BlockStack gap="200">
-            <InlineStack align="space-between" blockAlign="center">
-              <Text as="h2" variant="headingMd">
-                Your price lists
-              </Text>
-              <Badge tone={data.allowance.allowed ? undefined : "attention"}>
-                {data.allowance.cap === null
-                  ? `${data.allowance.used} · unlimited`
-                  : `${data.allowance.used} / ${data.allowance.cap} used`}
-              </Badge>
-            </InlineStack>
-            <Text as="p" tone="subdued" variant="bodySm">
-              Assign per-customer prices and volume breaks so buyers see the right
-              price — no discount codes. Volume breaks and CSV import are Growth.
-            </Text>
-            {!data.allowance.allowed && (
-              <Banner tone="warning" title="Price-list limit reached">
-                <p>{data.capMessage}</p>
-                <Box paddingBlockStart="200">
-                  <Button url="/app/settings" variant="primary">
-                    Upgrade to Growth
-                  </Button>
-                </Box>
-              </Banner>
-            )}
-          </BlockStack>
-        </Card>
-
-        {/* Create */}
-        {data.allowance.allowed && (
-          <Card>
-            <Form method="post">
-              <input type="hidden" name="currency" value="USD" />
-              <BlockStack gap="300">
-                <Text as="h3" variant="headingSm">
-                  New price list
-                </Text>
-                <TextField
-                  label="Name"
-                  name="name"
-                  value={name}
-                  onChange={setName}
-                  autoComplete="off"
-                  placeholder="e.g. Wholesale tier A"
-                />
-                <InlineStack>
-                  <Button variant="primary" submit loading={submitting}>
-                    Create price list
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Form>
-          </Card>
-        )}
-
-        {/* List / empty state */}
+        {/* 1. The list the merchant works in (with plan usage) */}
         <Card padding="0">
-          {data.lists.length === 0 ? (
+          <Box padding="400">
+            <BlockStack gap="200">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">
+                  Your price lists
+                </Text>
+                <Badge tone={data.allowance.allowed ? undefined : "attention"}>
+                  {data.allowance.cap === null
+                    ? `${data.allowance.used} · unlimited`
+                    : `${data.allowance.used} / ${data.allowance.cap} used`}
+                </Badge>
+              </InlineStack>
+              {!data.allowance.allowed && (
+                <Banner
+                  tone="warning"
+                  title="Price-list limit reached"
+                  action={{ content: "Upgrade to Growth", url: upgradeUrl("growth") }}
+                >
+                  <p>{data.capMessage}</p>
+                </Banner>
+              )}
+            </BlockStack>
+          </Box>
+          {firstRun ? (
             <EmptyState
-              heading="Create your first price list"
+              heading="No price lists yet"
+              action={
+                data.allowance.allowed
+                  ? { content: "Create price list", onAction: () => focusField(NAME_FIELD_ID) }
+                  : { content: "Upgrade to Growth", url: upgradeUrl("growth") }
+              }
               image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
             >
               <p>
-                A price list holds per-variant prices (and volume breaks on Growth).
-                Assign it to a company and its buyers see those prices in the portal
-                and on quotes.
+                Buyers see your regular prices until you assign them a price list. Create one,
+                add prices, then assign it to a company.
               </p>
             </EmptyState>
           ) : (
@@ -179,8 +160,8 @@ export default function PriceLists() {
               headings={[
                 { title: "Name" },
                 { title: "Currency" },
-                { title: "Entries" },
-                { title: "Breaks" },
+                { title: "Prices" },
+                { title: "Volume breaks" },
                 { title: "Companies" },
               ]}
             >
@@ -198,6 +179,53 @@ export default function PriceLists() {
             </IndexTable>
           )}
         </Card>
+
+        {/* 2. Create */}
+        {data.allowance.allowed && (
+          <Card>
+            <Form method="post">
+              <input type="hidden" name="currency" value="USD" />
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">
+                  Create a price list
+                </Text>
+                <TextField
+                  id={NAME_FIELD_ID}
+                  label="Name"
+                  name="name"
+                  value={name}
+                  onChange={setName}
+                  autoComplete="off"
+                  placeholder="e.g. Wholesale tier A"
+                  helpText="You add prices and companies on the next screen."
+                />
+                <InlineStack>
+                  <Button variant="primary" submit loading={submitting}>
+                    Create price list
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Form>
+          </Card>
+        )}
+
+        {/* 3. Explanation, one click away (open on first run) */}
+        <DisclosureCard
+          title="How price lists work"
+          subtitle="Set per-customer prices so buyers see the right price, with no discount codes."
+          defaultOpen={firstRun}
+        >
+          <BlockStack gap="200">
+            <Text as="p" variant="bodyMd">
+              A price list holds a price for each product variant. Assign it to a company and that
+              company’s buyers see those prices in the portal and on their quotes.
+            </Text>
+            <Text as="p" variant="bodyMd">
+              On Growth you can also add volume breaks (a lower price from a set quantity), import
+              prices from a CSV file, and apply a list automatically by customer tag.
+            </Text>
+          </BlockStack>
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

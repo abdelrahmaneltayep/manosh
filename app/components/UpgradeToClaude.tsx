@@ -18,7 +18,7 @@ import {
  */
 export function UpgradeToClaude({
   access,
-  upgradeUrl = "/app/settings?upgrade=growth",
+  upgradeUrl = "/app/plans?upgrade=growth",
   settingsUrl = "/app/settings",
 }: {
   access: Pick<ClaudeAccess, "reason">;

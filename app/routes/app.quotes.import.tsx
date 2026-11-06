@@ -11,6 +11,7 @@ import { bulkImportAllowed, bulkImportRowCap, GROWTH_PLAN } from "../lib/billing
 import { previewImport, commitImport, ImportHasErrorsError } from "../services/quote-import.server";
 import type { ImportMode } from "../lib/quote-import";
 import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -94,19 +95,19 @@ export default function QuoteImport() {
 
   if (!allowed) {
     return (
-      <Page backAction={{ url: "/app/quotes" }}>
-        <TitleBar title="Bulk import" />
+      <Page backAction={{ content: "Quotes", url: "/app/quotes" }} title="Import quotes">
+        <TitleBar title="Import quotes" />
         <Banner tone="info" title="Bulk import is a Growth feature">
           <p>Upload a CSV to add many products to a quote, or create many quotes at once.</p>
-          <Box paddingBlockStart="200"><Button url={`/app/settings?upgrade=${GROWTH_PLAN}`} variant="primary">See Growth</Button></Box>
+          <Box paddingBlockStart="200"><Button url={upgradeUrl(GROWTH_PLAN)} variant="primary">See Growth</Button></Box>
         </Banner>
       </Page>
     );
   }
 
   return (
-    <Page backAction={{ url: "/app/quotes" }}>
-      <TitleBar title="Bulk import" />
+    <Page backAction={{ content: "Quotes", url: "/app/quotes" }} title="Import quotes">
+      <TitleBar title="Import quotes" />
       <BlockStack gap="400">
           {committed && <Banner tone="success" title="Imported">{committed}</Banner>}
           {errorMsg && <Banner tone="critical">{errorMsg}</Banner>}

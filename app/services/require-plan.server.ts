@@ -2,6 +2,7 @@ import { redirect } from "@remix-run/node";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { effectivePlanHandle, meetsPlan, type PlanHandle } from "../lib/billing-v3";
+import { upgradeUrl } from "../lib/upgrade";
 
 /**
  * Pricing v3 route gate. Enforces that the authenticated shop's effective plan
@@ -21,7 +22,7 @@ export async function requirePlanV3(request: Request, minPlan: PlanHandle): Prom
   });
   const current = effectivePlanHandle(shop?.plan ?? null, shop?.legacyPlan ?? false);
   if (!meetsPlan(current, minPlan)) {
-    throw redirect(`/app/settings?upgrade=${minPlan}`);
+    throw redirect(upgradeUrl(minPlan));
   }
   return current;
 }

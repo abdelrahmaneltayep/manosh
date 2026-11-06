@@ -61,7 +61,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     select: { plan: true, legacyPlan: true },
   });
   const current = effectivePlanHandle(shop?.plan ?? null, shop?.legacyPlan ?? false);
-  return { current };
+  // ?upgrade=growth — set by every "Upgrade" / "See Growth" button (lib/upgrade.ts)
+  // so this page can say why the merchant is here and highlight the plan they need.
+  const asked = (new URL(request.url).searchParams.get("upgrade") || "").toLowerCase();
+  const needed = (LADDER as string[]).includes(asked) ? (asked as PlanHandle) : null;
+  return { current, needed: needed && planIndex(needed) > planIndex(current) ? needed : null };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -80,7 +84,11 @@ function dollars(cents: number): string {
 }
 
 export default function Plans() {
-  const { current } = useLoaderData<typeof loader>();
+  const { current, needed } = useLoaderData<typeof loader>();
+  // The one highlighted (primary) plan: the plan a feature asked for, else the
+  // next plan up from the current one. A Scale merchant sees no primary button.
+  const next = LADDER[planIndex(current) + 1] ?? null;
+  const highlight: PlanHandle | null = needed ?? (next && next !== "free" ? next : null);
   const nav = useNavigation();
   const submitting = nav.state === "submitting";
   const pendingPlan = submitting ? String(nav.formData?.get("plan") ?? "") : null;
@@ -89,6 +97,14 @@ export default function Plans() {
     <Page>
       <TitleBar title="Pricing plans" />
       <BlockStack gap="400">
+        {needed && (
+          <Banner tone="info" title={`That feature is on the ${PLAN_DISPLAY_NAME[needed]} plan`}>
+            <p>
+              Choose {PLAN_DISPLAY_NAME[needed]} or a higher plan below. Shopify shows the
+              price and free trial before anything changes.
+            </p>
+          </Banner>
+        )}
         <Text as="p" tone="subdued" variant="bodySm">
           {NO_PER_ORDER_FEES_COPY}
         </Text>
@@ -140,7 +156,7 @@ export default function Plans() {
                       <input type="hidden" name="plan" value={handle} />
                       <Button
                         submit
-                        variant={handle === "growth" ? "primary" : "secondary"}
+                        variant={handle === highlight ? "primary" : "secondary"}
                         loading={pendingPlan === handle}
                         tone={handle === "free" ? "critical" : undefined}
                       >

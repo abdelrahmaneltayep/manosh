@@ -22,6 +22,8 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
+import { DisclosureCard } from "../components/DisclosureCard";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -153,9 +155,18 @@ export default function QuoteFormBuilder() {
     setTranslations({ ...translations, [loc]: { ...(translations[loc] ?? {}), successValue: value || undefined } });
 
   return (
-    <Page backAction={{ url: "/app/quote-forms" }}>
-      <TitleBar title={`Edit — ${form.name}`} />
-      <Form method="post">
+    <Page
+      backAction={{ content: "Quote forms", url: "/app/quote-forms" }}
+      title={name || form.name}
+      titleMetadata={<Badge tone={active ? "success" : undefined}>{active ? "Active" : "Draft"}</Badge>}
+      primaryAction={{
+        content: "Save",
+        loading: busy,
+        onAction: () => (document.getElementById("quote-form-builder") as HTMLFormElement | null)?.requestSubmit(),
+      }}
+    >
+      <TitleBar title={name || form.name} />
+      <Form method="post" id="quote-form-builder">
         <input type="hidden" name="fields" value={JSON.stringify(fields)} />
         <input type="hidden" name="active" value={active ? "on" : "off"} />
         <input type="hidden" name="successMode" value={successMode} />
@@ -170,9 +181,9 @@ export default function QuoteFormBuilder() {
               <InlineStack gap="300" blockAlign="end" wrap>
                 <Box minWidth="16rem"><TextField label="Form name" name="name" value={name} onChange={setName} autoComplete="off" /></Box>
                 <Box minWidth="14rem">
-                  <Select label="Surface" name="surface" options={SURFACES.map((s) => ({ label: s.label, value: s.value }))} value={surface} onChange={(v) => setSurface(v as typeof surface)} />
+                  <Select label="Where it shows" name="surface" options={SURFACES.map((s) => ({ label: s.label, value: s.value }))} value={surface} onChange={(v) => setSurface(v as typeof surface)} />
                 </Box>
-                <Checkbox label="Active (render on the storefront)" checked={active} onChange={setActive} />
+                <Checkbox label="Active" helpText="Show this form on your storefront" checked={active} onChange={setActive} />
               </InlineStack>
             </BlockStack>
           </Card>
@@ -285,7 +296,7 @@ export default function QuoteFormBuilder() {
                           )}
                         </BlockStack>
                       ) : (
-                        <UpgradeToClaude access={access as ClaudeAccess} upgradeUrl="/app/settings" />
+                        <UpgradeToClaude access={access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />
                       )}
                     </BlockStack>
                   ) : (
@@ -301,12 +312,13 @@ export default function QuoteFormBuilder() {
             </BlockStack>
           </Card>
 
-          <Card>
+          <DisclosureCard
+            title="Translations"
+            subtitle={advanced ? `${Object.keys(translations).length} language${Object.keys(translations).length === 1 ? "" : "s"} · field labels and the thank-you message per storefront language` : "Translate this form per storefront language on Growth."}
+            badge={!advanced ? <Badge tone="info">Growth</Badge> : undefined}
+            defaultOpen={Object.keys(translations).length > 0}
+          >
             <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Text as="h2" variant="headingMd">Translations</Text>
-                {!advanced && <Badge tone="info">Growth</Badge>}
-              </InlineStack>
               {advanced ? (
                 <>
                   <Text as="p" tone="subdued" variant="bodySm">Override field labels + the thank-you message per storefront locale. The buyer sees their locale, falling back to the default.</Text>
@@ -333,7 +345,7 @@ export default function QuoteFormBuilder() {
                 <Text as="p" tone="subdued" variant="bodyMd">Localize the form + thank-you message per storefront locale on Growth.</Text>
               )}
             </BlockStack>
-          </Card>
+          </DisclosureCard>
 
           <InlineStack>
             <Button submit variant="primary" disabled={busy} loading={busy}>Save form</Button>
@@ -345,5 +357,9 @@ export default function QuoteFormBuilder() {
 }
 
 export const ErrorBoundary = () => (
-  <Page><Banner tone="critical" title="Something went wrong">Couldn’t load this form. Go back and try again.</Banner></Page>
+  <Page backAction={{ content: "Quote forms", url: "/app/quote-forms" }} title="Quote form">
+    <Banner tone="critical" title="We couldn’t load this form" action={{ content: "Back to quote forms", url: "/app/quote-forms" }}>
+      <p>It may have been deleted. Your other forms are safe.</p>
+    </Banner>
+  </Page>
 );

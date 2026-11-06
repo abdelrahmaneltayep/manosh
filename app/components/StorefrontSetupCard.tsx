@@ -7,12 +7,20 @@ import type { StorefrontBlockLink } from "../lib/theme-deep-links";
  * with the block placed. Nothing changes on the storefront until the merchant
  * clicks Save in the theme editor. No theme code is edited.
  */
-export function StorefrontSetupCard({ links, title = "Add it to your storefront" }: { links: StorefrontBlockLink[]; title?: string }) {
+export function StorefrontSetupCard({
+  links,
+  title = "Add it to your storefront",
+  bare = false,
+}: {
+  links: StorefrontBlockLink[];
+  title?: string;
+  /** Render just the steps (no Card, no heading) — for use inside a DisclosureCard. */
+  bare?: boolean;
+}) {
   if (links.length === 0) return null;
-  return (
-    <Card>
+  const body = (
       <BlockStack gap="300">
-        <Text as="h2" variant="headingMd">{title}</Text>
+        {!bare && <Text as="h2" variant="headingMd">{title}</Text>}
         <List type="number">
           <List.Item>Click <strong>Add to theme</strong>. Your theme editor opens in a new tab with the block placed on the {links.every((l) => l.template === "cart") ? "cart" : "product"} page.</List.Item>
           <List.Item>Drag the block where you want it and adjust its settings in the sidebar.</List.Item>
@@ -41,6 +49,6 @@ export function StorefrontSetupCard({ links, title = "Add it to your storefront"
           Works with Online Store 2.0 themes. On an older theme, add the block from Online Store → Themes → Customize → Add block → Apps.
         </Text>
       </BlockStack>
-    </Card>
   );
+  return bare ? body : <Card>{body}</Card>;
 }

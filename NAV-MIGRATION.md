@@ -1,5 +1,10 @@
 # Navigation IA merge — 22 pages → 7
 
+> **Update (Nov 2026, docs/ux-audit.md):** tabs regrouped by jobs to be done — Offers
+> moved to Quotes (every negotiation inbox together), Wholesale moved to Buyers as
+> "Applications", Pricing & catalog opens on Price lists, and Settings gained a
+> Notifications tab (the email templates). Old URLs are unchanged.
+
 Mannon's left-nav went from **22 flat items** to **7 tabbed parents**, matching the
 density of competitor quote apps (5–8 nav items). **No feature was removed** — every
 old page is still reachable in ≤ 2 clicks (nav parent → tab).
@@ -35,12 +40,12 @@ Settings *(+ Home)*
 
 | # | Nav parent | Landing URL | Tabs (folded-in pages) |
 |---|---|---|---|
-| 1 | **Quotes** | `/app/quotes` | Quotes · Requests · Follow-ups |
+| 1 | **Quotes** | `/app/quotes` | Quotes · Requests · Offers · Follow-ups |
 | 2 | **Quote forms** | `/app/quote-forms` (alias `/app/forms`) | Quote forms · Languages |
-| 3 | **Pricing & catalog** | `/app/price-rules` (alias `/app/pricing`) | Price rules · Price lists · Offers · Wholesale · Catalogs · Catalog sharing · Order rules |
-| 4 | **Buyers** | `/app/buyers` | Buyers · Reps · Credit |
+| 3 | **Pricing & catalog** | `/app/price-lists` (alias `/app/pricing`) | Price lists · Catalogs · Catalog sharing · Price rules · Order rules |
+| 4 | **Buyers** | `/app/buyers` | Buyers · Applications (wholesale) · Reps · Credit |
 | 5 | **Analytics** | `/app/analytics` | *(standalone — no tabs)* |
-| 6 | **Settings** | `/app/settings` | General · Payments · Tax & VAT · ERP sync · Accounting · Agency |
+| 6 | **Settings** | `/app/settings` | General · Notifications · Payments · Tax & VAT · ERP sync · Accounting · Agency |
 | 7 | **Pricing plans** | `/app/plans` | *(standalone — 4-plan billing picker)* |
 
 `Home` (`/app`, the ROI dashboard) stays as the App-Bridge-required `rel="home"` row.

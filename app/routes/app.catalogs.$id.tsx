@@ -19,6 +19,9 @@ import {
   Divider,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { ConfirmAction } from "../components/ConfirmAction";
+import { upgradeUrl } from "../lib/upgrade";
 import prisma from "../db.server";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
@@ -166,6 +169,7 @@ export default function CatalogBuilder() {
     data.detail.items.filter((i) => (visibility === "ALL" ? i.hidden : !i.hidden)).map((i) => `${i.productId}||${i.variantId ?? ""}`),
   );
   const modeLabel = visibility === "ALL" ? "Hidden" : "In catalog";
+  const firstRun = data.detail.items.length === 0 && data.detail.assignments.length === 0;
 
   const previewOptions = [
     { label: "Choose a customer…", value: "" },
@@ -185,88 +189,87 @@ export default function CatalogBuilder() {
     setSearchParams(next);
   };
 
+  const assignmentLabel = (a: (typeof data.detail.assignments)[number]) =>
+    a.companyId
+      ? `Company · ${data.companies.find((c) => c.id === a.companyId)?.name ?? a.companyId}`
+      : a.memberId
+        ? `Member · ${data.companies.flatMap((c) => c.buyers).find((b) => b.id === a.memberId)?.email ?? a.memberId}`
+        : `Group · ${a.customerGroupTag}`;
+
   return (
-    <Page backAction={{ url: "/app/catalogs" }} title={data.detail.name}>
+    <Page
+      backAction={{ content: "Catalogs", url: "/app/catalogs" }}
+      title={data.detail.name}
+      titleMetadata={data.detail.isDefault ? <Badge tone="info">Default catalog</Badge> : undefined}
+    >
       <TitleBar title={data.detail.name} />
       <BlockStack gap="500">
         {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
         {data.catalogError && (
           <Banner tone="warning" title="We couldn’t load your products just now">
-            <p>Refresh to try again — catalog membership is safe.</p>
+            <p>Refresh to try again. Catalog membership is safe.</p>
           </Banner>
         )}
 
-        {/* Name + visibility */}
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack gap="300" blockAlign="end" wrap>
-              <Form method="post">
-                <input type="hidden" name="intent" value="rename" />
-                <InlineStack gap="200" blockAlign="end">
-                  <Box minWidth="240px"><TextField label="Name" name="name" value={name} onChange={setName} autoComplete="off" /></Box>
-                  <Button submit loading={busy}>Rename</Button>
-                </InlineStack>
-              </Form>
-              <Form method="post">
-                <input type="hidden" name="intent" value="visibility" />
-                <InlineStack gap="200" blockAlign="end">
-                  <Select
-                    label="Visibility"
-                    name="visibility"
-                    options={[
-                      { label: "Assigned only (deny by default)", value: "ASSIGNED" },
-                      { label: "Everything except hidden SKUs", value: "ALL" },
-                    ]}
-                    value={visibility}
-                    onChange={setVisibility}
-                  />
-                  <Button submit loading={busy}>Save</Button>
-                </InlineStack>
-              </Form>
-              {data.detail.isDefault && <Badge tone="info">Default catalog</Badge>}
-            </InlineStack>
-            <Text as="p" tone="subdued" variant="bodySm">
-              {visibility === "ASSIGNED"
-                ? "Only the products you check below are visible to assigned buyers. Everything else is hidden — including via direct URL, search, and the quote picker."
-                : "Buyers see everything except the SKUs you check as hidden."}
-            </Text>
-          </BlockStack>
-        </Card>
-
+        {/* 1. The job: pick products, check what a buyer sees */}
         <InlineGrid columns={{ xs: 1, md: 2 }} gap="500">
-          {/* Item grid */}
           <Card padding="0">
-            <Box padding="400"><Text as="h2" variant="headingMd">Products ({modeLabel})</Text></Box>
-            <Form method="post">
-              <input type="hidden" name="intent" value="save-items" />
-              <input type="hidden" name="mode" value={visibility} />
-              <div style={{ maxHeight: 420, overflowY: "auto" }}>
-                <IndexTable
-                  resourceName={{ singular: "product", plural: "products" }}
-                  itemCount={data.products.length}
-                  selectable={false}
-                  headings={[{ title: modeLabel }, { title: "Product" }, { title: "SKU" }]}
-                >
-                  {data.products.map((p, i) => {
-                    const key = `${p.productId}||${p.variantId}`;
-                    return (
-                      <IndexTable.Row id={p.variantId} key={p.variantId} position={i}>
-                        <IndexTable.Cell>
-                          <input type="checkbox" name="pick" value={key} defaultChecked={checkedKeys.has(key)} aria-label={`${modeLabel}: ${p.title}`} />
-                        </IndexTable.Cell>
-                        <IndexTable.Cell>{p.title}</IndexTable.Cell>
-                        <IndexTable.Cell>{p.sku ?? "—"}</IndexTable.Cell>
-                      </IndexTable.Row>
-                    );
-                  })}
-                </IndexTable>
-              </div>
-              <Box padding="400"><Button variant="primary" submit loading={busy}>Save products</Button></Box>
-            </Form>
+            <Box padding="400">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Products</Text>
+                <Text as="p" tone="subdued" variant="bodySm">
+                  {visibility === "ASSIGNED"
+                    ? "Check the products assigned buyers can see. Everything else is hidden from them, including through a direct link, search, and the quote picker."
+                    : "Buyers see everything except the products you check as hidden."}
+                </Text>
+              </BlockStack>
+            </Box>
+            {data.products.length === 0 ? (
+              <Box paddingInline="400" paddingBlockEnd="400">
+                <BlockStack gap="200">
+                  <Text as="p" tone="subdued">
+                    {data.catalogError
+                      ? "Products will appear here once they load."
+                      : "No products to pick from yet. Products from your store appear here once you add them in Shopify."}
+                  </Text>
+                  {!data.catalogError && (
+                    <InlineStack>
+                      <Button url="shopify://admin/products" target="_top">Go to products</Button>
+                    </InlineStack>
+                  )}
+                </BlockStack>
+              </Box>
+            ) : (
+              <Form method="post">
+                <input type="hidden" name="intent" value="save-items" />
+                <input type="hidden" name="mode" value={visibility} />
+                <div style={{ maxHeight: 420, overflowY: "auto" }}>
+                  <IndexTable
+                    resourceName={{ singular: "product", plural: "products" }}
+                    itemCount={data.products.length}
+                    selectable={false}
+                    headings={[{ title: modeLabel }, { title: "Product" }, { title: "SKU" }]}
+                  >
+                    {data.products.map((p, i) => {
+                      const key = `${p.productId}||${p.variantId}`;
+                      return (
+                        <IndexTable.Row id={p.variantId} key={p.variantId} position={i}>
+                          <IndexTable.Cell>
+                            <input type="checkbox" name="pick" value={key} defaultChecked={checkedKeys.has(key)} aria-label={`${modeLabel}: ${p.title}`} />
+                          </IndexTable.Cell>
+                          <IndexTable.Cell>{p.title}</IndexTable.Cell>
+                          <IndexTable.Cell>{p.sku ?? "—"}</IndexTable.Cell>
+                        </IndexTable.Row>
+                      );
+                    })}
+                  </IndexTable>
+                </div>
+                <Box padding="400"><Button variant="primary" submit loading={busy}>Save products</Button></Box>
+              </Form>
+            )}
           </Card>
 
-          {/* Preview as customer */}
           <Card>
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">Preview as customer</Text>
@@ -288,16 +291,44 @@ export default function CatalogBuilder() {
                   </div>
                 </BlockStack>
               ) : (
-                <Text as="p" tone="subdued" variant="bodySm">Pick a customer to preview exactly what they’d see in the portal and order pad.</Text>
+                <Text as="p" tone="subdued" variant="bodySm">
+                  {data.companies.length === 0
+                    ? "Once you have B2B companies, pick one here to see exactly what they’d see in the portal and order pad."
+                    : "Pick a customer to see exactly what they’d see in the portal and order pad."}
+                </Text>
               )}
             </BlockStack>
           </Card>
         </InlineGrid>
 
-        {/* Assignments */}
+        {/* 2. Who gets this catalog */}
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">Assignments</Text>
+            {data.detail.assignments.length === 0 ? (
+              <Text as="p" tone="subdued">
+                Not assigned yet, so no buyer is limited by this catalog. Assign it below.
+              </Text>
+            ) : (
+              <BlockStack gap="150">
+                {data.detail.assignments.map((a) => (
+                  <InlineStack key={a.id} align="space-between" blockAlign="center">
+                    <Text as="span" variant="bodySm">{assignmentLabel(a)}</Text>
+                    <ConfirmAction
+                      label="Remove"
+                      title="Remove this assignment?"
+                      message={`${assignmentLabel(a)} will no longer be limited by this catalog and falls back to its next matching catalog or your default.`}
+                      confirmLabel="Remove assignment"
+                      fields={{ intent: "unassign", assignmentId: a.id }}
+                      size="micro"
+                      variant="tertiary"
+                      disabled={busy}
+                    />
+                  </InlineStack>
+                ))}
+              </BlockStack>
+            )}
+            <Divider />
             <Form method="post">
               <input type="hidden" name="intent" value="assign" />
               <InlineStack gap="300" blockAlign="end" wrap>
@@ -311,7 +342,7 @@ export default function CatalogBuilder() {
                   ]}
                   value={scope}
                   onChange={setScope}
-                  helpText={data.isGrowth ? undefined : "Group & member assignment need Growth."}
+                  helpText={data.isGrowth ? undefined : "Group and member assignment need Growth."}
                 />
                 <Box minWidth="280px">
                   {scope === "COMPANY" ? (
@@ -322,57 +353,73 @@ export default function CatalogBuilder() {
                     <TextField label="Customer tag" name="targetId" value={targetId} onChange={setTargetId} autoComplete="off" placeholder="e.g. vip" />
                   )}
                 </Box>
-                <Button submit variant="primary" loading={busy} disabled={!data.scopes.includes(scope as "COMPANY" | "GROUP" | "MEMBER")}>Assign</Button>
+                <Button submit variant="primary" loading={busy} disabled={!data.scopes.includes(scope as "COMPANY" | "GROUP" | "MEMBER")}>Assign catalog</Button>
               </InlineStack>
             </Form>
-
-            {data.detail.assignments.length > 0 && (
-              <BlockStack gap="150">
-                {data.detail.assignments.map((a) => (
-                  <InlineStack key={a.id} align="space-between" blockAlign="center">
-                    <Text as="span" variant="bodySm">
-                      {a.companyId ? `Company · ${data.companies.find((c) => c.id === a.companyId)?.name ?? a.companyId}` : a.memberId ? `Member · ${a.memberId}` : `Group · ${a.customerGroupTag}`}
-                    </Text>
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="unassign" />
-                      <input type="hidden" name="assignmentId" value={a.id} />
-                      <Button submit variant="tertiary" tone="critical" size="micro" loading={busy}>Remove</Button>
-                    </Form>
-                  </InlineStack>
-                ))}
-              </BlockStack>
-            )}
           </BlockStack>
         </Card>
 
-        {/* CSV import (Growth) */}
-        <Card>
+        {/* 3. Settings + advanced, one click away */}
+        <DisclosureCard
+          title="Catalog settings"
+          subtitle={`Name and visibility. Currently: ${data.detail.visibility === "ASSIGNED" ? "only the products you pick" : "everything except products you hide"}.`}
+          defaultOpen={firstRun}
+        >
           <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h2" variant="headingMd">Bulk import (CSV)</Text>
-              {!data.csvAllowed && <Badge tone="info">Growth</Badge>}
-            </InlineStack>
-            {data.csvAllowed ? (
-              <Form method="post">
-                <input type="hidden" name="intent" value="import-csv" />
-                <BlockStack gap="200">
-                  <TextField
-                    label="Paste CSV (product_id,variant_id,hidden)"
-                    name="csv"
-                    value={csv}
-                    onChange={setCsv}
-                    multiline={4}
-                    autoComplete="off"
-                    placeholder={"gid://shopify/Product/1,,false\ngid://shopify/Product/2,gid://shopify/ProductVariant/9,true"}
-                  />
-                  <InlineStack><Button submit loading={busy}>Import CSV</Button></InlineStack>
-                </BlockStack>
-              </Form>
-            ) : (
-              <Text as="p" tone="subdued" variant="bodySm">CSV bulk import is a Growth feature.</Text>
-            )}
+            <Form method="post">
+              <input type="hidden" name="intent" value="rename" />
+              <InlineStack gap="200" blockAlign="end">
+                <Box minWidth="240px"><TextField label="Name" name="name" value={name} onChange={setName} autoComplete="off" /></Box>
+                <Button submit loading={busy}>Rename catalog</Button>
+              </InlineStack>
+            </Form>
+            <Form method="post">
+              <input type="hidden" name="intent" value="visibility" />
+              <InlineStack gap="200" blockAlign="end">
+                <Select
+                  label="Visibility"
+                  name="visibility"
+                  options={[
+                    { label: "Only the products I pick", value: "ASSIGNED" },
+                    { label: "Everything except products I hide", value: "ALL" },
+                  ]}
+                  value={visibility}
+                  onChange={setVisibility}
+                  helpText="Changing this flips what the checkboxes under Products mean. Save it before you pick products."
+                />
+                <Button submit loading={busy}>Save visibility</Button>
+              </InlineStack>
+            </Form>
           </BlockStack>
-        </Card>
+        </DisclosureCard>
+
+        <DisclosureCard
+          title="Bulk import (CSV)"
+          subtitle="Add or hide many products at once."
+          badge={!data.csvAllowed ? <Badge tone="info">Growth</Badge> : undefined}
+        >
+          {data.csvAllowed ? (
+            <Form method="post">
+              <input type="hidden" name="intent" value="import-csv" />
+              <BlockStack gap="200">
+                <TextField
+                  label="Paste CSV (product_id,variant_id,hidden)"
+                  name="csv"
+                  value={csv}
+                  onChange={setCsv}
+                  multiline={4}
+                  autoComplete="off"
+                  placeholder={"gid://shopify/Product/1,,false\ngid://shopify/Product/2,gid://shopify/ProductVariant/9,true"}
+                />
+                <InlineStack><Button submit loading={busy}>Import CSV</Button></InlineStack>
+              </BlockStack>
+            </Form>
+          ) : (
+            <Banner tone="info" action={{ content: "See Growth", url: upgradeUrl("growth") }}>
+              <p>CSV bulk import comes with the Growth plan.</p>
+            </Banner>
+          )}
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

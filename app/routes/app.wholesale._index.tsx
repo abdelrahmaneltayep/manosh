@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, Link, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, Link, useActionData, useFetcher, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -18,8 +18,9 @@ import {
   IndexTable,
   EmptyState,
 } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { getPlanLimits, GROWTH_PLAN } from "../lib/billing";
@@ -43,6 +44,7 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftDecisionNote, isWholesaleDecision } from "../services/wholesale-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_WHOLESALE_REG === "true";
@@ -139,6 +141,38 @@ const DECISION_OPTIONS = [
   { label: "Decline", value: "REJECTED" },
 ];
 
+/** Read-only, selectable link with a Copy button (keyboard + screen-reader friendly). */
+function CopyLinkField({ label, value, helpText }: { label: string; value: string; helpText?: string }) {
+  const shopify = useAppBridge();
+  const [copied, setCopied] = useState(false);
+  return (
+    <TextField
+      label={label}
+      value={value}
+      readOnly
+      autoComplete="off"
+      helpText={helpText}
+      selectTextOnFocus
+      connectedRight={
+        <Button
+          accessibilityLabel={`Copy ${label.toLowerCase()}`}
+          onClick={async () => {
+            try {
+              await navigator.clipboard?.writeText(value);
+              setCopied(true);
+              shopify.toast.show("Link copied");
+            } catch {
+              setCopied(false);
+            }
+          }}
+        >
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+      }
+    />
+  );
+}
+
 function WholesaleReplyRow({
   app,
   access,
@@ -163,11 +197,17 @@ function WholesaleReplyRow({
         <BlockStack gap="200">
           <InlineStack gap="200" blockAlign="center" align="space-between" wrap>
             <InlineStack gap="200" blockAlign="center">
-              <Link to={`/app/quotes`}>{app.companyName}</Link>
+              <Text as="h3" variant="headingSm">{app.companyName}</Text>
               <Text as="span" tone="subdued" variant="bodySm">{app.contactEmail}</Text>
             </InlineStack>
             <InlineStack gap="200" blockAlign="end">
-              <Select label="Decision" labelHidden options={DECISION_OPTIONS} value={decision} onChange={setDecision} />
+              <Select
+                label={`Decision for ${app.companyName}`}
+                labelHidden
+                options={DECISION_OPTIONS}
+                value={decision}
+                onChange={setDecision}
+              />
               {access.allowed && (
                 <Button
                   size="slim"
@@ -204,16 +244,19 @@ function WholesaleReplyRow({
             <BlockStack gap="200">
               <TextField
                 label="Note to applicant (optional)"
-                labelHidden
                 name="note"
                 value={note}
                 onChange={setNote}
                 multiline={2}
                 autoComplete="off"
-                placeholder="Leave blank to send the default decision email, or draft a note with Claude above."
+                helpText={
+                  access.allowed
+                    ? "Leave blank to send the default decision email, or draft a note with Claude."
+                    : "Leave blank to send the default decision email."
+                }
               />
               <InlineStack>
-                <Button size="slim" submit>Send decision</Button>
+                <Button size="slim" submit accessibilityLabel={`Send decision to ${app.companyName}`}>Send decision</Button>
               </InlineStack>
             </BlockStack>
           </Form>
@@ -227,6 +270,7 @@ export default function WholesaleQueue() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const submit = useSubmit();
   const submitting = navigation.state === "submitting";
   const [name, setName] = useState("");
 
@@ -234,34 +278,143 @@ export default function WholesaleQueue() {
   const message = actionData && actionData.ok ? actionData.message : null;
   const pending = data.applications.filter((a) => a.status === "PENDING");
   const respondable = data.applications.filter((a) => a.status === "PENDING" || a.status === "MORE_INFO");
+  const hasPublished = data.forms.some((f) => f.published);
+  const firstForm = data.forms[0];
+
+  const createFirstForm = () => {
+    const fd = new FormData();
+    fd.set("intent", "create-form");
+    fd.set("name", "Wholesale application");
+    submit(fd, { method: "post" });
+  };
+
+  // Empty state: say why it's empty + the one action that fills it.
+  const emptyState =
+    data.forms.length === 0
+      ? {
+          heading: "Create your wholesale application form",
+          body: "Buyers apply through a branded form, and you approve them here before they see your wholesale prices.",
+          action: { content: "Create application form", onAction: createFirstForm, loading: submitting },
+        }
+      : !hasPublished
+        ? {
+            heading: "Publish your form to start receiving applications",
+            body: "Your form is still a draft, so buyers can't apply yet.",
+            action: firstForm ? { content: "Edit form", url: `/app/wholesale/forms/${firstForm.id}` } : undefined,
+          }
+        : {
+            heading: "No applications yet",
+            body: "Share your public form link below. New applications will land here for review.",
+            action: undefined,
+          };
 
   return (
     <Page>
-      <TitleBar title="Wholesale" />
+      <TitleBar title="Applications" />
       <SectionTabs active="wholesale" />
       <BlockStack gap="500">
         {error && <Banner tone="critical" title="Couldn’t complete that"><p>{error}</p></Banner>}
         {message && <Banner tone="success" title={message} />}
 
-        {/* Activation: publish your form */}
-        {data.forms.length === 0 && (
-          <Banner tone="info" title="Publish your wholesale form">
-            <p>
-              Create a branded “apply to buy wholesale” form, share its link, and
-              approve buyers before they see your prices. It’s the top of your B2B
-              funnel.
-            </p>
-            <Box paddingBlockStart="200">
-              <Form method="post">
-                <input type="hidden" name="intent" value="create-form" />
-                <input type="hidden" name="name" value="Wholesale application" />
-                <Button submit variant="primary" loading={submitting}>Create your first form</Button>
-              </Form>
-            </Box>
-          </Banner>
+        {/* 1. The job: review applications */}
+        <Card padding="0">
+          <Box padding="400">
+            <BlockStack gap="100">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">Approval queue</Text>
+                {pending.length > 0 && <Badge tone="attention">{`${pending.length} pending`}</Badge>}
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Approve buyers before they see your wholesale prices. Each decision emails the applicant.
+              </Text>
+            </BlockStack>
+          </Box>
+          {data.applications.length === 0 ? (
+            <EmptyState
+              heading={emptyState.heading}
+              action={emptyState.action}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>{emptyState.body}</p>
+            </EmptyState>
+          ) : (
+            <IndexTable
+              resourceName={{ singular: "application", plural: "applications" }}
+              itemCount={data.applications.length}
+              selectable={false}
+              headings={[{ title: "Company" }, { title: "Contact" }, { title: "Received" }, { title: "Status" }, { title: "Decision" }]}
+            >
+              {data.applications.map((a, index) => (
+                <IndexTable.Row id={a.id} key={a.id} position={index}>
+                  <IndexTable.Cell>
+                    <Text as="span" fontWeight="semibold">{a.companyName}</Text>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>{a.contactEmail}</IndexTable.Cell>
+                  <IndexTable.Cell>{formatDate(a.createdAt)}</IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Badge tone={statusTone(a.status) as never}>{STATUS_LABELS[a.status as keyof typeof STATUS_LABELS] ?? a.status}</Badge>
+                  </IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {a.status === "PENDING" || a.status === "MORE_INFO" ? (
+                      <InlineStack gap="150" blockAlign="center">
+                        <Form method="post">
+                          <input type="hidden" name="intent" value="decide" />
+                          <input type="hidden" name="applicationId" value={a.id} />
+                          <input type="hidden" name="decision" value="APPROVED" />
+                          <Button size="slim" submit accessibilityLabel={`Approve ${a.companyName}`}>Approve</Button>
+                        </Form>
+                        <Form method="post">
+                          <input type="hidden" name="intent" value="decide" />
+                          <input type="hidden" name="applicationId" value={a.id} />
+                          <input type="hidden" name="decision" value="MORE_INFO" />
+                          <Button size="slim" variant="plain" submit accessibilityLabel={`Request more info from ${a.companyName}`}>More info</Button>
+                        </Form>
+                        <ConfirmAction
+                          label="Reject"
+                          size="micro"
+                          variant="plain"
+                          title={`Reject ${a.companyName}?`}
+                          message="The applicant gets the default decline email and won't see your wholesale prices. To add a personal note, use “Respond with a note” below instead."
+                          confirmLabel="Reject application"
+                          fields={{ intent: "decide", applicationId: a.id, decision: "REJECTED" }}
+                        />
+                      </InlineStack>
+                    ) : (
+                      <Text as="span" tone="subdued" variant="bodySm">—</Text>
+                    )}
+                  </IndexTable.Cell>
+                </IndexTable.Row>
+              ))}
+            </IndexTable>
+          )}
+        </Card>
+
+        {/* 1b. Same job, with a personal note (manual always works; Claude only pre-fills) */}
+        {respondable.length > 0 && (
+          <Card>
+            <BlockStack gap="300">
+              <BlockStack gap="100">
+                <InlineStack gap="200" blockAlign="center">
+                  <Text as="h2" variant="headingMd">Respond with a note</Text>
+                  {data.access.state === "trial" && data.access.daysLeft != null && (
+                    <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                  )}
+                </InlineStack>
+                <Text as="p" tone="subdued" variant="bodySm">
+                  Pick a decision and add a personal note. You review every note before it's sent.
+                </Text>
+              </BlockStack>
+              <BlockStack gap="0">
+                {respondable.map((a, i) => (
+                  <WholesaleReplyRow key={a.id} app={a} access={data.access as ClaudeAccess} divider={i > 0} />
+                ))}
+              </BlockStack>
+              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />}
+            </BlockStack>
+          </Card>
         )}
 
-        {/* Forms */}
+        {/* 2. Create / manage the forms that feed the queue */}
         <Card>
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
@@ -271,7 +424,11 @@ export default function WholesaleQueue() {
               </Badge>
             </InlineStack>
 
-            {data.forms.length > 0 && (
+            {data.forms.length === 0 ? (
+              <Text as="p" tone="subdued">
+                You don't have a form yet. Add one below, then publish it to get a public link.
+              </Text>
+            ) : (
               <BlockStack gap="0">
                 {data.forms.map((f, i) => (
                   <div key={f.id}>
@@ -293,6 +450,14 @@ export default function WholesaleQueue() {
               </BlockStack>
             )}
 
+            {hasPublished && (
+              <CopyLinkField
+                label="Public application link"
+                value={data.publicUrl}
+                helpText="Share this link on your site or in emails. Buyers apply here."
+              />
+            )}
+
             {data.allowance.allowed ? (
               <Form method="post">
                 <input type="hidden" name="intent" value="create-form" />
@@ -306,98 +471,10 @@ export default function WholesaleQueue() {
             ) : (
               <Banner tone="warning">
                 <p>{data.capMessage}</p>
-                <Box paddingBlockStart="200"><Button url="/app/settings" variant="primary">Upgrade to Growth</Button></Box>
+                <Box paddingBlockStart="200"><Button url={upgradeUrl("growth")} variant="primary">Upgrade to Growth</Button></Box>
               </Banner>
             )}
-
-            {data.forms.some((f) => f.published) && (
-              <Text as="p" tone="subdued" variant="bodySm">
-                Public link: <code>{data.publicUrl}</code>
-              </Text>
-            )}
           </BlockStack>
-        </Card>
-
-        {/* Respond with a personalised (Claude-drafted) note */}
-        {respondable.length > 0 && (
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Text as="h2" variant="headingMd">Respond with a note</Text>
-                {data.access.state === "trial" && data.access.daysLeft != null && (
-                  <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
-                )}
-              </InlineStack>
-              <Text as="p" tone="subdued" variant="bodySm">
-                Send your decision with a personal note. Draft it with Claude, review, then send.
-              </Text>
-              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />}
-              <BlockStack gap="0">
-                {respondable.map((a, i) => (
-                  <WholesaleReplyRow key={a.id} app={a} access={data.access as ClaudeAccess} divider={i > 0} />
-                ))}
-              </BlockStack>
-            </BlockStack>
-          </Card>
-        )}
-
-        {/* Approval queue */}
-        <Card padding="0">
-          <Box padding="400">
-            <InlineStack align="space-between" blockAlign="center">
-              <Text as="h2" variant="headingMd">Approval queue</Text>
-              {pending.length > 0 && <Badge tone="attention">{`${pending.length} pending`}</Badge>}
-            </InlineStack>
-          </Box>
-          {data.applications.length === 0 ? (
-            <EmptyState heading="No applications yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>Share your form link and applications will land here for review.</p>
-            </EmptyState>
-          ) : (
-            <IndexTable
-              resourceName={{ singular: "application", plural: "applications" }}
-              itemCount={data.applications.length}
-              selectable={false}
-              headings={[{ title: "Company" }, { title: "Contact" }, { title: "Received" }, { title: "Status" }, { title: "Decision" }]}
-            >
-              {data.applications.map((a, index) => (
-                <IndexTable.Row id={a.id} key={a.id} position={index}>
-                  <IndexTable.Cell>{a.companyName}</IndexTable.Cell>
-                  <IndexTable.Cell>{a.contactEmail}</IndexTable.Cell>
-                  <IndexTable.Cell>{formatDate(a.createdAt)}</IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Badge tone={statusTone(a.status) as never}>{STATUS_LABELS[a.status]}</Badge>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    {a.status === "PENDING" || a.status === "MORE_INFO" ? (
-                      <InlineStack gap="150">
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="decide" />
-                          <input type="hidden" name="applicationId" value={a.id} />
-                          <input type="hidden" name="decision" value="APPROVED" />
-                          <Button size="slim" submit>Approve</Button>
-                        </Form>
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="decide" />
-                          <input type="hidden" name="applicationId" value={a.id} />
-                          <input type="hidden" name="decision" value="MORE_INFO" />
-                          <Button size="slim" variant="plain" submit>More info</Button>
-                        </Form>
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="decide" />
-                          <input type="hidden" name="applicationId" value={a.id} />
-                          <input type="hidden" name="decision" value="REJECTED" />
-                          <Button size="slim" variant="plain" tone="critical" submit>Reject</Button>
-                        </Form>
-                      </InlineStack>
-                    ) : (
-                      <Text as="span" tone="subdued" variant="bodySm">—</Text>
-                    )}
-                  </IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
-          )}
         </Card>
       </BlockStack>
     </Page>

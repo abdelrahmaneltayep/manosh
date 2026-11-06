@@ -19,6 +19,8 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { ConfirmAction } from "../components/ConfirmAction";
+import { DisclosureCard } from "../components/DisclosureCard";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { taxRegionsAllowed, taxCertWorkflowAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -46,6 +48,7 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_TAX_VAT === "true";
@@ -150,6 +153,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
 };
 
 const STATUS_TONE: Record<string, "success" | "attention" | "critical"> = { VERIFIED: "success", UNVERIFIED: "attention", REJECTED: "critical" };
+const STATUS_LABELS: Record<string, string> = { VERIFIED: "Verified", UNVERIFIED: "Not verified", REJECTED: "Rejected" };
 
 function TaxRejectRow({
   p,
@@ -212,14 +216,17 @@ function TaxRejectRow({
             <input type="hidden" name="companyId" value={p.companyId} />
             <BlockStack gap="200">
               <TextField
-                label="Reason to send the buyer"
-                labelHidden
+                label={`Reason to send ${p.companyName}`}
                 name="reason"
                 value={reason}
                 onChange={setReason}
                 multiline={2}
                 autoComplete="off"
-                placeholder="Draft a reason with Claude above, or write one here."
+                placeholder={
+                  access.allowed
+                    ? "Write what to re-submit, or draft a reason with Claude above."
+                    : "Say what couldn't be verified and what to re-submit."
+                }
               />
               <InlineStack>
                 <Button size="slim" tone="critical" submit disabled={!reason.trim()}>Reject with this reason</Button>
@@ -237,6 +244,8 @@ export default function TaxSettings() {
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
+  const busyIntent = busy ? String(nav.formData?.get("intent") ?? "") : "";
+  const busyCompany = busy ? String(nav.formData?.get("companyId") ?? "") : "";
 
   const [rate, setRate] = useState(data.defaultRatePct != null ? String(data.defaultRatePct) : "");
   const [region, setRegion] = useState("");
@@ -252,95 +261,23 @@ export default function TaxSettings() {
         {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
 
-        <Text as="p" tone="subdued" variant="bodyMd">
-          Collect exemption documents, verify tax IDs, and apply the right tax at
-          checkout. Mannon never computes tax — Shopify does; we set exemptions and
-          keep your invoices compliant. Buyers are <b>charged tax until verified</b>.
-        </Text>
-
-        {/* Default rate (both plans) */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="default-rate" />
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">Default tax rate</Text>
-              <Text as="p" tone="subdued" variant="bodySm">A reference rate shown on quotes/invoices (e.g. KSA 15%, UAE 5%). Shopify still calculates the actual tax.</Text>
-              <InlineStack gap="300" blockAlign="end" wrap>
-                <Box minWidth="180px"><TextField label="Default rate" name="rate" type="number" value={rate} onChange={setRate} min={0} max={100} suffix="%" autoComplete="off" /></Box>
-                <Button submit loading={busy}>Save rate</Button>
-              </InlineStack>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        {/* Per-region rules (Growth) */}
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h2" variant="headingMd">Per-region rules</Text>
-              {!data.regionsAllowed && <Badge tone="info">Growth</Badge>}
-            </InlineStack>
-            {data.regionsAllowed ? (
-              <>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="region" />
-                  <InlineStack gap="300" blockAlign="end" wrap>
-                    <Box minWidth="140px"><TextField label="Region" name="region" value={region} onChange={setRegion} autoComplete="off" placeholder="SA, AE, EU, US-CA" /></Box>
-                    <Box minWidth="140px"><TextField label="Rate %" name="rate" type="number" value={regionRate} onChange={setRegionRate} min={0} max={100} suffix="%" autoComplete="off" /></Box>
-                    <Checkbox label="Exempt by default" name="exemptByDefault" checked={regionExempt} onChange={setRegionExempt} />
-                    <Button submit loading={busy}>Add / update</Button>
-                  </InlineStack>
-                </Form>
-                {data.regionRules.length > 0 && (
-                  <BlockStack gap="150">
-                    {data.regionRules.map((r) => (
-                      <InlineStack key={r.id} align="space-between" blockAlign="center">
-                        <Text as="span" variant="bodySm">{r.region} · {r.rate != null ? `${Math.round(Number(r.rate) * 10000) / 100}%` : "—"} {r.exemptByDefault ? "· exempt by default" : ""}</Text>
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="region-delete" />
-                          <input type="hidden" name="id" value={r.id} />
-                          <Button submit variant="tertiary" tone="critical" size="micro" loading={busy}>Remove</Button>
-                        </Form>
-                      </InlineStack>
-                    ))}
-                  </BlockStack>
-                )}
-              </>
-            ) : (
-              <Text as="p" tone="subdued" variant="bodySm">Per-region VAT/GST rules are a Growth feature. Starter uses the single default rate + a manual exempt toggle per company.</Text>
-            )}
-          </BlockStack>
-        </Card>
-
-        {/* Reject with a considered (Claude-drafted) reason */}
-        {data.certWorkflow && unverified.length > 0 && (
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Text as="h2" variant="headingMd">Reject with a reason</Text>
-                {data.access.state === "trial" && data.access.daysLeft != null && (
-                  <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
-                )}
+        {/* 1. Review queue: company tax profiles */}
+        <Card padding="0">
+          <Box padding="400">
+            <BlockStack gap="100">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">Company tax profiles</Text>
+                {data.certWorkflow && unverified.length > 0 && <Badge tone="attention">{`${unverified.length} to review`}</Badge>}
               </InlineStack>
               <Text as="p" tone="subdued" variant="bodySm">
-                Tell a buyer why their exemption couldn’t be verified and what to re-submit. Draft it with Claude, review, then reject — the buyer is emailed your reason.
+                Verify tax IDs and exemption certificates. Shopify calculates the tax — Mannon only sets
+                who is exempt. Buyers are charged tax until you verify them.
               </Text>
-              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />}
-              <BlockStack gap="0">
-                {unverified.map((p, i) => (
-                  <TaxRejectRow key={p.companyId} p={p} access={data.access as ClaudeAccess} divider={i > 0} />
-                ))}
-              </BlockStack>
             </BlockStack>
-          </Card>
-        )}
-
-        {/* Company profiles / review queue */}
-        <Card padding="0">
-          <Box padding="400"><Text as="h2" variant="headingMd">Company tax profiles</Text></Box>
+          </Box>
           {data.profiles.length === 0 ? (
             <EmptyState heading="No tax profiles yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>Buyers submit their tax ID or exemption certificate from their portal.</p>
+              <p>Buyers add their tax ID or exemption certificate from their portal. Each one lands here for you to review.</p>
             </EmptyState>
           ) : (
             <IndexTable
@@ -354,19 +291,19 @@ export default function TaxSettings() {
                   <IndexTable.Cell>{p.companyName}</IndexTable.Cell>
                   <IndexTable.Cell>
                     {p.taxId ? (
-                      <>
-                        {p.taxIdType} {p.taxId}{" "}
-                        {p.idValid === false && <Badge tone="critical">bad format</Badge>}
-                        {p.idValid === true && <Badge tone="success">valid</Badge>}
-                      </>
+                      <InlineStack gap="100" blockAlign="center" wrap>
+                        <Text as="span">{p.taxIdType} {p.taxId}</Text>
+                        {p.idValid === false && <Badge tone="critical">Invalid format</Badge>}
+                        {p.idValid === true && <Badge tone="success">Valid format</Badge>}
+                      </InlineStack>
                     ) : "—"}
                   </IndexTable.Cell>
                   <IndexTable.Cell>
-                    <Badge tone={STATUS_TONE[p.status] ?? "attention"}>{`${p.status}${p.exempt ? " · exempt" : ""}`}</Badge>
+                    <Badge tone={STATUS_TONE[p.status] ?? "attention"}>{`${STATUS_LABELS[p.status] ?? p.status}${p.exempt ? " · Exempt" : ""}`}</Badge>
                   </IndexTable.Cell>
                   <IndexTable.Cell>
                     {p.hasCertificate ? (
-                      <PolarisLink url={`/app/tax/certificate/${p.companyId}`} target="_blank">Download</PolarisLink>
+                      <PolarisLink url={`/app/tax/certificate/${p.companyId}`} target="_blank" accessibilityLabel={`Download ${p.companyName}'s certificate`}>Download</PolarisLink>
                     ) : "—"}
                   </IndexTable.Cell>
                   <IndexTable.Cell>
@@ -376,25 +313,29 @@ export default function TaxSettings() {
                           <input type="hidden" name="intent" value="verify" />
                           <input type="hidden" name="companyId" value={p.companyId} />
                           <input type="hidden" name="exempt" value="on" />
-                          <Button submit size="micro" loading={busy}>Verify exempt</Button>
+                          <Button submit size="micro" accessibilityLabel={`Verify ${p.companyName} as exempt`} loading={busyIntent === "verify" && busyCompany === p.companyId && nav.formData?.get("exempt") === "on"}>Verify exempt</Button>
                         </Form>
                         <Form method="post">
                           <input type="hidden" name="intent" value="verify" />
                           <input type="hidden" name="companyId" value={p.companyId} />
-                          <Button submit size="micro" variant="tertiary" loading={busy}>Verify taxable</Button>
+                          <Button submit size="micro" variant="tertiary" accessibilityLabel={`Verify ${p.companyName} as taxable`} loading={busyIntent === "verify" && busyCompany === p.companyId && nav.formData?.get("exempt") !== "on"}>Verify taxable</Button>
                         </Form>
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="reject" />
-                          <input type="hidden" name="companyId" value={p.companyId} />
-                          <Button submit size="micro" tone="critical" variant="tertiary" loading={busy}>Reject</Button>
-                        </Form>
+                        <ConfirmAction
+                          label="Reject"
+                          size="micro"
+                          variant="tertiary"
+                          title={`Reject ${p.companyName}'s tax profile?`}
+                          message="The buyer keeps paying tax and is asked to re-submit. To tell them why, use “Reject with a reason” below instead."
+                          confirmLabel="Reject profile"
+                          fields={{ intent: "reject", companyId: p.companyId }}
+                        />
                       </InlineStack>
                     ) : (
                       <Form method="post">
                         <input type="hidden" name="intent" value="manual-exempt" />
                         <input type="hidden" name="companyId" value={p.companyId} />
                         <input type="hidden" name="exempt" value={p.exempt ? "" : "on"} />
-                        <Button submit size="micro" loading={busy}>{p.exempt ? "Remove exemption" : "Mark exempt"}</Button>
+                        <Button submit size="micro" loading={busyIntent === "manual-exempt" && busyCompany === p.companyId}>{p.exempt ? "Remove exemption" : "Mark exempt"}</Button>
                       </Form>
                     )}
                   </IndexTable.Cell>
@@ -403,6 +344,95 @@ export default function TaxSettings() {
             </IndexTable>
           )}
         </Card>
+
+        {/* 1b. Reject with a reason — right next to the queue (manual always works; Claude only pre-fills) */}
+        {data.certWorkflow && unverified.length > 0 && (
+          <Card>
+            <BlockStack gap="300">
+              <BlockStack gap="100">
+                <InlineStack gap="200" blockAlign="center">
+                  <Text as="h2" variant="headingMd">Reject with a reason</Text>
+                  {data.access.state === "trial" && data.access.daysLeft != null && (
+                    <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                  )}
+                </InlineStack>
+                <Text as="p" tone="subdued" variant="bodySm">
+                  Tell a buyer why their exemption couldn’t be verified and what to re-submit. The buyer is emailed your reason.
+                </Text>
+              </BlockStack>
+              <BlockStack gap="0">
+                {unverified.map((p, i) => (
+                  <TaxRejectRow key={p.companyId} p={p} access={data.access as ClaudeAccess} divider={i > 0} />
+                ))}
+              </BlockStack>
+              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />}
+            </BlockStack>
+          </Card>
+        )}
+
+        {/* 2. Default rate (both plans) */}
+        <Card>
+          <Form method="post">
+            <input type="hidden" name="intent" value="default-rate" />
+            <BlockStack gap="300">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Default tax rate</Text>
+                <Text as="p" tone="subdued" variant="bodySm">A reference rate shown on quotes and invoices (for example KSA 15%, UAE 5%). Shopify still calculates the actual tax.</Text>
+              </BlockStack>
+              <InlineStack gap="300" blockAlign="end" wrap>
+                <Box minWidth="180px"><TextField label="Default rate" name="rate" type="number" value={rate} onChange={setRate} min={0} max={100} suffix="%" autoComplete="off" /></Box>
+                <Button submit loading={busyIntent === "default-rate"}>Save rate</Button>
+              </InlineStack>
+            </BlockStack>
+          </Form>
+        </Card>
+
+        {/* 3. Per-region rules (Growth) — advanced */}
+        <DisclosureCard
+          title="Per-region rules"
+          subtitle="Set a different rate, or exempt by default, for specific countries or regions."
+          badge={!data.regionsAllowed ? <Badge tone="info">Growth</Badge> : undefined}
+          defaultOpen={data.regionsAllowed && data.regionRules.length > 0}
+        >
+          {data.regionsAllowed ? (
+            <BlockStack gap="300">
+              {data.regionRules.length === 0 ? (
+                <Text as="p" tone="subdued" variant="bodySm">No region rules yet. Every region uses the default rate.</Text>
+              ) : (
+                <BlockStack gap="150">
+                  {data.regionRules.map((r) => (
+                    <InlineStack key={r.id} align="space-between" blockAlign="center">
+                      <Text as="span" variant="bodySm">{r.region} · {r.rate != null ? `${Math.round(Number(r.rate) * 10000) / 100}%` : "—"} {r.exemptByDefault ? "· exempt by default" : ""}</Text>
+                      <ConfirmAction
+                        label="Remove"
+                        size="micro"
+                        variant="tertiary"
+                        title={`Remove the ${r.region} rule?`}
+                        message={`Buyers in ${r.region} will use the default tax rate instead.`}
+                        confirmLabel="Remove rule"
+                        fields={{ intent: "region-delete", id: r.id }}
+                      />
+                    </InlineStack>
+                  ))}
+                </BlockStack>
+              )}
+              <Form method="post">
+                <input type="hidden" name="intent" value="region" />
+                <InlineStack gap="300" blockAlign="end" wrap>
+                  <Box minWidth="140px"><TextField label="Region" name="region" value={region} onChange={setRegion} autoComplete="off" placeholder="SA, AE, EU, US-CA" /></Box>
+                  <Box minWidth="140px"><TextField label="Rate %" name="rate" type="number" value={regionRate} onChange={setRegionRate} min={0} max={100} suffix="%" autoComplete="off" /></Box>
+                  <Checkbox label="Exempt by default" name="exemptByDefault" checked={regionExempt} onChange={setRegionExempt} />
+                  <Button submit loading={busyIntent === "region"}>Save rule</Button>
+                </InlineStack>
+              </Form>
+            </BlockStack>
+          ) : (
+            <BlockStack gap="200">
+              <Text as="p" tone="subdued" variant="bodySm">Per-region VAT/GST rules are a Growth feature. Starter uses the single default rate and a manual exempt toggle per company.</Text>
+              <InlineStack><Button url={upgradeUrl("growth")}>See Growth</Button></InlineStack>
+            </BlockStack>
+          )}
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -17,12 +17,15 @@ import {
   Checkbox,
   IndexTable,
 } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { ConfirmAction } from "../components/ConfirmAction";
+import { DisclosureCard } from "../components/DisclosureCard";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { GROWTH_PLAN } from "../lib/billing";
 import { slugifyKey, type WholesaleFieldType } from "../lib/wholesale";
 import { getForm, saveField, deleteField, updateFormSettings, NotFoundError } from "../services/wholesale.server";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_WHOLESALE_REG === "true";
@@ -117,11 +120,53 @@ const TYPE_OPTIONS = [
   { label: "File upload (Growth)", value: "FILE" },
 ];
 
+const TYPE_LABELS: Record<string, string> = {
+  TEXT: "Text",
+  EMAIL: "Email",
+  SELECT: "Dropdown",
+  CHECKBOX: "Checkbox",
+  FILE: "File upload",
+};
+
+/** Read-only, selectable link with a Copy button (keyboard + screen-reader friendly). */
+function CopyLinkField({ label, value, helpText }: { label: string; value: string; helpText?: string }) {
+  const shopify = useAppBridge();
+  const [copied, setCopied] = useState(false);
+  return (
+    <TextField
+      label={label}
+      value={value}
+      readOnly
+      autoComplete="off"
+      helpText={helpText}
+      selectTextOnFocus
+      connectedRight={
+        <Button
+          accessibilityLabel={`Copy ${label.toLowerCase()}`}
+          onClick={async () => {
+            try {
+              await navigator.clipboard?.writeText(value);
+              setCopied(true);
+              shopify.toast.show("Link copied");
+            } catch {
+              setCopied(false);
+            }
+          }}
+        >
+          {copied ? "Copied" : "Copy link"}
+        </Button>
+      }
+    />
+  );
+}
+
 export default function WholesaleFormEditor() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
+  const submit = useSubmit();
   const submitting = navigation.state === "submitting";
+  const publishing = submitting && navigation.formData?.get("intent") === "publish";
 
   const [label, setLabel] = useState("");
   const [type, setType] = useState("TEXT");
@@ -132,49 +177,74 @@ export default function WholesaleFormEditor() {
   const err = actionData && !actionData.ok ? actionData.error : null;
   const msg = actionData && actionData.ok ? actionData.message : null;
 
+  // Page-wide action: publish state is the one thing that changes what buyers see.
+  const togglePublish = () => {
+    const fd = new FormData();
+    fd.set("intent", "publish");
+    fd.set("published", data.form.published ? "" : "on");
+    submit(fd, { method: "post" });
+  };
+
   return (
     <Page
-      backAction={{ content: "Wholesale", url: "/app/wholesale" }}
+      backAction={{ content: "Applications", url: "/app/wholesale" }}
       title={data.form.name}
+      subtitle="Choose what buyers fill in when they apply for a wholesale account."
       titleMetadata={<Badge tone={data.form.published ? "success" : undefined}>{data.form.published ? "Published" : "Draft"}</Badge>}
+      primaryAction={{
+        content: data.form.published ? "Unpublish form" : "Publish form",
+        onAction: togglePublish,
+        loading: publishing,
+        destructive: data.form.published,
+      }}
     >
-      <TitleBar title="Wholesale form" />
+      <TitleBar title={data.form.name} />
       <BlockStack gap="500">
         {err && <Banner tone="critical" title="Couldn’t save"><p>{err}</p></Banner>}
         {msg && <Banner tone="success" title={msg} />}
 
-        {/* Fields */}
+        {/* Fields: the main job on this page */}
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">Form fields</Text>
-            <IndexTable
-              resourceName={{ singular: "field", plural: "fields" }}
-              itemCount={data.form.fields.length}
-              selectable={false}
-              headings={[{ title: "Label" }, { title: "Type" }, { title: "Required" }, { title: "" }]}
-            >
-              {data.form.fields.map((f, i) => (
-                <IndexTable.Row id={f.id} key={f.id} position={i}>
-                  <IndexTable.Cell>{f.label}</IndexTable.Cell>
-                  <IndexTable.Cell>{f.type}</IndexTable.Cell>
-                  <IndexTable.Cell>{f.required ? "Yes" : "No"}</IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="delete-field" />
-                      <input type="hidden" name="fieldId" value={f.id} />
-                      <Button size="slim" variant="plain" tone="critical" submit>Delete</Button>
-                    </Form>
-                  </IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
+            {data.form.fields.length === 0 ? (
+              <Text as="p" tone="subdued">
+                This form has no fields yet, so buyers can only send their contact details. Add a field below.
+              </Text>
+            ) : (
+              <IndexTable
+                resourceName={{ singular: "field", plural: "fields" }}
+                itemCount={data.form.fields.length}
+                selectable={false}
+                headings={[{ title: "Label" }, { title: "Type" }, { title: "Required" }, { title: "Actions", hidden: true }]}
+              >
+                {data.form.fields.map((f, i) => (
+                  <IndexTable.Row id={f.id} key={f.id} position={i}>
+                    <IndexTable.Cell>{f.label}</IndexTable.Cell>
+                    <IndexTable.Cell>{TYPE_LABELS[f.type] ?? f.type}</IndexTable.Cell>
+                    <IndexTable.Cell>{f.required ? "Yes" : "No"}</IndexTable.Cell>
+                    <IndexTable.Cell>
+                      <ConfirmAction
+                        label="Delete"
+                        size="micro"
+                        variant="plain"
+                        title={`Delete “${f.label}”?`}
+                        message="Buyers won't be asked this anymore. Answers already submitted stay on past applications."
+                        confirmLabel="Delete field"
+                        fields={{ intent: "delete-field", fieldId: f.id }}
+                      />
+                    </IndexTable.Cell>
+                  </IndexTable.Row>
+                ))}
+              </IndexTable>
+            )}
 
             <Form method="post">
               <input type="hidden" name="intent" value="add-field" />
               <InlineGrid columns={{ xs: 1, sm: "2fr 1fr auto" }} gap="200">
                 <TextField label="Field label" name="label" value={label} onChange={setLabel} autoComplete="off" placeholder="e.g. Resale certificate #" />
                 <Select label="Type" name="type" options={TYPE_OPTIONS} value={type} onChange={setType} />
-                <Box paddingBlockStart="600"><Button submit loading={submitting}>Add field</Button></Box>
+                <Box paddingBlockStart="600"><Button submit loading={submitting && !publishing}>Add field</Button></Box>
               </InlineGrid>
               {type === "SELECT" && (
                 <Box paddingBlockStart="200">
@@ -188,57 +258,55 @@ export default function WholesaleFormEditor() {
           </BlockStack>
         </Card>
 
-        {/* Publish */}
+        {/* Share */}
         <Card>
           <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Publish</Text>
-            <Text as="p" tone="subdued" variant="bodySm">
-              Public link: <code>{data.publicUrl}</code>
-            </Text>
-            <Form method="post">
-              <input type="hidden" name="intent" value="publish" />
-              <InlineStack gap="200" blockAlign="center">
-                <input type="hidden" name="published" value={data.form.published ? "" : "on"} />
-                <Button submit variant={data.form.published ? undefined : "primary"} loading={submitting}>
-                  {data.form.published ? "Unpublish" : "Publish form"}
-                </Button>
-              </InlineStack>
-            </Form>
-          </BlockStack>
-        </Card>
-
-        {/* Auto-approval (Growth) */}
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h2" variant="headingMd">Auto-approval</Text>
-              <Badge tone="info">Growth</Badge>
-            </InlineStack>
-            {data.isGrowth ? (
-              <Form method="post">
-                <input type="hidden" name="intent" value="auto-approve" />
-                <BlockStack gap="200">
-                  <TextField
-                    label="Auto-approve email domains (one per line)"
-                    name="domains"
-                    value={domains}
-                    onChange={setDomains}
-                    multiline={3}
-                    autoComplete="off"
-                    helpText="Applications from these domains are approved automatically."
-                    placeholder={"acme.com\npartner.co"}
-                  />
-                  <InlineStack><Button submit loading={submitting}>Save rules</Button></InlineStack>
-                </BlockStack>
-              </Form>
+            <Text as="h2" variant="headingMd">Share</Text>
+            {data.form.published ? (
+              <CopyLinkField
+                label="Public application link"
+                value={data.publicUrl}
+                helpText="Share this link on your site or in emails. Buyers apply here."
+              />
             ) : (
-              <Banner tone="warning">
-                <p>Auto-approval rules and file-upload fields are a Growth feature.</p>
-                <Box paddingBlockStart="200"><Button url="/app/settings" variant="primary">Upgrade to Growth</Button></Box>
-              </Banner>
+              <Text as="p" tone="subdued">
+                This form is a draft. Publish it to get a public link buyers can apply through.
+              </Text>
             )}
           </BlockStack>
         </Card>
+
+        {/* Auto-approval (Growth) — advanced, so it stays one click away */}
+        <DisclosureCard
+          title="Auto-approval"
+          subtitle="Approve applicants from trusted email domains automatically."
+          badge={<Badge tone="info">Growth</Badge>}
+          defaultOpen={data.form.autoApproveDomains.length > 0}
+        >
+          {data.isGrowth ? (
+            <Form method="post">
+              <input type="hidden" name="intent" value="auto-approve" />
+              <BlockStack gap="200">
+                <TextField
+                  label="Auto-approve email domains (one per line)"
+                  name="domains"
+                  value={domains}
+                  onChange={setDomains}
+                  multiline={3}
+                  autoComplete="off"
+                  helpText="Applications from these domains are approved automatically."
+                  placeholder={"acme.com\npartner.co"}
+                />
+                <InlineStack><Button submit loading={submitting && !publishing}>Save rules</Button></InlineStack>
+              </BlockStack>
+            </Form>
+          ) : (
+            <Banner tone="warning">
+              <p>Auto-approval rules and file-upload fields are a Growth feature.</p>
+              <Box paddingBlockStart="200"><Button url={upgradeUrl("growth")} variant="primary">Upgrade to Growth</Button></Box>
+            </Banner>
+          )}
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

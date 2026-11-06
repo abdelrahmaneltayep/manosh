@@ -18,6 +18,8 @@ import {
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
 import { DraftedByClaude } from "../components/DraftedByClaude";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { issueMagicLink } from "../services/magic-link.server";
@@ -101,11 +103,26 @@ function RelationshipInsights({
   access,
 }: {
   companies: { id: string; name: string }[];
-  access: Pick<ClaudeAccess, "allowed">;
+  access: Pick<ClaudeAccess, "allowed" | "reason">;
 }) {
   const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
   const fetcher = useFetcher<typeof action>();
-  if (!access.allowed || companies.length === 0) return null;
+  if (!access.allowed) {
+    // Manual mode still works (the table above); Claude only adds a read here,
+    // so show an honest nudge instead of silently rendering nothing.
+    return (
+      <Card>
+        <BlockStack gap="300">
+          <Text as="h2" variant="headingMd">Relationship insights</Text>
+          <Text as="p" tone="subdued">
+            A plain-language summary of each company's quote history and when they're likely to reorder.
+          </Text>
+          <UpgradeToClaude access={access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />
+        </BlockStack>
+      </Card>
+    );
+  }
+  if (companies.length === 0) return null;
   const busy = fetcher.state !== "idle";
   const d = fetcher.data;
   const summary = d && "kind" in d && d.kind === "summary" ? d.summary : null;
@@ -118,7 +135,12 @@ function RelationshipInsights({
   return (
     <Card>
       <BlockStack gap="300">
-        <Text as="h2" variant="headingMd">Relationship insights</Text>
+        <BlockStack gap="100">
+          <Text as="h2" variant="headingMd">Relationship insights</Text>
+          <Text as="p" tone="subdued">
+            Pick a company for a summary of its quote history or a reorder estimate. Nothing is changed or sent.
+          </Text>
+        </BlockStack>
         <Select
           label="Company"
           options={companies.map((c) => ({ label: c.name, value: c.id }))}
@@ -216,7 +238,6 @@ export default function BuyersPage() {
       <TitleBar title="Buyers" />
       <SectionTabs active="buyers" />
       <BlockStack gap="400">
-        <RelationshipInsights companies={companies} access={access} />
         {error && (
           <Banner tone="critical" title="Couldn’t generate a link">
             <p>{error}</p>
@@ -281,6 +302,7 @@ export default function BuyersPage() {
             </IndexTable>
           )}
         </Card>
+        <RelationshipInsights companies={companies} access={access} />
       </BlockStack>
     </Page>
   );

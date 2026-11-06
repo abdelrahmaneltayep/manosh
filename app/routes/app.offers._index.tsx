@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, Link as RemixLink } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Button, Box,
   IndexTable, EmptyState, Link as PolarisLink,
@@ -12,6 +12,7 @@ import { GROWTH_PLAN } from "../lib/billing";
 import { MAKE_AN_OFFER_ENABLED, listOffers } from "../services/offers.server";
 import { formatDate } from "../lib/format";
 import type { OfferStatus } from "@prisma/client";
+import { upgradeUrl } from "../lib/upgrade";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -34,13 +35,14 @@ export default function OffersQueue() {
       <Page>
         <TitleBar title="Offers" />
         <SectionTabs active="offers" />
-        <Banner tone="info" title="Make an Offer — let buyers name their price">
+        <Banner tone="info" title="Let buyers name their price">
           <p>
-            Turn browsers into buyers: accept, counter, or auto-handle price offers with margin-safe
-            rules. Available on Growth (manual + rules) and Scale (automation + pay-what-you-want).
+            Accept, counter, or decline price offers from your storefront, with rules that protect your
+            margin. Available on Growth (manual answers and rules) and Scale (automatic answers and
+            pay-what-you-want).
           </p>
           <Box paddingBlockStart="200">
-            <Button url={`/app/settings?upgrade=${GROWTH_PLAN}`} variant="primary">See Growth</Button>
+            <Button url={upgradeUrl(GROWTH_PLAN)} variant="primary">See Growth</Button>
           </Box>
         </Banner>
       </Page>
@@ -48,41 +50,49 @@ export default function OffersQueue() {
   }
 
   return (
-    <Page>
+    <Page
+      secondaryActions={[
+        { content: "Offer rules", url: "/app/offers/rules" },
+        { content: "Storefront widget", url: "/app/offers/widget" },
+      ]}
+    >
       <TitleBar title="Offers" />
+      <SectionTabs active="offers" />
       <BlockStack gap="400">
-        <InlineStack align="space-between" blockAlign="center">
-          <Text as="p" tone="subdued" variant="bodyMd">
-            Buyer price offers. Counter, accept, or decline — margin-safe.{" "}
-            {tier === "manual" && <Badge tone="info">Growth · manual + rules</Badge>}
-            {tier === "auto" && <Badge tone="success">Scale · automation + PWYW</Badge>}
-          </Text>
-          <InlineStack gap="200">
-            <Button url="/app/offers/rules">Rules</Button>
-            <Button url="/app/offers/widget">Widget</Button>
-          </InlineStack>
-        </InlineStack>
-
         <Card padding="0">
+          <Box padding="400">
+            <BlockStack gap="100">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Buyer offers</Text>
+                {tier === "manual" && <Badge tone="info">Growth · manual + rules</Badge>}
+                {tier === "auto" && <Badge tone="success">Scale · automatic + pay what you want</Badge>}
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Open an offer to counter, accept, or decline it. Your margin floor is always respected.
+              </Text>
+            </BlockStack>
+          </Box>
           {offers.length === 0 ? (
-            <Box padding="400">
-              <EmptyState heading="No offers yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-                <p>Once the Make-an-Offer widget is live on your storefront, buyer offers land here.</p>
-              </EmptyState>
-            </Box>
+            <EmptyState
+              heading="No offers yet"
+              action={{ content: "Set up the widget", url: "/app/offers/widget" }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>Buyers can only make an offer once the Make an Offer widget is on your storefront. Set it up and offers land here.</p>
+            </EmptyState>
           ) : (
             <IndexTable
               resourceName={{ singular: "offer", plural: "offers" }}
               itemCount={offers.length}
               selectable={false}
-              headings={[{ title: "Buyer" }, { title: "Source" }, { title: "List" }, { title: "Offer" }, { title: "Margin" }, { title: "Status" }, { title: "Received" }]}
+              headings={[{ title: "Buyer" }, { title: "Source" }, { title: "List price" }, { title: "Offer" }, { title: "Margin" }, { title: "Status" }, { title: "Received" }]}
             >
               {offers.map((o, i) => (
                 <IndexTable.Row id={o.id} key={o.id} position={i}>
                   <IndexTable.Cell>
                     <PolarisLink url={`/app/offers/${o.id}`} removeUnderline>{o.buyerEmail}</PolarisLink>
                   </IndexTable.Cell>
-                  <IndexTable.Cell>{o.source.toLowerCase()}</IndexTable.Cell>
+                  <IndexTable.Cell>{o.source.charAt(0) + o.source.slice(1).toLowerCase()}</IndexTable.Cell>
                   <IndexTable.Cell>{o.listPriceTotal.toFixed(2)}</IndexTable.Cell>
                   <IndexTable.Cell>{o.offeredTotal.toFixed(2)}{o.currentCounterTotal != null && <Text as="span" tone="subdued"> → {o.currentCounterTotal.toFixed(2)}</Text>}</IndexTable.Cell>
                   <IndexTable.Cell>{o.marginAtOffer == null ? "—" : `${Math.round(o.marginAtOffer * 100)}%`}</IndexTable.Cell>

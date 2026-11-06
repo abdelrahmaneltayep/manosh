@@ -71,7 +71,7 @@ describe("merged IA — visibleNavParents (22 pages → 7)", () => {
     const byLabel = Object.fromEntries(visibleNavParents(ALL_ON).map((p) => [p.label, p.url]));
     expect(byLabel["Quotes"]).toBe("/app/quotes");
     expect(byLabel["Quote forms"]).toBe("/app/quote-forms");
-    expect(byLabel["Pricing & catalog"]).toBe("/app/price-rules");
+    expect(byLabel["Pricing & catalog"]).toBe("/app/price-lists");
     expect(byLabel["Buyers"]).toBe("/app/buyers");
     expect(byLabel["Settings"]).toBe("/app/settings");
     expect(byLabel["Pricing plans"]).toBe("/app/plans");
@@ -83,6 +83,12 @@ describe("merged IA — visibleNavParents (22 pages → 7)", () => {
     const labels = visibleNavParents(flags).map((p) => p.label);
     expect(labels).not.toContain("Quote forms");
     expect(labels).not.toContain("Pricing & catalog"); // all pricing tabs off too
+  });
+
+  it("puts every inbox in the Quotes group and applications under Buyers (JTBD IA)", () => {
+    expect(SECTION_GROUPS.quotes.map((t) => t.id)).toEqual(["quotes", "requests", "offers", "followups"]);
+    expect(SECTION_GROUPS.buyers.map((t) => t.id)).toEqual(["buyers", "wholesale", "reps", "credit"]);
+    expect(SECTION_GROUPS.pricing.map((t) => t.id)).toEqual(["price-lists", "catalogs", "catalog-sharing", "price-rules", "order-rules"]);
   });
 
   it("keeps core parents (Quotes/Buyers/Settings/Pricing plans) even with all flags off", () => {
@@ -105,8 +111,8 @@ describe("merged IA — visibleNavParents (22 pages → 7)", () => {
 
 describe("firstEnabledTabUrl", () => {
   it("returns the first on tab; null when the group is fully off", () => {
-    expect(firstEnabledTabUrl("pricing", ALL_ON)).toBe("/app/price-rules");
-    expect(firstEnabledTabUrl("pricing", { ...ALL_OFF, offers: true })).toBe("/app/offers");
+    expect(firstEnabledTabUrl("pricing", ALL_ON)).toBe("/app/price-lists");
+    expect(firstEnabledTabUrl("pricing", { ...ALL_OFF, orderRules: true })).toBe("/app/order-rules");
     expect(firstEnabledTabUrl("pricing", ALL_OFF)).toBeNull();
     expect(firstEnabledTabUrl("nope", ALL_ON)).toBeNull();
   });
@@ -115,10 +121,11 @@ describe("firstEnabledTabUrl", () => {
 describe("SECTION_GROUPS integrity (tab bar ↔ nav share one source)", () => {
   it("all 22 old pages are represented across the 5 tabbed groups + 2 standalone", () => {
     const tabIds = Object.values(SECTION_GROUPS).flat().map((t) => t.id);
-    // 3 quotes + 2 forms + 7 pricing + 3 buyers + 6 settings = 21 tabs; Analytics
-    // + Pricing plans are the 2 standalone parents (not tabs).
-    expect(tabIds.length).toBe(21);
-    expect(new Set(tabIds).size).toBe(21); // no dup ids
+    // 4 quotes + 2 forms + 5 pricing + 4 buyers + 7 settings (incl. the new
+    // Notifications page) = 22 tabs; Analytics + Pricing plans are the 2
+    // standalone parents (not tabs).
+    expect(tabIds.length).toBe(22);
+    expect(new Set(tabIds).size).toBe(22); // no dup ids
   });
 
   it("GROUP_OF_TAB resolves every tab id back to its group", () => {

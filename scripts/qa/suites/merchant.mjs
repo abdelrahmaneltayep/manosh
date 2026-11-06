@@ -10,9 +10,9 @@ import { ERROR_TEXT, openApp, sleep, textOf } from "../lib.mjs";
 const PAGES = [
   ["/app", "Home"], ["/app/quotes", "Quotes"], ["/app/quote-requests", "Requests"], ["/app/followups", "Follow-ups"],
   ["/app/quote-forms", "Quote forms"], ["/app/i18n", "Languages"], ["/app/price-rules", "Price rules"], ["/app/price-lists", "Price lists"],
-  ["/app/offers", "Offers"], ["/app/wholesale", "Wholesale"], ["/app/catalogs", "Catalogs"], ["/app/catalog-sharing", "Catalog sharing"],
+  ["/app/offers", "Offers"], ["/app/wholesale", "Applications"], ["/app/catalogs", "Catalogs"], ["/app/catalog-sharing", "Catalog sharing"],
   ["/app/order-rules", "Order rules"], ["/app/buyers", "Buyers"], ["/app/reps", "Reps"], ["/app/credit", "Credit"],
-  ["/app/analytics", "Analytics"], ["/app/settings", "General settings"], ["/app/payments", "Payments"], ["/app/tax", "Tax & VAT"],
+  ["/app/analytics", "Analytics"], ["/app/settings", "General settings"], ["/app/notifications", "Notifications"], ["/app/payments", "Payments"], ["/app/tax", "Tax & VAT"],
   ["/app/erp", "ERP sync"], ["/app/accounting", "Accounting"], ["/app/agency", "Agency"], ["/app/plans", "Pricing plans"],
   ["/app/offers/widget", "Offers → widget"], ["/app/offers/rules", "Offers → rules"],
 ];
@@ -275,6 +275,11 @@ export async function merchant(rec, ctx) {
       const found = [];
       for (const [path, blocks] of Object.entries(want)) {
         const f = await openApp(page, app, path);
+        // Theme setup may sit in a collapsed DisclosureCard (Polaris Collapsible
+        // doesn't render closed content): open it before reading the links.
+        const toggles = f.getByRole("button", { name: /^(Show|Edit): .*storefront/i });
+        for (let i = 0, n = await toggles.count(); i < n; i++) await toggles.nth(i).click().catch(() => {});
+        if (await toggles.count()) await sleep(400);
         const hrefs = await f.locator("a").evaluateAll((as) => as.filter((a) => /Add to theme/.test(a.textContent || "")).map((a) => a.getAttribute("href")));
         for (const b of blocks) {
           const h = hrefs.find((x) => x && x.includes(`/${b}&`));

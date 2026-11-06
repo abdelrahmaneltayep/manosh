@@ -5,7 +5,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { useActionData, useFetcher, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import {
-  Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Box, Button, TextField, Checkbox,
+  Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Box, Button, TextField, Checkbox, Layout,
 } from "@shopify/polaris";
 import { TitleBar, SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
@@ -23,6 +23,8 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
+import { DisclosureCard } from "../components/DisclosureCard";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -37,6 +39,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return {
+    // Never saved = first run: open the theme setup steps by default.
+    configured: !!cfg,
     allSurfaces: caps.makeAnOffer === "auto", // Scale unlocks banner + exit popup
     buttonLabel: cfg?.buttonLabel ?? "Make an offer",
     hideAtcUntilOffer: cfg?.hideAtcUntilOffer ?? false,
@@ -141,8 +145,8 @@ export default function OfferWidget() {
   };
 
   return (
-    <Page backAction={{ url: "/app/offers" }}>
-      <TitleBar title="Make-an-Offer widget" />
+    <Page backAction={{ content: "Offers", url: "/app/offers" }} title="Storefront widget">
+      <TitleBar title="Storefront widget" />
       <SaveBar id={SAVE_BAR_ID}>
         <button variant="primary" onClick={handleSave} disabled={busy}>Save</button>
         <button onClick={handleDiscard} disabled={busy}>Discard</button>
@@ -151,66 +155,93 @@ export default function OfferWidget() {
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
 
-        <StorefrontSetupCard title="Add Make an Offer to your storefront" links={data.themeLinks} />
-
-        <Card>
-          <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Where buyers can make an offer</Text>
-            <Text as="p" tone="subdued" variant="bodyMd">
-              The storefront surface ships as a theme app extension: add it with the button below.
-              Growth includes the button + inline form; Scale adds the banner and exit popup.
-            </Text>
-            <Checkbox label="Product/cart button" checked={s.button} onChange={(v) => setS({ ...s, button: v })} />
-            <Checkbox label="Inline form" checked={s.inlineForm} onChange={(v) => setS({ ...s, inlineForm: v })} />
-            <InlineStack gap="200" blockAlign="center">
-              <Checkbox label="Banner" checked={s.banner} disabled={!data.allSurfaces} onChange={(v) => setS({ ...s, banner: v })} />
-              {!data.allSurfaces && <Badge tone="info">Scale</Badge>}
-            </InlineStack>
-            <InlineStack gap="200" blockAlign="center">
-              <Checkbox label="Exit-intent popup" checked={s.exitPopup} disabled={!data.allSurfaces} onChange={(v) => setS({ ...s, exitPopup: v })} />
-              {!data.allSurfaces && <Badge tone="info">Scale</Badge>}
-            </InlineStack>
-
-            <TextField label="Button label" value={label} onChange={setLabel} autoComplete="off" />
-            {access.state === "trial" && access.daysLeft != null && (
-              <InlineStack gap="200" blockAlign="center">
-                <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
-              </InlineStack>
-            )}
-            {access.allowed ? (
+        <Layout>
+          <Layout.AnnotatedSection
+            id="offer-surfaces"
+            title="Where buyers can make an offer"
+            description={
+              data.allSurfaces
+                ? "Choose the surfaces the Make an Offer block shows on your storefront."
+                : "Growth includes the button and inline form. Scale adds the banner and exit-intent popup."
+            }
+          >
+            <Card>
               <BlockStack gap="200">
-                <InlineStack>
-                  <Button
-                    size="slim"
-                    disabled={draftingLabel}
-                    loading={draftingLabel}
-                    onClick={() => labelFetcher.submit({ intent: "ai-widget-label", currentLabel: label }, { method: "post" })}
-                  >
-                    ✦ Draft label with Claude
-                  </Button>
+                <Checkbox label="Product and cart button" checked={s.button} onChange={(v) => setS({ ...s, button: v })} />
+                <Checkbox label="Inline form" checked={s.inlineForm} onChange={(v) => setS({ ...s, inlineForm: v })} />
+                <InlineStack gap="200" blockAlign="center">
+                  <Checkbox label="Banner" checked={s.banner} disabled={!data.allSurfaces} onChange={(v) => setS({ ...s, banner: v })} />
+                  {!data.allSurfaces && <Badge tone="info">Scale</Badge>}
                 </InlineStack>
-                {labelErr && <Banner tone="warning">{labelErr}</Banner>}
-                {labelDraft && (
-                  <Box background="bg-surface-secondary" borderRadius="200" padding="300">
-                    <BlockStack gap="200">
-                      <Text as="p" variant="bodyMd" fontWeight="semibold">{labelDraft}</Text>
-                      <InlineStack gap="200">
-                        <Button size="slim" variant="primary" onClick={() => setLabel(labelDraft)}>Use this</Button>
-                      </InlineStack>
-                      <InlineStack gap="200" blockAlign="center" wrap>
-                        <Badge tone="info">✦ Drafted by Claude</Badge>
-                        <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
-                      </InlineStack>
-                    </BlockStack>
-                  </Box>
+                <InlineStack gap="200" blockAlign="center">
+                  <Checkbox label="Exit-intent popup" checked={s.exitPopup} disabled={!data.allSurfaces} onChange={(v) => setS({ ...s, exitPopup: v })} />
+                  {!data.allSurfaces && <Badge tone="info">Scale</Badge>}
+                </InlineStack>
+                {!data.allSurfaces && (
+                  <InlineStack><Button variant="plain" url={upgradeUrl("scale")}>Upgrade to Scale</Button></InlineStack>
                 )}
               </BlockStack>
-            ) : (
-              <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
-            )}
-            <Checkbox label="Hide Add to cart until an offer is made" checked={hideAtc} onChange={setHideAtc} />
-          </BlockStack>
-        </Card>
+            </Card>
+          </Layout.AnnotatedSection>
+
+          <Layout.AnnotatedSection
+            id="offer-button"
+            title="Button"
+            description="What buyers see, and whether Add to cart waits for an offer."
+          >
+            <Card>
+              <BlockStack gap="300">
+                <TextField label="Button label" value={label} onChange={setLabel} autoComplete="off" />
+                {access.state === "trial" && access.daysLeft != null && (
+                  <InlineStack gap="200" blockAlign="center">
+                    <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                  </InlineStack>
+                )}
+                {access.allowed ? (
+                  <BlockStack gap="200">
+                    <InlineStack>
+                      <Button
+                        size="slim"
+                        disabled={draftingLabel}
+                        loading={draftingLabel}
+                        onClick={() => labelFetcher.submit({ intent: "ai-widget-label", currentLabel: label }, { method: "post" })}
+                      >
+                        ✦ Draft label with Claude
+                      </Button>
+                    </InlineStack>
+                    {labelErr && <Banner tone="warning">{labelErr}</Banner>}
+                    {labelDraft && (
+                      <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodyMd" fontWeight="semibold">{labelDraft}</Text>
+                          <InlineStack gap="200">
+                            <Button size="slim" variant="primary" onClick={() => setLabel(labelDraft)}>Use this</Button>
+                          </InlineStack>
+                          <InlineStack gap="200" blockAlign="center" wrap>
+                            <Badge tone="info">✦ Drafted by Claude</Badge>
+                            <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                          </InlineStack>
+                        </BlockStack>
+                      </Box>
+                    )}
+                  </BlockStack>
+                ) : (
+                  <UpgradeToClaude access={access} upgradeUrl={upgradeUrl("growth")} />
+                )}
+                <Checkbox label="Hide Add to cart until an offer is made" checked={hideAtc} onChange={setHideAtc} />
+              </BlockStack>
+            </Card>
+          </Layout.AnnotatedSection>
+        </Layout>
+
+        {/* Theme setup: open on first run, one click away after */}
+        <DisclosureCard
+          title="Add Make an Offer to your storefront"
+          subtitle="These settings apply once the Make an Offer block is in your theme."
+          defaultOpen={!data.configured}
+        >
+          <StorefrontSetupCard bare links={data.themeLinks} />
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

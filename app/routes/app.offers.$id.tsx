@@ -6,6 +6,7 @@ import {
   Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Button, Box, TextField, Divider,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
+import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getShopCapabilities } from "../services/billing.server";
@@ -23,6 +24,7 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftOfferCounter } from "../services/offers-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -121,6 +123,13 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
   return { ok: false, error: "Unknown action." };
 };
 
+/** Admin link for a converted offer's draft order: the order itself when the
+ *  stored GID carries a numeric id, else the Drafts list. */
+function draftOrderUrl(gid: string | null): string {
+  const numeric = gid?.match(/(\d+)$/)?.[1];
+  return numeric ? `shopify://admin/draft_orders/${numeric}` : "shopify://admin/draft_orders";
+}
+
 const SUGGESTION_LABEL: Record<string, string> = {
   accept: "Suggest: accept (margin intact)", decline: "Suggest: decline (below threshold)",
   counter: "Suggest: counter", manual: "Suggest: review manually",
@@ -137,6 +146,7 @@ export default function OfferDetail() {
   const [note, setNote] = useState("");
   const open = offer.status === "PENDING" || offer.status === "COUNTERED";
   const canConvert = isScale && offer.status === "ACCEPTED" && !offer.convertedOrderId;
+  const statusLabel = offer.status.charAt(0) + offer.status.slice(1).toLowerCase();
 
   // Dual-mode: Claude drafts a counter + note; the merchant reviews + sends.
   const draftFetcher = useFetcher<typeof action>();
@@ -150,158 +160,179 @@ export default function OfferDetail() {
   };
 
   return (
-    <Page backAction={{ url: "/app/offers" }}>
+    <Page
+      backAction={{ content: "Offers", url: "/app/offers" }}
+      title={`Offer from ${offer.buyerEmail}`}
+      titleMetadata={
+        <Badge tone={offer.status === "ACCEPTED" || offer.status === "CONVERTED" ? "success" : offer.status === "PENDING" ? "attention" : undefined}>
+          {statusLabel}
+        </Badge>
+      }
+      subtitle={`Received ${formatDate(offer.createdAt)} · ${offer.source.charAt(0) + offer.source.slice(1).toLowerCase()}`}
+    >
       <TitleBar title={`Offer from ${offer.buyerEmail}`} />
       <BlockStack gap="400">
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
 
+        {/* 1. What's on the table */}
         <Card>
           <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center">
-              <Text as="h2" variant="headingMd">{offer.buyerEmail}</Text>
-              <Badge tone={offer.status === "ACCEPTED" ? "success" : offer.status === "PENDING" ? "attention" : undefined}>
-                {offer.status.charAt(0) + offer.status.slice(1).toLowerCase()}
-              </Badge>
-            </InlineStack>
+            <Text as="h2" variant="headingMd">Summary</Text>
             <InlineStack gap="400" wrap>
               <Metric label="List price" value={offer.listPriceTotal.toFixed(2)} />
               <Metric label="Offered" value={offer.offeredTotal.toFixed(2)} />
               {offer.currentCounterTotal != null && <Metric label="Your counter" value={offer.currentCounterTotal.toFixed(2)} />}
-              <Metric label="Margin at offer" value={offer.marginAtOffer == null ? "unknown" : `${Math.round(offer.marginAtOffer * 100)}%`} />
+              <Metric label="Margin at offer" value={offer.marginAtOffer == null ? "Unknown" : `${Math.round(offer.marginAtOffer * 100)}%`} />
             </InlineStack>
-            {suggestion && (
+            {suggestion && open && (
               <Banner tone={suggestion.action === "decline" ? "warning" : suggestion.action === "accept" ? "success" : "info"}>
                 <b>{SUGGESTION_LABEL[suggestion.action]}</b> — {suggestion.reason}
                 {suggestion.action === "counter" && suggestion.counterCents != null && <> (${(suggestion.counterCents / 100).toFixed(2)})</>}
               </Banner>
             )}
-            <Text as="p" tone="subdued" variant="bodySm">
-              Received {formatDate(offer.createdAt)} · {offer.source.toLowerCase()}
-            </Text>
           </BlockStack>
         </Card>
 
+        {/* 2. The job: answer it (or finish it) */}
+        {open ? (
+          <Card>
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">Respond</Text>
+
+              {/* Dual-mode: Claude drafts a counter + note into the form below. */}
+              {access.state === "trial" && access.daysLeft != null && (
+                <InlineStack gap="200" blockAlign="center">
+                  <Badge tone="attention">
+                    {`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}
+                  </Badge>
+                </InlineStack>
+              )}
+              {access.allowed ? (
+                <BlockStack gap="200">
+                  <InlineStack gap="200" blockAlign="center">
+                    <Button
+                      size="slim"
+                      disabled={draftingClaude}
+                      loading={draftingClaude}
+                      onClick={() => draftFetcher.submit({ intent: "ai-offer-draft" }, { method: "post" })}
+                    >
+                      ✦ Draft counter with Claude
+                    </Button>
+                  </InlineStack>
+                  {claudeError && <Banner tone="warning">{claudeError}</Banner>}
+                  {claudeDraft && (
+                    <Box background={claudeDraft.belowFloor || claudeDraft.aboveList ? "bg-surface-critical" : "bg-surface-secondary"} borderRadius="200" padding="300">
+                      <BlockStack gap="200">
+                        <Text as="span" fontWeight="semibold">
+                          Claude suggests a counter of ${claudeDraft.counterTotal.toFixed(2)}
+                        </Text>
+                        {claudeDraft.belowFloor && (
+                          <Text as="p" tone="critical" variant="bodySm">
+                            This counter is below your floor margin — review before using.
+                          </Text>
+                        )}
+                        {claudeDraft.aboveList && (
+                          <Text as="p" tone="critical" variant="bodySm">
+                            This counter is above the list price — review before using.
+                          </Text>
+                        )}
+                        {claudeDraft.note && (
+                          <Box background="bg-surface" borderRadius="100" padding="200">
+                            <Text as="p" variant="bodySm" tone="subdued">Draft note to buyer</Text>
+                            <Text as="p" variant="bodySm">{claudeDraft.note}</Text>
+                          </Box>
+                        )}
+                        <InlineStack gap="200">
+                          <Button size="slim" variant="primary" disabled={claudeDraft.belowFloor || claudeDraft.aboveList} onClick={useClaudeDraft}>
+                            Use this
+                          </Button>
+                        </InlineStack>
+                        <InlineStack gap="200" blockAlign="center" wrap>
+                          <Badge tone="info">✦ Drafted by Claude</Badge>
+                          <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                        </InlineStack>
+                      </BlockStack>
+                    </Box>
+                  )}
+                </BlockStack>
+              ) : (
+                <UpgradeToClaude access={access} upgradeUrl={upgradeUrl("growth")} />
+              )}
+
+              <Form method="post">
+                <input type="hidden" name="intent" value="counter" />
+                <InlineStack gap="300" blockAlign="end" wrap>
+                  <Box minWidth="10rem"><TextField label="Counter amount" name="amount" type="number" value={counter} onChange={setCounter} autoComplete="off" prefix="$" /></Box>
+                  <Box minWidth="18rem"><TextField label="Note (optional)" name="note" value={note} onChange={setNote} autoComplete="off" /></Box>
+                  <Button submit disabled={busy}>Send counter</Button>
+                </InlineStack>
+              </Form>
+              <Divider />
+              <InlineStack gap="200">
+                <Form method="post"><input type="hidden" name="intent" value="accept" /><Button submit variant="primary" disabled={busy}>Accept offer</Button></Form>
+                <ConfirmAction
+                  label="Decline offer"
+                  title="Decline this offer?"
+                  message="The offer closes and can’t be accepted or countered after this."
+                  confirmLabel="Decline offer"
+                  fields={{ intent: "decline" }}
+                  disabled={busy}
+                />
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                {isScale
+                  ? "Once accepted, you can turn it into a draft order with net terms or a deposit. Shopify calculates the totals."
+                  : "On Scale, an accepted offer can become a draft order with net terms or a deposit. Shopify calculates the totals."}
+              </Text>
+            </BlockStack>
+          </Card>
+        ) : offer.convertedOrderId ? (
+          <Banner
+            tone="success"
+            title="Converted to a draft order"
+            action={{ content: "View draft order", url: draftOrderUrl(offer.convertedOrderId), target: "_top" }}
+          >
+            <p>Shopify calculated the totals. Finish the order from the draft in Shopify.</p>
+          </Banner>
+        ) : canConvert ? (
+          <Card>
+            <BlockStack gap="200">
+              <Text as="h2" variant="headingMd">Turn this into an order</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Creates a native draft order at the agreed price on the buyer’s company location. Shopify calculates tax and the total.
+              </Text>
+              <Form method="post">
+                <input type="hidden" name="intent" value="convert" />
+                <Button submit variant="primary" disabled={busy}>Convert to draft order</Button>
+              </Form>
+            </BlockStack>
+          </Card>
+        ) : (
+          <Banner tone="info">
+            <p>This offer is closed ({offer.status.toLowerCase()}), so there’s nothing left to do.</p>
+          </Banner>
+        )}
+
+        {/* 3. History */}
         <Card>
           <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Negotiation</Text>
-            <BlockStack gap="200">
-              {offer.messages.map((m) => (
-                <Box key={m.id} padding="200" background={m.actor === "MERCHANT" ? "bg-surface-secondary" : undefined} borderRadius="200">
-                  <InlineStack align="space-between">
-                    <Text as="span" variant="bodySm" fontWeight="semibold">{m.actor.charAt(0) + m.actor.slice(1).toLowerCase()}</Text>
-                    <Text as="span" variant="bodySm" tone="subdued">{formatDate(m.createdAt)}</Text>
-                  </InlineStack>
-                  {m.amountTotal != null && <Text as="p" variant="bodyMd">Amount: {m.amountTotal.toFixed(2)}</Text>}
-                  {m.note && <Text as="p" variant="bodySm" tone="subdued">{m.note}</Text>}
-                </Box>
-              ))}
-            </BlockStack>
-
-            {open ? (
-              <>
-                <Divider />
-                <Text as="h3" variant="headingSm">Respond</Text>
-
-                {/* Dual-mode: Claude drafts a counter + note into the form below. */}
-                {access.state === "trial" && access.daysLeft != null && (
-                  <InlineStack gap="200" blockAlign="center">
-                    <Badge tone="attention">
-                      {`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}
-                    </Badge>
-                  </InlineStack>
-                )}
-                {access.allowed ? (
-                  <BlockStack gap="200">
-                    <InlineStack gap="200" blockAlign="center">
-                      <Button
-                        size="slim"
-                        disabled={draftingClaude}
-                        loading={draftingClaude}
-                        onClick={() => draftFetcher.submit({ intent: "ai-offer-draft" }, { method: "post" })}
-                      >
-                        ✦ Draft counter with Claude
-                      </Button>
-                    </InlineStack>
-                    {claudeError && <Banner tone="warning">{claudeError}</Banner>}
-                    {claudeDraft && (
-                      <Box background={claudeDraft.belowFloor || claudeDraft.aboveList ? "bg-surface-critical" : "bg-surface-secondary"} borderRadius="200" padding="300">
-                        <BlockStack gap="200">
-                          <Text as="span" fontWeight="semibold">
-                            Claude suggests a counter of ${claudeDraft.counterTotal.toFixed(2)}
-                          </Text>
-                          {claudeDraft.belowFloor && (
-                            <Text as="p" tone="critical" variant="bodySm">
-                              This counter is below your floor margin — review before using.
-                            </Text>
-                          )}
-                          {claudeDraft.aboveList && (
-                            <Text as="p" tone="critical" variant="bodySm">
-                              This counter is above the list price — review before using.
-                            </Text>
-                          )}
-                          {claudeDraft.note && (
-                            <Box background="bg-surface" borderRadius="100" padding="200">
-                              <Text as="p" variant="bodySm" tone="subdued">Draft note to buyer</Text>
-                              <Text as="p" variant="bodySm">{claudeDraft.note}</Text>
-                            </Box>
-                          )}
-                          <InlineStack gap="200">
-                            <Button size="slim" variant="primary" disabled={claudeDraft.belowFloor || claudeDraft.aboveList} onClick={useClaudeDraft}>
-                              Use this
-                            </Button>
-                          </InlineStack>
-                          <InlineStack gap="200" blockAlign="center" wrap>
-                            <Badge tone="info">✦ Drafted by Claude</Badge>
-                            <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
-                          </InlineStack>
-                        </BlockStack>
-                      </Box>
-                    )}
-                  </BlockStack>
-                ) : (
-                  <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
-                )}
-
-                <Form method="post">
-                  <input type="hidden" name="intent" value="counter" />
-                  <BlockStack gap="200">
-                    <InlineStack gap="300" blockAlign="end" wrap>
-                      <Box minWidth="10rem"><TextField label="Counter amount" name="amount" type="number" value={counter} onChange={setCounter} autoComplete="off" prefix="$" /></Box>
-                      <Box minWidth="18rem"><TextField label="Note (optional)" name="note" value={note} onChange={setNote} autoComplete="off" /></Box>
-                      <Button submit disabled={busy}>Send counter</Button>
-                    </InlineStack>
-                  </BlockStack>
-                </Form>
-                <InlineStack gap="200">
-                  <Form method="post"><input type="hidden" name="intent" value="accept" /><Button submit variant="primary" disabled={busy}>Accept offer</Button></Form>
-                  <Form method="post"><input type="hidden" name="intent" value="decline" /><Button submit tone="critical" disabled={busy}>Decline</Button></Form>
-                </InlineStack>
-                <Text as="p" tone="subdued" variant="bodySm">
-                  Once accepted, Scale can convert it to a native draft order (net-terms / deposit). Totals are always Shopify's.
-                </Text>
-              </>
-            ) : offer.convertedOrderId ? (
-              <>
-                <Divider />
-                <Banner tone="success">Converted to a draft order. Totals are Shopify’s — finish it in Orders → Drafts.</Banner>
-              </>
-            ) : canConvert ? (
-              <>
-                <Divider />
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingSm">Turn this into an order</Text>
-                  <Text as="p" tone="subdued" variant="bodySm">
-                    Creates a native draft order at the agreed price on the buyer’s company location. Shopify calculates tax and the total — we never compute money.
-                  </Text>
-                  <Form method="post">
-                    <input type="hidden" name="intent" value="convert" />
-                    <Button submit variant="primary" disabled={busy}>Convert to draft order</Button>
-                  </Form>
-                </BlockStack>
-              </>
+            <Text as="h2" variant="headingMd">Negotiation history</Text>
+            {offer.messages.length === 0 ? (
+              <Text as="p" tone="subdued">No messages yet.</Text>
             ) : (
-              <Text as="p" tone="subdued" variant="bodyMd">This offer is closed ({offer.status.toLowerCase()}).</Text>
+              <BlockStack gap="200">
+                {offer.messages.map((m) => (
+                  <Box key={m.id} padding="200" background={m.actor === "MERCHANT" ? "bg-surface-secondary" : undefined} borderRadius="200">
+                    <InlineStack align="space-between">
+                      <Text as="span" variant="bodySm" fontWeight="semibold">{m.actor === "MERCHANT" ? "You" : m.actor.charAt(0) + m.actor.slice(1).toLowerCase()}</Text>
+                      <Text as="span" variant="bodySm" tone="subdued">{formatDate(m.createdAt)}</Text>
+                    </InlineStack>
+                    {m.amountTotal != null && <Text as="p" variant="bodyMd">Amount: {m.amountTotal.toFixed(2)}</Text>}
+                    {m.note && <Text as="p" variant="bodySm" tone="subdued">{m.note}</Text>}
+                  </Box>
+                ))}
+              </BlockStack>
             )}
           </BlockStack>
         </Card>

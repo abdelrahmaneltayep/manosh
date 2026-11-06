@@ -27,6 +27,7 @@ import { claudeAccess, CLAUDE_UNAVAILABLE_COPY, CLAUDE_UPGRADE_COPY, CLAUDE_TRIA
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftWinRateInsight } from "../services/insights-ai.server";
 import { DraftedByClaude } from "../components/DraftedByClaude";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_QUOTE_ANALYTICS === "true";
@@ -162,11 +163,11 @@ export default function Analytics() {
   if (data.locked) {
     return (
       <Page>
-        <TitleBar title="Quote analytics" />
+        <TitleBar title="Analytics" />
         <BlockStack gap="400">
           <Banner tone="warning" title="Quote analytics is a Growth feature">
             <p>See win rate, average discount, time-to-close, and your open pipeline. Upgrade to Growth to unlock it.</p>
-            <Box paddingBlockStart="200"><Button url="/app/settings" variant="primary">Upgrade to Growth</Button></Box>
+            <Box paddingBlockStart="200"><Button url={upgradeUrl("growth")} variant="primary">Upgrade to Growth</Button></Box>
           </Banner>
           <Box>
             <div style={{ filter: "blur(5px)", opacity: 0.6, pointerEvents: "none", userSelect: "none" }}>
@@ -194,7 +195,7 @@ export default function Analytics() {
   if (!a || a.count < data.minQuotes) {
     return (
       <Page>
-        <TitleBar title="Quote analytics" />
+        <TitleBar title="Analytics" />
         <Card>
           <EmptyState heading="Come back after a few quotes" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
             <p>
@@ -213,7 +214,7 @@ export default function Analytics() {
 
   return (
     <Page>
-      <TitleBar title="Quote analytics" />
+      <TitleBar title="Analytics" />
       <BlockStack gap="500">
         <InlineStack align="space-between" blockAlign="center">
           <Text as="h2" variant="headingMd">Last {data.range} days</Text>

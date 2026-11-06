@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
-import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -17,9 +17,13 @@ import {
   Checkbox,
   IndexTable,
   EmptyState,
+  Link as PolarisLink,
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { ConfirmAction } from "../components/ConfirmAction";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { SUPPORT_EMAIL } from "../lib/legal";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { erpSyncAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -34,6 +38,7 @@ import {
   runExportForShop,
   makeConnector,
 } from "../services/erp.server";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_ERP_SYNC === "true";
@@ -106,12 +111,16 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
 };
 
 const STATUS_TONE: Record<string, "success" | "attention" | "critical"> = { SYNCED: "success", PENDING: "attention", FAILED: "critical" };
+const STATUS_LABELS: Record<string, string> = { SYNCED: "Synced", PENDING: "Pending", FAILED: "Failed" };
+const CONNECTION_LABELS: Record<string, string> = { CONNECTED: "Connected", ERROR: "Connection error" };
 
 export default function Erp() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
+  const submit = useSubmit();
   const busy = nav.state === "submitting";
+  const busyIntent = busy ? String(nav.formData?.get("intent") ?? "") : "";
 
   const c = data.connection;
   const [kind, setKind] = useState<string>(c?.kind ?? "WEBHOOK");
@@ -125,7 +134,7 @@ export default function Erp() {
   if (!data.isGrowth) {
     return (
       <Page>
-        <TitleBar title="ERP & inventory sync" />
+        <TitleBar title="ERP sync" />
         <SectionTabs active="erp" />
         <Banner tone="info" title="ERP & inventory sync — upgrade to Growth">
           <p>
@@ -133,122 +142,173 @@ export default function Erp() {
             NetSuite, or a custom connector). ERP sync is included on the Growth plan.
           </p>
           <Box paddingBlockStart="200">
-            <Button url="/app/settings?upgrade=Growth" variant="primary">See Growth</Button>
+            <Button url={upgradeUrl("growth")} variant="primary">See Growth</Button>
           </Box>
           <Box paddingBlockStart="200">
-            <Text as="p" tone="subdued" variant="bodySm">Need enterprise-scale sync (bi-directional NetSuite, high volume)? An Enterprise sync add-on is coming — contact us.</Text>
+            <Text as="p" tone="subdued" variant="bodySm">
+              Need enterprise-scale sync (bi-directional NetSuite, high volume)? Email{" "}
+              <PolarisLink url={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Enterprise ERP sync")}`} target="_blank">
+                {SUPPORT_EMAIL}
+              </PolarisLink>{" "}
+              and tell us what you need.
+            </Text>
           </Box>
         </Banner>
       </Page>
     );
   }
 
+  const runExport = () => {
+    const fd = new FormData();
+    fd.set("intent", "run-export");
+    submit(fd, { method: "post" });
+  };
+
+  const syncLog = (
+    <Card padding="0" key="log">
+      <Box padding="400">
+        <BlockStack gap="100">
+          <Text as="h2" variant="headingMd">Sync log</Text>
+          <Text as="p" tone="subdued" variant="bodySm">
+            Inbound stock updates the oversell guard; paid and approved orders export automatically. A sync
+            failure never blocks a Shopify order — it shows here so you can retry it.
+          </Text>
+        </BlockStack>
+      </Box>
+      {data.logs.length === 0 ? (
+        <EmptyState
+          heading="Nothing synced yet"
+          action={c ? { content: "Run export now", onAction: runExport, loading: busyIntent === "run-export" } : undefined}
+          image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+        >
+          <p>
+            {c
+              ? "Orders queue for export once they're paid or approved. Run the queue now, or let the scheduler do it."
+              : "Connect your ERP below. Stock updates and order exports will appear here."}
+          </p>
+        </EmptyState>
+      ) : (
+        <IndexTable resourceName={{ singular: "sync", plural: "syncs" }} itemCount={data.logs.length} selectable={false} headings={[{ title: "Direction" }, { title: "Entity" }, { title: "Status" }, { title: "Detail" }, { title: "Actions", hidden: true }]}>
+          {data.logs.map((l, i) => (
+            <IndexTable.Row id={l.id} key={l.id} position={i}>
+              <IndexTable.Cell>{l.direction === "INBOUND_STOCK" ? "Inbound stock" : "Outbound order"}</IndexTable.Cell>
+              <IndexTable.Cell>{l.entity}</IndexTable.Cell>
+              <IndexTable.Cell><Badge tone={STATUS_TONE[l.status] ?? "attention"}>{STATUS_LABELS[l.status] ?? l.status}</Badge></IndexTable.Cell>
+              <IndexTable.Cell>
+                <Text as="span" tone={l.status === "FAILED" ? "critical" : "subdued"} variant="bodySm">
+                  {l.error ?? (l.remoteId ? `→ ${l.remoteId}` : l.status === "SYNCED" ? "Synced" : `Attempt ${l.attempts}`)}
+                </Text>
+              </IndexTable.Cell>
+              <IndexTable.Cell>
+                {l.status === "FAILED" && (
+                  <Form method="post">
+                    <input type="hidden" name="intent" value="retry" />
+                    <input type="hidden" name="logId" value={l.id} />
+                    <Button submit size="micro" accessibilityLabel={`Retry sync for ${l.entity}`} loading={busyIntent === "retry" && nav.formData?.get("logId") === l.id}>Retry</Button>
+                  </Form>
+                )}
+              </IndexTable.Cell>
+            </IndexTable.Row>
+          ))}
+        </IndexTable>
+      )}
+    </Card>
+  );
+
+  const connection = (
+    <Card key="connection">
+      <BlockStack gap="300">
+        <Form method="post">
+          <input type="hidden" name="intent" value="save" />
+          <BlockStack gap="300">
+            <BlockStack gap="100">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">Connection</Text>
+                {c ? (
+                  <Badge tone={c.status === "CONNECTED" ? "success" : "critical"}>
+                    {`${CONNECTION_LABELS[c.status] ?? c.status}${c.sandbox ? " · Sandbox" : ""}`}
+                  </Badge>
+                ) : (
+                  <Badge>Not connected</Badge>
+                )}
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                {c ? `${erpKindName(c.kind as ErpKind)} · ` : ""}Credentials are stored encrypted and never logged.
+              </Text>
+            </BlockStack>
+            <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
+              <Select label="Connection type" name="kind" options={data.kinds.map((k) => ({ label: k.name, value: k.id }))} value={kind} onChange={setKind} />
+              <Select label="Source of truth for stock" name="sourceOfTruth" options={[{ label: "Shopify", value: "SHOPIFY" }, { label: "ERP", value: "ERP" }]} value={sourceOfTruth} onChange={setSourceOfTruth} />
+              <TextField label="Endpoint (webhook URL or SFTP host)" name="endpoint" value={endpoint} onChange={setEndpoint} autoComplete="off" placeholder="https://erp.example.com/hooks/mannon" />
+              <TextField label="Secret or credentials" name="secret" type="password" value={secret} onChange={setSecret} autoComplete="off" helpText={c?.hasSecret ? "A secret is stored (encrypted). Leave blank to keep it." : "Stored encrypted; used as the bearer token and inbound secret."} />
+            </InlineGrid>
+            <TextField label="Field mapping (JSON)" name="config" value={config} onChange={setConfig} multiline={3} autoComplete="off" helpText="Optional. Leave as {} to use the default mapping." />
+            <Checkbox label="Sandbox (dry run) mode" name="sandbox" checked={sandbox} onChange={setSandbox} helpText="Exports are logged but not sent to your ERP." />
+            <InlineStack>
+              <Button variant="primary" submit loading={busyIntent === "save"}>Save connection</Button>
+            </InlineStack>
+          </BlockStack>
+        </Form>
+        {/* Outside the Save form: a nested <form> is invalid HTML and broke Disconnect. */}
+        {c && (
+          <InlineStack>
+            <ConfirmAction
+              label="Disconnect"
+              variant="tertiary"
+              title="Disconnect your ERP?"
+              message="Stock updates and order exports stop until you connect again. Your sync log is kept."
+              confirmLabel="Disconnect ERP"
+              fields={{ intent: "disconnect" }}
+            />
+          </InlineStack>
+        )}
+      </BlockStack>
+    </Card>
+  );
+
   return (
-    <Page>
-      <TitleBar title="ERP & inventory sync" />
+    <Page
+      primaryAction={
+        c ? { content: "Run export now", onAction: runExport, loading: busyIntent === "run-export" } : undefined
+      }
+    >
+      <TitleBar title="ERP sync" />
+      <SectionTabs active="erp" />
       <BlockStack gap="500">
         {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
-        {data.lagging && <Banner tone="warning" title="Sync lag detected">
-          <p>No successful sync in over 2 hours. Check your ERP connection.</p>
-        </Banner>}
-
-        <Text as="p" tone="subdued" variant="bodyMd">
-          Stock and orders stay in sync with your ERP. Inbound stock updates the
-          oversell guard; paid orders export automatically. Credentials are encrypted
-          — never logged. A sync failure never blocks a Shopify order; it surfaces here.
-        </Text>
-
-        {/* Connection */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="save" />
-            <BlockStack gap="300">
-              <InlineStack align="space-between" blockAlign="center">
-                <Text as="h2" variant="headingMd">Connection</Text>
-                {c ? <Badge tone={c.status === "CONNECTED" ? "success" : "critical"}>{c.sandbox ? `${c.status} (sandbox)` : c.status}</Badge> : <Badge>Not connected</Badge>}
-              </InlineStack>
-              <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
-                <Select label="Kind" name="kind" options={data.kinds.map((k) => ({ label: k.name, value: k.id }))} value={kind} onChange={setKind} />
-                <Select label="Source of truth for stock" name="sourceOfTruth" options={[{ label: "Shopify", value: "SHOPIFY" }, { label: "ERP", value: "ERP" }]} value={sourceOfTruth} onChange={setSourceOfTruth} />
-                <TextField label="Endpoint (webhook URL / SFTP host)" name="endpoint" value={endpoint} onChange={setEndpoint} autoComplete="off" placeholder="https://erp.example.com/hooks/mannon" />
-                <TextField label="Secret / credentials" name="secret" type="password" value={secret} onChange={setSecret} autoComplete="off" helpText={c?.hasSecret ? "A secret is stored (encrypted). Leave blank to keep it." : "Stored encrypted; used as the bearer token + inbound secret."} />
-              </InlineGrid>
-              <TextField label="Field mapping (JSON)" name="config" value={config} onChange={setConfig} multiline={3} autoComplete="off" />
-              <Checkbox label="Sandbox / dry-run mode" name="sandbox" checked={sandbox} onChange={setSandbox} />
-              <InlineStack gap="200">
-                <Button variant="primary" submit loading={busy}>Save connection</Button>
-                {c && (
-                  <Form method="post">
-                    <input type="hidden" name="intent" value="disconnect" />
-                    <Button submit tone="critical" variant="tertiary" loading={busy}>Disconnect</Button>
-                  </Form>
-                )}
-              </InlineStack>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        {c && (
-          <InlineGrid columns={{ xs: 1, sm: 2 }} gap="400">
-            {/* Run export */}
-            <Card>
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">Outbound export</Text>
-                <Text as="p" tone="subdued" variant="bodySm">Paid/approved orders queue automatically. Run the queue now, or let the scheduler do it.</Text>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="run-export" />
-                  <Button submit loading={busy}>Run export now</Button>
-                </Form>
-              </BlockStack>
-            </Card>
-            {/* Simulate inbound stock (dry-run/QA) */}
-            <Card>
-              <Form method="post">
-                <input type="hidden" name="intent" value="simulate-stock" />
-                <BlockStack gap="300">
-                  <Text as="h2" variant="headingMd">Inbound stock (test)</Text>
-                  <TextField label="Paste stock (variant_id,qty per line)" labelHidden name="stock" value={stock} onChange={setStock} multiline={3} autoComplete="off" placeholder={"gid://shopify/ProductVariant/1,0\ngid://shopify/ProductVariant/2,24"} />
-                  <InlineStack><Button submit loading={busy}>Apply stock update</Button></InlineStack>
-                </BlockStack>
-              </Form>
-            </Card>
-          </InlineGrid>
+        {data.lagging && (
+          <Banner tone="warning" title="Sync lag detected">
+            <p>No successful sync in over 2 hours. Check your ERP connection.</p>
+          </Banner>
         )}
 
-        {/* Two-way sync log */}
-        <Card padding="0">
-          <Box padding="400"><Text as="h2" variant="headingMd">Sync log</Text></Box>
-          {data.logs.length === 0 ? (
-            <EmptyState heading="Nothing synced yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>Inbound stock updates and outbound order exports appear here.</p>
-            </EmptyState>
-          ) : (
-            <IndexTable resourceName={{ singular: "sync", plural: "syncs" }} itemCount={data.logs.length} selectable={false} headings={[{ title: "Direction" }, { title: "Entity" }, { title: "Status" }, { title: "Detail" }, { title: "" }]}>
-              {data.logs.map((l, i) => (
-                <IndexTable.Row id={l.id} key={l.id} position={i}>
-                  <IndexTable.Cell>{l.direction === "INBOUND_STOCK" ? "⬇ Inbound stock" : "⬆ Outbound order"}</IndexTable.Cell>
-                  <IndexTable.Cell>{l.entity}</IndexTable.Cell>
-                  <IndexTable.Cell><Badge tone={STATUS_TONE[l.status] ?? "attention"}>{l.status}</Badge></IndexTable.Cell>
-                  <IndexTable.Cell>
-                    <Text as="span" tone={l.status === "FAILED" ? "critical" : "subdued"} variant="bodySm">
-                      {l.error ?? (l.remoteId ? `→ ${l.remoteId}` : l.status === "SYNCED" ? "Synced" : `Attempt ${l.attempts}`)}
-                    </Text>
-                  </IndexTable.Cell>
-                  <IndexTable.Cell>
-                    {l.status === "FAILED" && (
-                      <Form method="post">
-                        <input type="hidden" name="intent" value="retry" />
-                        <input type="hidden" name="logId" value={l.id} />
-                        <Button submit size="micro" loading={busy}>Retry</Button>
-                      </Form>
-                    )}
-                  </IndexTable.Cell>
-                </IndexTable.Row>
-              ))}
-            </IndexTable>
-          )}
-        </Card>
+        {/* Connected: status + log first. Not connected yet: the connection form is the job. */}
+        {c ? [syncLog, connection] : [connection, syncLog]}
+
+        {c && (
+          <DisclosureCard
+            title="Inbound stock (test tool)"
+            subtitle="For testing only: paste stock levels to check how an inbound update from your ERP is applied."
+            badge={<Badge>Test</Badge>}
+          >
+            <Form method="post">
+              <input type="hidden" name="intent" value="simulate-stock" />
+              <BlockStack gap="300">
+                <TextField
+                  label="Stock levels (variant ID, quantity — one per line)"
+                  name="stock"
+                  value={stock}
+                  onChange={setStock}
+                  multiline={3}
+                  autoComplete="off"
+                  placeholder={"gid://shopify/ProductVariant/1,0\ngid://shopify/ProductVariant/2,24"}
+                />
+                <InlineStack><Button submit loading={busyIntent === "simulate-stock"}>Apply stock update</Button></InlineStack>
+              </BlockStack>
+            </Form>
+          </DisclosureCard>
+        )}
       </BlockStack>
     </Page>
   );

@@ -19,6 +19,10 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { ConfirmAction } from "../components/ConfirmAction";
+import prisma from "../db.server";
+import { upgradeUrl } from "../lib/upgrade";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { allowedRuleScopes, packRulesAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -36,6 +40,25 @@ import { evaluateCart, type OrderRuleLite } from "../lib/order-rules";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_MOQ === "true";
+const SCOPE_FIELD_ID = "order-rule-scope";
+
+const SCOPE_LABEL: Record<string, string> = {
+  STORE: "Whole store",
+  PRODUCT: "Product variant",
+  COLLECTION: "Collection",
+  CUSTOMER_GROUP: "Company",
+};
+const TARGET_FIELD: Record<string, { label: string; placeholder: string }> = {
+  PRODUCT: { label: "Variant ID", placeholder: "gid://shopify/ProductVariant/123" },
+  COLLECTION: { label: "Collection ID", placeholder: "gid://shopify/Collection/123" },
+};
+
+/** Move focus to the create form's first field (EmptyState action). */
+function focusField(id: string) {
+  const el = document.getElementById(id);
+  el?.scrollIntoView({ block: "center", behavior: "smooth" });
+  el?.focus();
+}
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
@@ -43,7 +66,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const rules = await listRules(session.shop);
   const rulesLite = await getRulesForShop(session.shop);
+  // CUSTOMER_GROUP rules target a company (docs/order-rules.md: the F5 company is
+  // the "group"), so the editor offers a company picker instead of a raw id.
+  const companies = await prisma.company.findMany({
+    where: { shop: { shopifyDomain: session.shop } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+    take: 250,
+  });
   return {
+    companies,
     isGrowth: status.plan === GROWTH_PLAN,
     scopes: allowedRuleScopes(status.plan),
     packsAllowed: packRulesAllowed(status.plan),
@@ -106,6 +138,7 @@ export default function OrderRules() {
   const [minQty, setMinQty] = useState("");
   const [packSize, setPackSize] = useState("");
   const [minOrderValue, setMinOrderValue] = useState("");
+  const [priority, setPriority] = useState("0");
   const [csv, setCsv] = useState("");
 
   // Test-this-cart preview.
@@ -121,8 +154,14 @@ export default function OrderRules() {
 
   const err = actionData && !actionData.ok ? actionData.error : null;
   const msg = actionData && actionData.ok ? actionData.message : null;
+  const firstRun = data.rules.length === 0;
 
-  const scopeOptions = data.scopes.map((s) => ({ label: s.replace("_", " "), value: s }));
+  const scopeOptions = data.scopes.map((s) => ({ label: SCOPE_LABEL[s] ?? s, value: s }));
+  const companyName = (id: string | null) => (id ? data.companies.find((c) => c.id === id)?.name ?? id : "—");
+  const onScopeChange = (v: string) => {
+    setScope(v);
+    setTargetId("");
+  };
 
   return (
     <Page>
@@ -132,73 +171,52 @@ export default function OrderRules() {
         {err && <Banner tone="critical" title="Couldn’t save"><p>{err}</p></Banner>}
         {msg && <Banner tone="success" title={msg} />}
 
-        {data.rules.length === 0 && (
-          <Banner tone="info" title="Set your order minimums">
-            <p>Add MOQ, pack/case sizes, and an order-value minimum so no unprofitable or invalid order slips through. Rules apply in the portal cart, the order pad, and quote conversion.</p>
-          </Banner>
-        )}
-
-        {/* Create */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="create" />
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">Add a rule</Text>
-              <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
-                <Select label="Scope" name="scope" options={scopeOptions} value={scope} onChange={setScope} />
-                <TextField
-                  label={scope === "PRODUCT" ? "Variant id" : scope === "CUSTOMER_GROUP" ? "Company id" : scope === "COLLECTION" ? "Collection id" : "Target (store-wide — leave blank)"}
-                  name="targetId"
-                  value={targetId}
-                  onChange={setTargetId}
-                  autoComplete="off"
-                  disabled={scope === "STORE"}
-                  placeholder={scope === "PRODUCT" ? "gid://shopify/ProductVariant/…" : ""}
-                />
-              </InlineGrid>
-              <InlineGrid columns={{ xs: 1, sm: 4 }} gap="300">
-                <TextField label="Min qty (MOQ)" type="number" name="minQty" value={minQty} onChange={setMinQty} min={0} autoComplete="off" />
-                <TextField label="Pack size" type="number" name="packSize" value={packSize} onChange={setPackSize} min={0} autoComplete="off" disabled={!data.packsAllowed} helpText={data.packsAllowed ? undefined : "Growth"} />
-                <TextField label="Min order value" type="number" name="minOrderValue" value={minOrderValue} onChange={setMinOrderValue} min={0} step={0.01} prefix="$" autoComplete="off" />
-                <TextField label="Priority" type="number" name="priority" value="0" autoComplete="off" />
-              </InlineGrid>
-              {!data.isGrowth && (
-                <Text as="p" tone="subdued" variant="bodySm">
-                  Starter supports store + product rules. Upgrade to Growth for collection / customer-group scopes, pack sizes, and CSV import.
-                </Text>
-              )}
-              <InlineStack><Button variant="primary" submit loading={busy}>Add rule</Button></InlineStack>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        {/* Rules table */}
+        {/* 1. The list the merchant works in */}
         <Card padding="0">
-          <Box padding="400"><Text as="h2" variant="headingMd">Rules</Text></Box>
-          {data.rules.length === 0 ? (
-            <EmptyState heading="No rules yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>Add a rule above to enforce minimums and pack sizes.</p>
+          <Box padding="400">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">Your rules</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Rules apply in the portal cart, the order pad, and when a quote becomes an order. The most specific rule wins.
+              </Text>
+            </BlockStack>
+          </Box>
+          {firstRun ? (
+            <EmptyState
+              heading="No order rules yet"
+              action={{ content: "Add a rule", onAction: () => focusField(SCOPE_FIELD_ID) }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>Buyers can order any quantity at any value until you add a rule. Set a minimum quantity, a pack size, or an order-value minimum so invalid orders can’t slip through.</p>
             </EmptyState>
           ) : (
             <IndexTable
               resourceName={{ singular: "rule", plural: "rules" }}
               itemCount={data.rules.length}
               selectable={false}
-              headings={[{ title: "Scope" }, { title: "Target" }, { title: "MOQ" }, { title: "Pack" }, { title: "Min value" }, { title: "" }]}
+              headings={[{ title: "Applies to" }, { title: "Target" }, { title: "Min quantity" }, { title: "Pack size" }, { title: "Min order value" }, { title: "Actions", hidden: true }]}
             >
               {data.rules.map((r, i) => (
                 <IndexTable.Row id={r.id} key={r.id} position={i}>
-                  <IndexTable.Cell><Badge>{r.scope.replace("_", " ")}</Badge></IndexTable.Cell>
-                  <IndexTable.Cell><Text as="span" variant="bodySm" breakWord>{r.targetId ?? "—"}</Text></IndexTable.Cell>
+                  <IndexTable.Cell><Badge>{SCOPE_LABEL[r.scope] ?? r.scope}</Badge></IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Text as="span" variant="bodySm" breakWord>
+                      {r.scope === "CUSTOMER_GROUP" ? companyName(r.targetId) : r.targetId ?? "—"}
+                    </Text>
+                  </IndexTable.Cell>
                   <IndexTable.Cell>{r.minQty ?? "—"}</IndexTable.Cell>
                   <IndexTable.Cell>{r.packSize ?? "—"}</IndexTable.Cell>
                   <IndexTable.Cell>{r.minOrderValue ? `$${Number(r.minOrderValue).toFixed(2)}` : "—"}</IndexTable.Cell>
                   <IndexTable.Cell>
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="delete" />
-                      <input type="hidden" name="ruleId" value={r.id} />
-                      <Button size="slim" variant="plain" tone="critical" submit>Delete</Button>
-                    </Form>
+                    <ConfirmAction
+                      label="Delete"
+                      title="Delete this order rule?"
+                      message="Buyers will no longer be held to this minimum or pack size. Orders already placed aren’t changed."
+                      confirmLabel="Delete rule"
+                      fields={{ intent: "delete", ruleId: r.id }}
+                      size="micro"
+                      variant="tertiary"
+                    />
                   </IndexTable.Cell>
                 </IndexTable.Row>
               ))}
@@ -206,16 +224,67 @@ export default function OrderRules() {
           )}
         </Card>
 
-        {/* Test this cart */}
+        {/* 2. Create */}
         <Card>
+          <Form method="post">
+            <input type="hidden" name="intent" value="create" />
+            <BlockStack gap="300">
+              <Text as="h2" variant="headingMd">Add a rule</Text>
+              <InlineGrid columns={{ xs: 1, sm: 2 }} gap="300">
+                <Select id={SCOPE_FIELD_ID} label="Applies to" name="scope" options={scopeOptions} value={scope} onChange={onScopeChange} />
+                {scope === "STORE" ? (
+                  <TextField label="Target" value="" onChange={() => {}} autoComplete="off" disabled helpText="Store-wide rules apply to every order." />
+                ) : scope === "CUSTOMER_GROUP" ? (
+                  data.companies.length === 0 ? (
+                    <TextField label="Company" value="" onChange={() => {}} autoComplete="off" disabled helpText="You don’t have any companies yet. They appear here once you add B2B buyers." />
+                  ) : (
+                    <Select
+                      label="Company"
+                      name="targetId"
+                      options={[{ label: "Choose a company…", value: "" }, ...data.companies.map((c) => ({ label: c.name, value: c.id }))]}
+                      value={targetId}
+                      onChange={setTargetId}
+                    />
+                  )
+                ) : (
+                  <TextField
+                    label={TARGET_FIELD[scope]?.label ?? "Target"}
+                    name="targetId"
+                    value={targetId}
+                    onChange={setTargetId}
+                    autoComplete="off"
+                    placeholder={TARGET_FIELD[scope]?.placeholder}
+                  />
+                )}
+              </InlineGrid>
+              <InlineGrid columns={{ xs: 1, sm: 4 }} gap="300">
+                <TextField label="Min quantity" type="number" name="minQty" value={minQty} onChange={setMinQty} min={0} autoComplete="off" helpText="Per line" />
+                <TextField label="Pack size" type="number" name="packSize" value={packSize} onChange={setPackSize} min={0} autoComplete="off" disabled={!data.packsAllowed} helpText={data.packsAllowed ? "Quantities round up to this" : "Needs Growth"} />
+                <TextField label="Min order value" type="number" name="minOrderValue" value={minOrderValue} onChange={setMinOrderValue} min={0} step={0.01} prefix="$" autoComplete="off" />
+                <TextField label="Priority" type="number" name="priority" value={priority} onChange={setPriority} autoComplete="off" helpText="Higher wins on a tie" />
+              </InlineGrid>
+              {!data.isGrowth && (
+                <Banner tone="info" action={{ content: "Upgrade to Growth", url: upgradeUrl("growth") }}>
+                  <p>Starter covers whole-store and product rules. Growth adds collection and company rules, pack sizes, and CSV import.</p>
+                </Banner>
+              )}
+              <InlineStack><Button variant="primary" submit loading={busy}>Add rule</Button></InlineStack>
+            </BlockStack>
+          </Form>
+        </Card>
+
+        {/* 3. Tools, one click away */}
+        <DisclosureCard
+          title="Test a cart"
+          subtitle="See what your rules do to a cart line before a buyer does."
+        >
           <BlockStack gap="300">
-            <Text as="h2" variant="headingMd">Test this cart</Text>
             <InlineGrid columns={{ xs: 1, sm: 3 }} gap="300">
-              <TextField label="Variant id" value={testVariant} onChange={setTestVariant} autoComplete="off" placeholder="gid://…/ProductVariant/123" />
+              <TextField label="Variant ID" value={testVariant} onChange={setTestVariant} autoComplete="off" placeholder="gid://shopify/ProductVariant/123" />
               <TextField label="Quantity" type="number" value={testQty} onChange={setTestQty} autoComplete="off" />
               <TextField label="Unit price" type="number" value={testPrice} onChange={setTestPrice} prefix="$" autoComplete="off" />
             </InlineGrid>
-            {preview && (
+            {preview ? (
               <Box background="bg-surface-secondary" borderRadius="200" padding="300">
                 <BlockStack gap="150">
                   <Text as="p">
@@ -230,38 +299,40 @@ export default function OrderRules() {
                   </Text>
                 </BlockStack>
               </Box>
-            )}
-          </BlockStack>
-        </Card>
-
-        {/* CSV (Growth) */}
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack gap="200" blockAlign="center">
-              <Text as="h2" variant="headingMd">Bulk import (CSV)</Text>
-              <Badge tone="info">Growth</Badge>
-            </InlineStack>
-            {data.isGrowth ? (
-              <Form method="post">
-                <input type="hidden" name="intent" value="import-csv" />
-                <BlockStack gap="200">
-                  <TextField
-                    label="Paste CSV (scope,target_id,min_qty,pack_size,min_order_value,priority)"
-                    name="csv"
-                    value={csv}
-                    onChange={setCsv}
-                    multiline={4}
-                    autoComplete="off"
-                    placeholder={"PRODUCT,gid://…/ProductVariant/1,,12,,0\nSTORE,,,,250,0"}
-                  />
-                  <InlineStack><Button submit loading={busy}>Import CSV</Button></InlineStack>
-                </BlockStack>
-              </Form>
             ) : (
-              <Text as="p" tone="subdued">CSV import is a Growth feature.</Text>
+              <Text as="p" tone="subdued" variant="bodySm">Enter a variant ID to see the result. This is a preview only; nothing is saved.</Text>
             )}
           </BlockStack>
-        </Card>
+        </DisclosureCard>
+
+        <DisclosureCard
+          title="Bulk import (CSV)"
+          subtitle="Add many rules at once."
+          badge={<Badge tone="info">Growth</Badge>}
+        >
+          {data.isGrowth ? (
+            <Form method="post">
+              <input type="hidden" name="intent" value="import-csv" />
+              <BlockStack gap="200">
+                <TextField
+                  label="Paste CSV (scope,target_id,min_qty,pack_size,min_order_value,priority)"
+                  name="csv"
+                  value={csv}
+                  onChange={setCsv}
+                  multiline={4}
+                  autoComplete="off"
+                  placeholder={"PRODUCT,gid://shopify/ProductVariant/1,,12,,0\nSTORE,,,,250,0"}
+                  helpText="For CUSTOMER_GROUP rows, target_id is the company’s Mannon ID."
+                />
+                <InlineStack><Button submit loading={busy}>Import CSV</Button></InlineStack>
+              </BlockStack>
+            </Form>
+          ) : (
+            <Banner tone="info" action={{ content: "Upgrade to Growth", url: upgradeUrl("growth") }}>
+              <p>CSV import comes with the Growth plan.</p>
+            </Banner>
+          )}
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

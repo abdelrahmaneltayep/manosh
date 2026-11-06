@@ -251,7 +251,7 @@ describe("requirePlan (enforcement)", () => {
     }).catch((e) => e as Response);
     expect(error).toBeInstanceOf(Response);
     expect((error as Response).status).toBe(302);
-    expect((error as Response).headers.get("location")).toBe(`/app/settings?upgrade=${GROWTH_PLAN}`);
+    expect((error as Response).headers.get("location")).toBe(`/app/plans?upgrade=${GROWTH_PLAN.toLowerCase()}`);
   });
 });
 

@@ -21,7 +21,7 @@ import { SectionTabs } from "../components/SectionTabs";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { requireBilling } from "../services/billing.server";
-import { GROWTH_PLAN } from "../lib/billing";
+import { isGrowthTier } from "../lib/billing";
 import { getPolicy, upsertPolicy, needsNudgeList, sendNow } from "../services/followups.server";
 import { clampCadence } from "../lib/followups";
 import { formatDate } from "../lib/format";
@@ -36,6 +36,8 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftFollowupMessage } from "../services/followups-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
+import { DisclosureCard } from "../components/DisclosureCard";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_FOLLOWUPS === "true";
@@ -50,7 +52,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const access = claudeAccess(shop ?? { plan: "FREE" }, new Date());
 
   return {
-    isGrowth: status.plan === GROWTH_PLAN,
+    // Growth and Scale both include the full cadence (Scale ⊃ Growth).
+    isGrowth: isGrowthTier(status.plan),
     policy,
     timezone: shop?.timezone ?? "",
     effectiveCadence: clampCadence(policy.cadenceDays, policy.planMax),
@@ -133,43 +136,10 @@ export default function Followups() {
       <TitleBar title="Follow-ups" />
       <SectionTabs active="followups" />
       <BlockStack gap="500">
-        {err && <Banner tone="critical" title="Couldn’t save"><p>{err}</p></Banner>}
+        {err && <Banner tone="critical" title="Something went wrong"><p>{err}</p></Banner>}
         {msg && <Banner tone="success" title={msg} />}
 
-        {!data.policy.enabled && (
-          <Banner tone="info" title="Set your quote expiry policy">
-            <p>Turn on follow-ups so open quotes nudge themselves before they expire — the simplest lift to quote-to-order conversion.</p>
-          </Banner>
-        )}
-
-        {/* Policy */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="save-policy" />
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">Store follow-up policy</Text>
-              <Checkbox label="Automatically follow up on open quotes" name="enabled" checked={enabled} onChange={setEnabled} />
-              <InlineGrid columns={{ xs: 1, sm: 3 }} gap="300">
-                <TextField label="Expire quotes after (days)" type="number" name="expiryDays" value={expiryDays} onChange={setExpiryDays} min={1} max={365} autoComplete="off" />
-                <TextField label="Nudge on days after submit" name="cadenceDays" value={cadence} onChange={setCadence} autoComplete="off" helpText="Comma-separated, e.g. 3, 7, 12" disabled={!data.isGrowth} />
-                <TextField label="Max nudges" type="number" name="maxNudges" value={maxNudges} onChange={setMaxNudges} min={0} max={10} autoComplete="off" disabled={!data.isGrowth} />
-              </InlineGrid>
-              <TextField label="Store timezone (IANA)" name="timezone" value={tz} onChange={setTz} autoComplete="off" placeholder="e.g. Asia/Riyadh" helpText="Reminders only send during business hours (Mon–Fri, 9–18) in this timezone." />
-              {!data.isGrowth && (
-                <Banner tone="warning">
-                  <p>Starter sends a <b>single</b> reminder per quote plus the expiry. Upgrade to Growth for a multi-nudge cadence and auto-expiry actions.</p>
-                  <Box paddingBlockStart="200"><Button url="/app/settings" variant="primary">Upgrade to Growth</Button></Box>
-                </Banner>
-              )}
-              <Text as="p" tone="subdued" variant="bodySm">
-                Effective cadence on your plan: {data.effectiveCadence.length ? data.effectiveCadence.map((d) => `day ${d}`).join(", ") : "expiry only"}.
-              </Text>
-              <InlineStack><Button variant="primary" submit loading={busy}>Save policy</Button></InlineStack>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        {/* Needs nudge */}
+        {/* 1 — The job: open quotes that need a reminder now. */}
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">Needs a nudge</Text>
@@ -179,10 +149,10 @@ export default function Followups() {
               </InlineStack>
             )}
             {!data.access.allowed && data.nudge.length > 0 && (
-              <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />
+              <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />
             )}
             {data.nudge.length === 0 ? (
-              <Text as="p" tone="subdued">No open quotes waiting on a nudge.</Text>
+              <Text as="p" tone="subdued">No open quotes need a reminder right now. Quotes show up here when they’re due a nudge.</Text>
             ) : (
               <BlockStack gap="0">
                 {data.nudge.map((n, i) => (
@@ -192,6 +162,42 @@ export default function Followups() {
             )}
           </BlockStack>
         </Card>
+        {/* 2 — The rule that keeps quotes moving: set once, adjust rarely. */}
+        <DisclosureCard
+          title="Follow-up policy"
+          subtitle={
+            data.policy.enabled
+              ? `On · ${data.effectiveCadence.length ? data.effectiveCadence.map((d) => `day ${d}`).join(", ") : "expiry reminder only"} · quotes expire after ${data.policy.expiryDays} days`
+              : "Off. Turn it on so open quotes get a reminder before they expire."
+          }
+          defaultOpen={!data.policy.enabled}
+          showLabel="Edit"
+          hideLabel="Close"
+        >
+          <Form method="post">
+            <input type="hidden" name="intent" value="save-policy" />
+            <BlockStack gap="300">
+              <Checkbox label="Automatically follow up on open quotes" name="enabled" checked={enabled} onChange={setEnabled} />
+              <InlineGrid columns={{ xs: 1, sm: 3 }} gap="300">
+                <TextField label="Expire quotes after (days)" type="number" name="expiryDays" value={expiryDays} onChange={setExpiryDays} min={1} max={365} autoComplete="off" />
+                <TextField label="Nudge on days after submit" name="cadenceDays" value={cadence} onChange={setCadence} autoComplete="off" helpText="Comma-separated, e.g. 3, 7, 12" disabled={!data.isGrowth} />
+                <TextField label="Max nudges" type="number" name="maxNudges" value={maxNudges} onChange={setMaxNudges} min={0} max={10} autoComplete="off" disabled={!data.isGrowth} />
+              </InlineGrid>
+              <TextField label="Store time zone" name="timezone" value={tz} onChange={setTz} autoComplete="off" placeholder="e.g. Asia/Riyadh" helpText="Reminders only go out during business hours (Mon–Fri, 9–18) in this time zone. Use a name like Asia/Riyadh or America/New_York." />
+              {!data.isGrowth && (
+                <Banner tone="warning">
+                  <p>Starter sends a <b>single</b> reminder per quote plus the expiry. Upgrade to Growth for a multi-nudge cadence and auto-expiry actions.</p>
+                  <Box paddingBlockStart="200"><Button url={upgradeUrl("growth")} variant="primary">Upgrade to Growth</Button></Box>
+                </Banner>
+              )}
+              <Text as="p" tone="subdued" variant="bodySm">
+                Effective cadence on your plan: {data.effectiveCadence.length ? data.effectiveCadence.map((d) => `day ${d}`).join(", ") : "expiry only"}.
+              </Text>
+              <InlineStack><Button variant="primary" submit loading={busy}>Save policy</Button></InlineStack>
+            </BlockStack>
+          </Form>
+        </DisclosureCard>
+
       </BlockStack>
     </Page>
   );

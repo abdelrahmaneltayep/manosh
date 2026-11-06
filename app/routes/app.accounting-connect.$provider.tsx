@@ -5,6 +5,7 @@ import { requireBilling } from "../services/billing.server";
 import { accountingSyncAllowed } from "../lib/billing";
 import { buildAuthorizeUrl, signState, oauthConfig } from "../services/accounting.server";
 import type { Provider } from "../lib/accounting";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
@@ -20,7 +21,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
   if (!accountingSyncAllowed(status.plan)) {
-    throw redirect("/app/settings?upgrade=Growth");
+    throw redirect(upgradeUrl("growth"));
   }
 
   const raw = (params.provider ?? "").toUpperCase();

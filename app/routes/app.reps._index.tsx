@@ -19,6 +19,7 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { repPortalAllowed, getPlanLimits, repSeatCapMessage, GROWTH_PLAN } from "../lib/billing";
@@ -43,6 +44,7 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_REP_PORTAL === "true";
@@ -123,11 +125,15 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   }
 };
 
+const REP_STATUS_LABELS: Record<string, string> = { ACTIVE: "Active", INVITED: "Invited" };
+const INVITE_EMAIL_ID = "rep-invite-email";
+
 export default function Reps() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
+  const busyIntent = busy ? String(nav.formData?.get("intent") ?? "") : "";
 
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -135,7 +141,7 @@ export default function Reps() {
   const [assignRep, setAssignRep] = useState("");
   const [assignCo, setAssignCo] = useState("");
 
-  // Dual-mode: Claude drafts a personal note into the invite below.
+  // Dual-mode: the note field always works by hand; Claude only pre-fills it.
   const noteFetcher = useFetcher<typeof action>();
   const draftingNote = noteFetcher.state !== "idle";
   const noteData = noteFetcher.data;
@@ -146,7 +152,7 @@ export default function Reps() {
   if (!data.isGrowth) {
     return (
       <Page>
-        <TitleBar title="Sales reps" />
+        <TitleBar title="Reps" />
         <SectionTabs active="reps" />
         <Banner tone="info" title="Add your sales team — upgrade to Growth">
           <p>
@@ -155,16 +161,21 @@ export default function Reps() {
             included on the Growth plan.
           </p>
           <Box paddingBlockStart="200">
-            <Button url="/app/settings?upgrade=Growth" variant="primary">See Growth</Button>
+            <Button url={upgradeUrl("growth")} variant="primary">See Growth</Button>
           </Box>
         </Banner>
       </Page>
     );
   }
 
+  const focusInvite = () => {
+    if (typeof document !== "undefined") document.getElementById(INVITE_EMAIL_ID)?.focus();
+  };
+
   return (
     <Page>
-      <TitleBar title="Sales reps" />
+      <TitleBar title="Reps" />
+      <SectionTabs active="reps" />
       <BlockStack gap="500">
         {actionData?.ok === true && (
           <Banner tone="success" title={actionData.message}>
@@ -175,120 +186,52 @@ export default function Reps() {
         )}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
 
-        <Text as="p" tone="subdued" variant="bodyMd">
-          Reps sell through Mannon: they log in to a scoped portal, see only their
-          assigned companies, and place or negotiate orders on behalf of buyers —
-          within each buyer’s limits. They can’t change credit or company settings.
-        </Text>
-
-        {/* Invite */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="invite" />
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">Invite a rep</Text>
-              <InlineStack gap="300" blockAlign="end" wrap>
-                <Box minWidth="240px"><TextField label="Email" name="email" type="email" value={email} onChange={setEmail} autoComplete="off" /></Box>
-                <Box minWidth="200px"><TextField label="Name (optional)" name="name" value={name} onChange={setName} autoComplete="off" /></Box>
-              </InlineStack>
-
-              {access.state === "trial" && access.daysLeft != null && (
-                <InlineStack gap="200" blockAlign="center">
-                  <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
-                </InlineStack>
-              )}
-              {access.allowed ? (
-                <BlockStack gap="200">
-                  <TextField
-                    label="Personal note (optional)"
-                    name="note"
-                    value={note}
-                    onChange={setNote}
-                    multiline={2}
-                    autoComplete="off"
-                    placeholder="Add a warm welcome, or draft one with Claude."
-                  />
-                  <InlineStack>
-                    <Button
-                      size="slim"
-                      disabled={draftingNote}
-                      loading={draftingNote}
-                      onClick={() => noteFetcher.submit({ intent: "ai-invite-note", name }, { method: "post" })}
-                    >
-                      ✦ Draft note with Claude
-                    </Button>
-                  </InlineStack>
-                  {noteErr && <Banner tone="warning">{noteErr}</Banner>}
-                  {noteDraft && (
-                    <Box background="bg-surface-secondary" borderRadius="200" padding="300">
-                      <BlockStack gap="200">
-                        <Text as="p" variant="bodySm">{noteDraft}</Text>
-                        <InlineStack gap="200">
-                          <Button size="slim" variant="primary" onClick={() => setNote(noteDraft)}>Use this</Button>
-                        </InlineStack>
-                        <InlineStack gap="200" blockAlign="center" wrap>
-                          <Badge tone="info">✦ Drafted by Claude</Badge>
-                          <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
-                        </InlineStack>
-                      </BlockStack>
-                    </Box>
-                  )}
-                </BlockStack>
-              ) : (
-                <>
-                  <input type="hidden" name="note" value="" />
-                  <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
-                </>
-              )}
-
-              <InlineStack>
-                <Button variant="primary" submit loading={busy}>Send invite</Button>
-              </InlineStack>
-              <Text as="p" tone="subdued" variant="bodySm">Seats used: {data.reps.length} of {data.seatCap}.</Text>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        {/* Assign */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="assign" />
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">Assign a company</Text>
-              <InlineStack gap="300" blockAlign="end" wrap>
-                <Select label="Rep" name="repId" options={[{ label: "Choose…", value: "" }, ...data.reps.map((r) => ({ label: r.name ?? r.email, value: r.id }))]} value={assignRep} onChange={setAssignRep} />
-                <Select label="Company" name="companyId" options={[{ label: "Choose…", value: "" }, ...data.companies.map((c) => ({ label: c.name, value: c.id }))]} value={assignCo} onChange={setAssignCo} />
-                <Button submit loading={busy} disabled={!assignRep || !assignCo}>Assign</Button>
-              </InlineStack>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        {/* Reps table */}
+        {/* 1. Reps table — the list the merchant works in */}
         <Card padding="0">
-          <Box padding="400"><Text as="h2" variant="headingMd">Reps</Text></Box>
+          <Box padding="400">
+            <BlockStack gap="100">
+              <InlineStack align="space-between" blockAlign="center">
+                <Text as="h2" variant="headingMd">Reps</Text>
+                <Badge>{`${data.reps.length} of ${data.seatCap} seats used`}</Badge>
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Reps sign in to a scoped portal, see only their assigned companies, and place or negotiate
+                orders for buyers within each buyer’s limits. They can’t change credit or company settings.
+              </Text>
+            </BlockStack>
+          </Box>
           {data.reps.length === 0 ? (
-            <EmptyState heading="No reps yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>Invite your first rep to give them scoped access to their accounts.</p>
+            <EmptyState
+              heading="No reps yet"
+              action={{ content: "Invite a rep", onAction: focusInvite }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>Invite a rep to give them a sign-in that shows only the accounts you assign.</p>
             </EmptyState>
           ) : (
             <IndexTable
               resourceName={{ singular: "rep", plural: "reps" }}
               itemCount={data.reps.length}
               selectable={false}
-              headings={[{ title: "Rep" }, { title: "Status" }, { title: "Accounts" }, { title: "" }]}
+              headings={[{ title: "Rep" }, { title: "Status" }, { title: "Accounts" }, { title: "Actions", hidden: true }]}
             >
               {data.reps.map((r, i) => (
                 <IndexTable.Row id={r.id} key={r.id} position={i}>
                   <IndexTable.Cell>{r.name ?? r.email}<br /><Text as="span" tone="subdued" variant="bodySm">{r.email}</Text></IndexTable.Cell>
-                  <IndexTable.Cell><Badge tone={r.status === "ACTIVE" ? "success" : "attention"}>{r.status}</Badge></IndexTable.Cell>
+                  <IndexTable.Cell>
+                    <Badge tone={r.status === "ACTIVE" ? "success" : "attention"}>{REP_STATUS_LABELS[r.status] ?? r.status}</Badge>
+                  </IndexTable.Cell>
                   <IndexTable.Cell>{String(r.assignmentCount)}</IndexTable.Cell>
                   <IndexTable.Cell>
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="remove" />
-                      <input type="hidden" name="repId" value={r.id} />
-                      <Button submit tone="critical" variant="tertiary" size="micro" loading={busy}>Remove</Button>
-                    </Form>
+                    <ConfirmAction
+                      label="Remove"
+                      size="micro"
+                      variant="tertiary"
+                      title={`Remove ${r.name ?? r.email}?`}
+                      message="They lose access to the rep portal right away and their company assignments are removed. Quotes they placed stay."
+                      confirmLabel="Remove rep"
+                      fields={{ intent: "remove", repId: r.id }}
+                    />
                   </IndexTable.Cell>
                 </IndexTable.Row>
               ))}
@@ -296,12 +239,108 @@ export default function Reps() {
           )}
         </Card>
 
-        {/* Leaderboard */}
+        {/* 2. Invite */}
+        <Card>
+          <Form method="post">
+            <input type="hidden" name="intent" value="invite" />
+            <BlockStack gap="300">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Invite a rep</Text>
+                {access.state === "trial" && access.daysLeft != null && (
+                  <Badge tone="attention">{`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                )}
+              </InlineStack>
+              <InlineStack gap="300" blockAlign="end" wrap>
+                <Box minWidth="240px">
+                  <TextField id={INVITE_EMAIL_ID} label="Email" name="email" type="email" value={email} onChange={setEmail} autoComplete="off" />
+                </Box>
+                <Box minWidth="200px"><TextField label="Name (optional)" name="name" value={name} onChange={setName} autoComplete="off" /></Box>
+              </InlineStack>
+
+              <BlockStack gap="200">
+                <TextField
+                  label="Personal note (optional)"
+                  name="note"
+                  value={note}
+                  onChange={setNote}
+                  multiline={2}
+                  autoComplete="off"
+                  placeholder={access.allowed ? "Add a warm welcome, or draft one with Claude." : "Add a warm welcome."}
+                />
+                {access.allowed ? (
+                  <>
+                    <InlineStack>
+                      <Button
+                        size="slim"
+                        disabled={draftingNote}
+                        loading={draftingNote}
+                        onClick={() => noteFetcher.submit({ intent: "ai-invite-note", name }, { method: "post" })}
+                      >
+                        ✦ Draft note with Claude
+                      </Button>
+                    </InlineStack>
+                    {noteErr && <Banner tone="warning">{noteErr}</Banner>}
+                    {noteDraft && (
+                      <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodySm">{noteDraft}</Text>
+                          <InlineStack gap="200">
+                            <Button size="slim" variant="primary" onClick={() => setNote(noteDraft)}>Use this</Button>
+                          </InlineStack>
+                          <InlineStack gap="200" blockAlign="center" wrap>
+                            <Badge tone="info">✦ Drafted by Claude</Badge>
+                            <Text as="span" variant="bodySm">{DRAFTED_BY_CLAUDE_TRUST}</Text>
+                          </InlineStack>
+                        </BlockStack>
+                      </Box>
+                    )}
+                  </>
+                ) : (
+                  <UpgradeToClaude access={access} upgradeUrl={upgradeUrl("growth")} />
+                )}
+              </BlockStack>
+
+              <InlineStack>
+                <Button variant="primary" submit loading={busyIntent === "invite"}>Send invite</Button>
+              </InlineStack>
+            </BlockStack>
+          </Form>
+        </Card>
+
+        {/* 3. Assign */}
+        <Card>
+          <Form method="post">
+            <input type="hidden" name="intent" value="assign" />
+            <BlockStack gap="300">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Assign a company</Text>
+                <Text as="p" tone="subdued" variant="bodySm">A rep only sees the companies you assign to them.</Text>
+              </BlockStack>
+              {data.reps.length === 0 || data.companies.length === 0 ? (
+                <Text as="p" tone="subdued">
+                  {data.reps.length === 0
+                    ? "Invite a rep first, then assign them companies here."
+                    : "You don't have any B2B companies yet. Companies appear here once they exist on your store."}
+                </Text>
+              ) : (
+                <InlineStack gap="300" blockAlign="end" wrap>
+                  <Select label="Rep" name="repId" options={[{ label: "Choose…", value: "" }, ...data.reps.map((r) => ({ label: r.name ?? r.email, value: r.id }))]} value={assignRep} onChange={setAssignRep} />
+                  <Select label="Company" name="companyId" options={[{ label: "Choose…", value: "" }, ...data.companies.map((c) => ({ label: c.name, value: c.id }))]} value={assignCo} onChange={setAssignCo} />
+                  <Button submit loading={busyIntent === "assign"} disabled={!assignRep || !assignCo}>Assign company</Button>
+                </InlineStack>
+              )}
+            </BlockStack>
+          </Form>
+        </Card>
+
+        {/* 4. Leaderboard */}
         <Card>
           <BlockStack gap="300">
             <Text as="h2" variant="headingMd">Rep leaderboard</Text>
             {data.leaderboard.length === 0 ? (
-              <Text as="p" tone="subdued" variant="bodySm">No rep-placed quotes yet.</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                No quotes placed by reps yet. Once a rep places a quote, their quotes, orders and win rate show here.
+              </Text>
             ) : (
               <IndexTable
                 resourceName={{ singular: "row", plural: "rows" }}

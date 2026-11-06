@@ -39,11 +39,14 @@ import {
   TERM_OPTIONS,
 } from "../services/credit.server";
 import { AGING_BUCKETS, AGING_LABELS } from "../lib/aging";
-import { formatDate } from "../lib/format";
+import { formatDate, formatMoney } from "../lib/format";
 import { claudeAccess, CLAUDE_UNAVAILABLE_COPY, CLAUDE_UPGRADE_COPY, CLAUDE_TRIAL_ENDED_COPY, type ClaudeAccess } from "../config/plans";
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftCreditRiskFlag } from "../services/insights-ai.server";
 import { DraftedByClaude } from "../components/DraftedByClaude";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const CREDIT_ENABLED = () => process.env.MANNON_FF_CREDIT === "true";
@@ -169,16 +172,17 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
 };
 
 function CreditRiskAssessor({
+  companies,
   companyId,
-  companyName,
+  onPickCompany,
   access,
 }: {
+  companies: { id: string; name: string }[];
   companyId: string;
-  companyName: string;
-  access: Pick<ClaudeAccess, "allowed">;
+  onPickCompany: (id: string) => void;
+  access: Pick<ClaudeAccess, "allowed" | "reason">;
 }) {
   const fetcher = useFetcher<typeof action>();
-  if (!access.allowed) return null;
   const busy = fetcher.state !== "idle";
   const d = fetcher.data;
   const risk = d && d.ok && "kind" in d && d.kind === "risk" ? d : null;
@@ -188,29 +192,49 @@ function CreditRiskAssessor({
   return (
     <Card>
       <BlockStack gap="300">
-        <InlineStack align="space-between" blockAlign="center" wrap gap="200">
-          <Text as="h2" variant="headingMd">
-            Credit-risk read {companyName ? `· ${companyName}` : ""}
+        <BlockStack gap="100">
+          <Text as="h2" variant="headingMd">Credit-risk read</Text>
+          <Text as="p" tone="subdued" variant="bodySm">
+            A plain-language read of a company's payment history. It's advice only — nothing changes until you save a profile.
           </Text>
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="ai-credit-risk" />
-            <input type="hidden" name="companyId" value={companyId} />
-            <Button submit size="slim" disabled={busy || !companyId} loading={busy}>
-              ✦ Assess risk with Claude
-            </Button>
-          </fetcher.Form>
-        </InlineStack>
-        {err && <Banner tone="warning">{err}</Banner>}
-        {risk && (
-          <DraftedByClaude>
-            <BlockStack gap="200">
-              <Badge tone={tone}>{label}</Badge>
-              <Text as="p" variant="bodyMd">{risk.rationale}</Text>
-              {risk.recommendation && (
-                <Text as="p" variant="bodyMd" fontWeight="semibold">Suggested: {risk.recommendation}</Text>
-              )}
-            </BlockStack>
-          </DraftedByClaude>
+        </BlockStack>
+        {access.allowed ? (
+          <>
+            <InlineStack gap="200" blockAlign="end" wrap>
+              <Box minWidth="16rem">
+                <Select
+                  label="Company"
+                  options={companies.map((c) => ({ label: c.name, value: c.id }))}
+                  value={companyId}
+                  onChange={onPickCompany}
+                />
+              </Box>
+              <fetcher.Form method="post">
+                <input type="hidden" name="intent" value="ai-credit-risk" />
+                <input type="hidden" name="companyId" value={companyId} />
+                <Button submit disabled={busy || !companyId} loading={busy}>
+                  ✦ Assess risk with Claude
+                </Button>
+              </fetcher.Form>
+            </InlineStack>
+            {err && <Banner tone="warning">{err}</Banner>}
+            {risk && (
+              <DraftedByClaude>
+                <BlockStack gap="200">
+                  <InlineStack gap="200" blockAlign="center">
+                    <Badge tone={tone}>{label}</Badge>
+                    <Text as="span" variant="bodySm" tone="subdued">{risk.companyName}</Text>
+                  </InlineStack>
+                  <Text as="p" variant="bodyMd">{risk.rationale}</Text>
+                  {risk.recommendation && (
+                    <Text as="p" variant="bodyMd" fontWeight="semibold">Suggested: {risk.recommendation}</Text>
+                  )}
+                </BlockStack>
+              </DraftedByClaude>
+            )}
+          </>
+        ) : (
+          <UpgradeToClaude access={access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />
         )}
       </BlockStack>
     </Card>
@@ -222,6 +246,7 @@ export default function Credit() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
+  const busyIntent = submitting ? String(navigation.formData?.get("intent") ?? "") : "";
 
   const [companyId, setCompanyId] = useState(data.companies[0]?.id ?? "");
   const selected = data.companies.find((c) => c.id === companyId);
@@ -239,12 +264,15 @@ export default function Credit() {
     setReason("");
   };
 
+  // First run (nothing owed, nothing invoiced): open setup so the next step is obvious.
+  const firstRun = data.invoices.length === 0 && (data.aging?.rows.length ?? 0) === 0;
+
   return (
     <Page>
-      <TitleBar title="Credit & invoices" />
+      <TitleBar title="Credit" />
       <SectionTabs active="credit" />
       <BlockStack gap="500">
-        {actionData && !actionData.ok && (
+        {actionData && !actionData.ok && !("kind" in actionData) && (
           <Banner tone="critical" title="Couldn’t save">
             <p>{actionData.error}</p>
           </Banner>
@@ -253,22 +281,7 @@ export default function Credit() {
           <Banner tone="success" title={actionData.message} />
         )}
 
-        {!data.growth && (
-          <Banner tone="warning" title="Credit control is a Growth feature">
-            <p>
-              Starter includes net terms and due dates on invoices. Upgrade to
-              Growth for credit limits, the aging dashboard, automatic reminders,
-              and invoice PDFs.
-            </p>
-            <Box paddingBlockStart="200">
-              <Button url="/app/settings" variant="primary">
-                Upgrade to Growth
-              </Button>
-            </Box>
-          </Banner>
-        )}
-
-        {/* Aging dashboard (Growth) */}
+        {/* 1. Aging summary (Growth) — what's owed, at a glance */}
         {data.growth && data.aging && (
           <Card>
             <BlockStack gap="300">
@@ -289,8 +302,8 @@ export default function Credit() {
               </InlineGrid>
               {data.aging.rows.length === 0 ? (
                 <Text as="p" tone="subdued">
-                  No outstanding balances yet. Invoices appear here once net-terms
-                  orders are placed.
+                  No outstanding balances yet. Balances appear here once net-terms
+                  orders are invoiced.
                 </Text>
               ) : (
                 <BlockStack gap="0">
@@ -319,89 +332,24 @@ export default function Credit() {
           </Card>
         )}
 
-        {/* Credit profile editor (Growth) */}
-        {data.growth && data.companies.length > 0 && (
-          <Card>
-            <Form method="post">
-              <input type="hidden" name="intent" value="save-profile" />
-              <input type="hidden" name="companyId" value={companyId} />
-              <BlockStack gap="300">
-                <Text as="h2" variant="headingMd">
-                  Set a credit profile
-                </Text>
-                <Select
-                  label="Company"
-                  options={data.companies.map((c) => ({ label: c.name, value: c.id }))}
-                  value={companyId}
-                  onChange={onPickCompany}
-                />
-                <InlineGrid columns={{ xs: 1, sm: 3 }} gap="300">
-                  <TextField
-                    label="Credit limit"
-                    type="number"
-                    name="creditLimit"
-                    value={limit}
-                    onChange={setLimit}
-                    min={0}
-                    step={0.01}
-                    prefix="$"
-                    autoComplete="off"
-                    helpText="0 = no limit"
-                  />
-                  <Select
-                    label="Terms (days)"
-                    name="termsDays"
-                    options={data.termOptions.map((t) => ({ label: `Net ${t}`, value: String(t) }))}
-                    value={terms}
-                    onChange={setTerms}
-                  />
-                  <Select
-                    label="Status"
-                    name="status"
-                    options={[
-                      { label: "Active", value: "ACTIVE" },
-                      { label: "On hold", value: "HOLD" },
-                    ]}
-                    value={holdStatus}
-                    onChange={(v) => setHoldStatus(v as "ACTIVE" | "HOLD")}
-                  />
-                </InlineGrid>
-                <TextField
-                  label="Override reason (optional)"
-                  name="reason"
-                  value={reason}
-                  onChange={setReason}
-                  autoComplete="off"
-                  helpText="If you're raising a limit or clearing a hold to let an order through, note why — it's logged."
-                />
-                <InlineStack>
-                  <Button variant="primary" submit loading={submitting}>
-                    Save profile
-                  </Button>
-                </InlineStack>
-              </BlockStack>
-            </Form>
-          </Card>
-        )}
-
-        {/* AI-15 credit-risk flag (Growth + Claude) */}
-        {data.growth && data.companies.length > 0 && (
-          <CreditRiskAssessor companyId={companyId} companyName={selected?.name ?? ""} access={data.access} />
-        )}
-
-        {/* Invoices (all plans — due dates; Growth adds paid/aging context) */}
+        {/* 2. Invoices — the daily task (all plans) */}
         <Card padding="0">
           <Box padding="400">
-            <Text as="h2" variant="headingMd">
-              Invoices
-            </Text>
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">
+                Invoices
+              </Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Mark an invoice paid when the money arrives so balances and holds stay accurate.
+              </Text>
+            </BlockStack>
           </Box>
           {data.invoices.length === 0 ? (
             <EmptyState
               heading="No invoices yet"
               image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
             >
-              <p>Net-terms orders raise an invoice here with its due date.</p>
+              <p>When a buyer places an order on net terms, its invoice and due date show up here.</p>
             </EmptyState>
           ) : (
             <IndexTable
@@ -414,16 +362,14 @@ export default function Credit() {
                 { title: "Amount" },
                 { title: "Due" },
                 { title: "Status" },
-                { title: "" },
+                { title: "Actions", hidden: true },
               ]}
             >
               {data.invoices.map((inv, index) => (
                 <IndexTable.Row id={inv.id} key={inv.id} position={index}>
                   <IndexTable.Cell>#{inv.number}</IndexTable.Cell>
                   <IndexTable.Cell>{inv.companyName}</IndexTable.Cell>
-                  <IndexTable.Cell>
-                    {inv.currency} {Number(inv.amount).toFixed(2)}
-                  </IndexTable.Cell>
+                  <IndexTable.Cell>{formatMoney(String(inv.amount), inv.currency)}</IndexTable.Cell>
                   <IndexTable.Cell>{formatDate(inv.dueDate)}</IndexTable.Cell>
                   <IndexTable.Cell>
                     <InvoiceStatusBadge status={inv.status} />
@@ -433,7 +379,12 @@ export default function Credit() {
                       <Form method="post">
                         <input type="hidden" name="intent" value="mark-paid" />
                         <input type="hidden" name="invoiceId" value={inv.id} />
-                        <Button size="slim" submit>
+                        <Button
+                          size="slim"
+                          submit
+                          accessibilityLabel={`Mark invoice ${inv.number} paid`}
+                          loading={busyIntent === "mark-paid" && navigation.formData?.get("invoiceId") === inv.id}
+                        >
                           Mark paid
                         </Button>
                       </Form>
@@ -444,6 +395,103 @@ export default function Credit() {
             </IndexTable>
           )}
         </Card>
+
+        {!data.growth && (
+          <Banner tone="warning" title="Credit control is a Growth feature">
+            <p>
+              Starter includes net terms and due dates on invoices. Upgrade to
+              Growth for credit limits, the aging dashboard, automatic reminders,
+              and invoice PDFs.
+            </p>
+            <Box paddingBlockStart="200">
+              <Button url={upgradeUrl("growth")} variant="primary">
+                Upgrade to Growth
+              </Button>
+            </Box>
+          </Banner>
+        )}
+
+        {/* 3. Credit profile editor (Growth) — setup, one click away */}
+        {data.growth && (
+          <DisclosureCard
+            title="Set a credit profile"
+            subtitle="Give a company a credit limit, payment terms, or put it on hold."
+            defaultOpen={firstRun}
+          >
+            {data.companies.length === 0 ? (
+              <Text as="p" tone="subdued">
+                You don't have any B2B companies yet. Companies appear here once they exist on your store.
+              </Text>
+            ) : (
+              <Form method="post">
+                <input type="hidden" name="intent" value="save-profile" />
+                <input type="hidden" name="companyId" value={companyId} />
+                <BlockStack gap="300">
+                  <Select
+                    label="Company"
+                    options={data.companies.map((c) => ({ label: c.name, value: c.id }))}
+                    value={companyId}
+                    onChange={onPickCompany}
+                  />
+                  <InlineGrid columns={{ xs: 1, sm: 3 }} gap="300">
+                    <TextField
+                      label="Credit limit"
+                      type="number"
+                      name="creditLimit"
+                      value={limit}
+                      onChange={setLimit}
+                      min={0}
+                      step={0.01}
+                      prefix="$"
+                      autoComplete="off"
+                      helpText="Enter 0 for no limit."
+                    />
+                    <Select
+                      label="Payment terms"
+                      name="termsDays"
+                      options={data.termOptions.map((t) => ({ label: `Net ${t}`, value: String(t) }))}
+                      value={terms}
+                      onChange={setTerms}
+                    />
+                    <Select
+                      label="Status"
+                      name="status"
+                      options={[
+                        { label: "Active", value: "ACTIVE" },
+                        { label: "On hold", value: "HOLD" },
+                      ]}
+                      value={holdStatus}
+                      onChange={(v) => setHoldStatus(v as "ACTIVE" | "HOLD")}
+                    />
+                  </InlineGrid>
+                  <TextField
+                    label="Override reason (optional)"
+                    name="reason"
+                    value={reason}
+                    onChange={setReason}
+                    autoComplete="off"
+                    helpText="If you're raising a limit or clearing a hold to let an order through, note why — it's logged."
+                  />
+                  <InlineStack>
+                    <Button variant="primary" submit loading={busyIntent === "save-profile"}>
+                      Save profile
+                    </Button>
+                  </InlineStack>
+                </BlockStack>
+              </Form>
+            )}
+          </DisclosureCard>
+        )}
+
+        {/* 4. AI-15 credit-risk read (Growth + Claude) — advisory */}
+        {data.growth && data.companies.length > 0 && (
+          <CreditRiskAssessor
+            companies={data.companies}
+            companyId={companyId}
+            onPickCompany={onPickCompany}
+            access={data.access}
+          />
+        )}
       </BlockStack>
     </Page>
   );

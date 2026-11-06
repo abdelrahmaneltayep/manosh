@@ -7,6 +7,7 @@ import {
   useFetcher,
   useLoaderData,
   useNavigation,
+  useSubmit,
 } from "@remix-run/react";
 import {
   Page,
@@ -22,7 +23,11 @@ import {
   Divider,
   Spinner,
   SkeletonBodyText,
+  Layout,
+  Modal,
+  Link as PolarisLink,
 } from "@shopify/polaris";
+import { DisclosureCard } from "../components/DisclosureCard";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
@@ -70,6 +75,7 @@ import {
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate, formatMoney } from "../lib/format";
 import type { loader as totalsLoader } from "./app.quote-totals.$id";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 // Dark-launch flag for Feature 1. AI UI + action are inert unless this is on.
@@ -311,10 +317,8 @@ function UpsellBundle({ quoteId }: { quoteId: string }) {
   const res = d && d.ok && "kind" in d && d.kind === "upsell" ? d : null;
   const err = d && !d.ok && "kind" in d && d.kind === "upsell" ? d.error : null;
   return (
-    <Card>
-      <BlockStack gap="300">
-        <InlineStack align="space-between" blockAlign="center" wrap gap="200">
-          <Text as="h3" variant="headingSm">Suggested add-ons</Text>
+    <BlockStack gap="300">
+        <InlineStack gap="200">
           <fetcher.Form method="post">
             <input type="hidden" name="intent" value="ai-upsell" />
             <Button submit size="slim" disabled={busy} loading={busy}>
@@ -346,8 +350,7 @@ function UpsellBundle({ quoteId }: { quoteId: string }) {
             </BlockStack>
           </DraftedByClaude>
         )}
-      </BlockStack>
-    </Card>
+    </BlockStack>
   );
 }
 
@@ -392,92 +395,219 @@ export default function QuoteDetail() {
   const showAi = aiEnabled && isSubmitted;
   const countered = quote.status === "COUNTERED";
 
+  // Page-level actions (App Home details pattern): one primary action for the
+  // next step, document actions as secondary, Decline behind a confirm dialog.
+  const submit = useSubmit();
+  const [confirmDecline, setConfirmDecline] = useState(false);
+  const post = (intent: string) => {
+    const fd = new FormData();
+    fd.set("intent", intent);
+    submit(fd, { method: "post" });
+  };
+  const canConvert =
+    quoteOpsEnabled &&
+    (quote.status === "ACCEPTED" || quote.status === "COUNTERED") &&
+    !quote.draftOrderId &&
+    !quote.convertedOrderId;
+  const orderGid = quote.draftOrderId || quote.convertedOrderId || null;
+  const orderNumericId = orderGid ? String(orderGid).split("/").pop() : null;
+  const orderUrl = orderGid
+    ? String(orderGid).includes("/Order/")
+      ? `shopify://admin/orders/${orderNumericId}`
+      : `shopify://admin/draft_orders/${orderNumericId}`
+    : null;
+  const secondaryActions = [
+    ...(quoteOpsEnabled
+      ? [
+          { content: "Download PDF", url: `/app/quotes/${quote.id}.pdf`, target: "_blank" as const },
+          { content: "Email PDF to buyer", onAction: () => post("pdf-email"), disabled: submitting },
+          { content: "Duplicate quote", onAction: () => post("duplicate"), disabled: submitting },
+        ]
+      : []),
+    ...(!isTerminal
+      ? [{ content: "Decline quote", destructive: true, onAction: () => setConfirmDecline(true), disabled: submitting }]
+      : []),
+  ];
+
   return (
     <Page
       backAction={{ content: "Quotes", url: "/app/quotes" }}
       title={quote.companyName}
       titleMetadata={<Badge tone={badge.tone}>{badge.label}</Badge>}
       subtitle={quote.buyerEmail}
+      primaryAction={
+        canConvert
+          ? { content: "Convert to order", onAction: () => post("convert"), loading: submitting }
+          : undefined
+      }
+      secondaryActions={secondaryActions}
     >
-      <TitleBar title="Quote" />
+      <TitleBar title={quote.companyName} />
+      <Modal
+        open={confirmDecline}
+        onClose={() => setConfirmDecline(false)}
+        title="Decline this quote?"
+        primaryAction={{
+          content: "Decline quote",
+          destructive: true,
+          loading: submitting,
+          onAction: () => {
+            setConfirmDecline(false);
+            post("decline");
+          },
+        }}
+        secondaryActions={[{ content: "Cancel", onAction: () => setConfirmDecline(false) }]}
+      >
+        <Modal.Section>
+          <Text as="p">
+            The buyer is told you can’t quote this order and the quote closes. This can’t be undone.
+          </Text>
+        </Modal.Section>
+      </Modal>
       <BlockStack gap="400">
         {quoteAction && !quoteAction.ok && (
           <Banner tone="critical" title="Couldn’t update this quote">
             <p>{quoteAction.error}</p>
           </Banner>
         )}
-        {quoteAction && quoteAction.ok && (
-          <Banner tone="success" title={quoteAction.message} />
-        )}
+        {quoteAction && quoteAction.ok && <Banner tone="success" title={quoteAction.message} />}
         {(aiActionError || aiFetcherError) && (
           <Banner tone="warning" title="Draft with Claude">
             <p>{aiActionError || aiFetcherError}</p>
           </Banner>
         )}
-
-        {/* Starter trial countdown — only while the 7-day Claude trial is running. */}
-        {showAi && access.state === "trial" && access.daysLeft != null && (
-          <InlineStack gap="200" blockAlign="center">
-            <Badge tone="attention">
-              {`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}
-            </Badge>
-          </InlineStack>
-        )}
-
-        {/* First-run tip: only for eligible merchants with no suggestions yet. */}
-        {showAi && access.allowed && !hasAnySuggestion && (
-          <Banner tone="info" title="Draft a counter-offer with Claude">
-            <p>
-              Click <b>Draft with Claude</b> on any line to get a suggested price, a
-              margin read, and a ready-to-send message. Claude drafts it — you always
-              confirm before it’s sent.
-            </p>
+        {orderUrl && (
+          <Banner tone="success" title="Order created" action={{ content: "Open the order in Shopify", url: orderUrl }}>
+            <p>The buyer has the invoice. Shopify calculated the totals.</p>
           </Banner>
         )}
 
-        {/* Locked (Free, or Starter after the trial) — the shared upgrade nudge. */}
-        {showAi && !access.allowed && (
-          <UpgradeToClaude access={access} upgradeUrl="/app/settings" />
-        )}
-
-        {/* AI-14 upsell bundle — complementary add-on suggestions from the catalog. */}
-        {showAi && access.allowed && <UpsellBundle quoteId={quote.id} />}
-
-        <Card>
-          <BlockStack gap="300">
-            <InlineStack gap="400" wrap>
-              <Text as="span" tone="subdued">
-                Received {formatDate(quote.createdAt)}
-              </Text>
-              <Text as="span" tone="subdued">
-                Expires {formatDate(quote.expiresAt)}
-              </Text>
-              {quote.poReference && (
-                <Text as="span" tone="subdued">
-                  PO {quote.poReference}
-                </Text>
+        <Layout>
+          {/* Primary column: what the quote IS — the lines and Shopify's totals. */}
+          <Layout.Section>
+            <BlockStack gap="400">
+              {showAi && !access.allowed && (
+                <UpgradeToClaude access={access} upgradeUrl={upgradeUrl("growth")} />
               )}
-              {quote.draftOrderId && (
-                <Text as="span" tone="subdued">
-                  Draft order created
-                </Text>
-              )}
-            </InlineStack>
 
-            <Divider />
+              <Card>
+                <BlockStack gap="300">
+                  <InlineStack align="space-between" blockAlign="center" wrap gap="200">
+                    <Text as="h2" variant="headingMd">
+                      {isSubmitted ? "Price this quote" : "Items"}
+                    </Text>
+                    {showAi && access.state === "trial" && access.daysLeft != null && (
+                      <Badge tone="attention">
+                        {`Claude trial · ${access.daysLeft} ${access.daysLeft === 1 ? "day" : "days"} left`}
+                      </Badge>
+                    )}
+                  </InlineStack>
+                  {showAi && access.allowed && !hasAnySuggestion && (
+                    <Text as="p" tone="subdued" variant="bodySm">
+                      Change any price or quantity, or use ✦ Draft with Claude on a line for a
+                      suggested price and message. Nothing is sent until you click Send counter.
+                    </Text>
+                  )}
 
-            {isSubmitted ? (
-              <Form method="post">
-                <input type="hidden" name="intent" value="counter" />
-                <BlockStack gap="400">
-                  {lines.map((line) => {
-                    const suggestion = suggestions[line.id];
-                    const showSuggestion = suggestion && !dismissed.has(line.id);
-                    return (
-                      <BlockStack key={line.id} gap="200">
-                        <input type="hidden" name="lineId" value={line.id} />
-                        <InlineStack gap="300" align="space-between" blockAlign="end" wrap>
-                          <Box minWidth="16rem">
+                  {isSubmitted ? (
+                    <Form method="post">
+                      <input type="hidden" name="intent" value="counter" />
+                      <BlockStack gap="400">
+                        {lines.map((line) => {
+                          const suggestion = suggestions[line.id];
+                          const showSuggestion = suggestion && !dismissed.has(line.id);
+                          return (
+                            <BlockStack key={line.id} gap="200">
+                              <input type="hidden" name="lineId" value={line.id} />
+                              <InlineStack gap="300" align="space-between" blockAlign="end" wrap>
+                                <Box minWidth="14rem">
+                                  <Text as="p" fontWeight="semibold">
+                                    {line.title}
+                                  </Text>
+                                  {line.sku && (
+                                    <Text as="p" tone="subdued" variant="bodySm">
+                                      SKU {line.sku}
+                                    </Text>
+                                  )}
+                                </Box>
+                                <Box minWidth="7rem">
+                                  <TextField
+                                    label="Quantity"
+                                    type="number"
+                                    name={`quantity_${line.id}`}
+                                    value={line.quantityInput}
+                                    onChange={(v) => setLine(line.id, "quantityInput", v)}
+                                    min={1}
+                                    autoComplete="off"
+                                  />
+                                </Box>
+                                <Box minWidth="9rem">
+                                  <TextField
+                                    label="Unit price"
+                                    type="number"
+                                    name={`price_${line.id}`}
+                                    value={line.priceInput}
+                                    onChange={(v) => setLine(line.id, "priceInput", v)}
+                                    min={0}
+                                    step={0.01}
+                                    autoComplete="off"
+                                  />
+                                </Box>
+                              </InlineStack>
+
+                              {showAi && access.allowed && (
+                                <InlineStack gap="200" blockAlign="center">
+                                  <Button
+                                    size="slim"
+                                    disabled={aiFetcher.state !== "idle"}
+                                    onClick={() => aiFetcher.submit({ intent: "ai-suggest", lineId: line.id }, { method: "post" })}
+                                  >
+                                    {suggestion ? "✦ Refresh Claude draft" : "✦ Draft with Claude"}
+                                  </Button>
+                                  {generatingLineId === line.id && (
+                                    <InlineStack gap="100" blockAlign="center">
+                                      <Spinner accessibilityLabel="Getting suggestion" size="small" />
+                                      <Text as="span" tone="subdued" variant="bodySm">
+                                        Thinking…
+                                      </Text>
+                                    </InlineStack>
+                                  )}
+                                </InlineStack>
+                              )}
+
+                              {showSuggestion && (
+                                <AiSuggestionPanel
+                                  suggestion={suggestion}
+                                  onAccept={() => setLine(line.id, "priceInput", cleanPrice(suggestion.suggestedPrice))}
+                                  onDismiss={() => setDismissed((prev) => new Set(prev).add(line.id))}
+                                />
+                              )}
+                              <Divider />
+                            </BlockStack>
+                          );
+                        })}
+
+                        <InlineStack gap="200">
+                          <Button variant="primary" submit loading={submitting}>
+                            Send counter
+                          </Button>
+                          {showAi && access.allowed && (
+                            <Button
+                              disabled={aiFetcher.state !== "idle"}
+                              loading={Boolean(generatingAll)}
+                              onClick={() => aiFetcher.submit({ intent: "ai-suggest-all" }, { method: "post" })}
+                            >
+                              ✦ Draft all lines with Claude
+                            </Button>
+                          )}
+                        </InlineStack>
+                      </BlockStack>
+                    </Form>
+                  ) : (
+                    <BlockStack gap="300">
+                      {lines.map((line) => (
+                        <InlineStack key={line.id} align="space-between" wrap>
+                          <Box minWidth="14rem">
                             <Text as="p" fontWeight="semibold">
                               {line.title}
                             </Text>
@@ -487,188 +617,113 @@ export default function QuoteDetail() {
                               </Text>
                             )}
                           </Box>
-                          <Box minWidth="7rem">
-                            <TextField
-                              label="Quantity"
-                              type="number"
-                              name={`quantity_${line.id}`}
-                              value={line.quantityInput}
-                              onChange={(v) => setLine(line.id, "quantityInput", v)}
-                              min={1}
-                              autoComplete="off"
-                            />
-                          </Box>
-                          <Box minWidth="9rem">
-                            <TextField
-                              label="Unit price"
-                              type="number"
-                              name={`price_${line.id}`}
-                              value={line.priceInput}
-                              onChange={(v) => setLine(line.id, "priceInput", v)}
-                              min={0}
-                              step={0.01}
-                              prefix="$"
-                              autoComplete="off"
-                            />
-                          </Box>
+                          <Text as="span" numeric>
+                            {line.quantity} × {money(line.price)}
+                          </Text>
                         </InlineStack>
-
-                        {/* Draft-with-Claude control (per line) */}
-                        {showAi && access.allowed && (
-                          <InlineStack gap="200" blockAlign="center">
-                            <Button
-                              size="slim"
-                              disabled={aiFetcher.state !== "idle"}
-                              onClick={() =>
-                                aiFetcher.submit(
-                                  { intent: "ai-suggest", lineId: line.id },
-                                  { method: "post" },
-                                )
-                              }
-                            >
-                              {suggestion ? "✦ Refresh Claude draft" : "✦ Draft with Claude"}
-                            </Button>
-                            {generatingLineId === line.id && (
-                              <InlineStack gap="100" blockAlign="center">
-                                <Spinner accessibilityLabel="Getting suggestion" size="small" />
-                                <Text as="span" tone="subdued" variant="bodySm">
-                                  Thinking…
-                                </Text>
-                              </InlineStack>
-                            )}
-                          </InlineStack>
-                        )}
-
-                        {showSuggestion && (
-                          <AiSuggestionPanel
-                            suggestion={suggestion}
-                            onAccept={() =>
-                              setLine(line.id, "priceInput", cleanPrice(suggestion.suggestedPrice))
-                            }
-                            onDismiss={() =>
-                              setDismissed((prev) => new Set(prev).add(line.id))
-                            }
-                          />
-                        )}
-                        <Divider />
-                      </BlockStack>
-                    );
-                  })}
-
-                  <InlineStack gap="200">
-                    <Button variant="primary" submit loading={submitting}>
-                      Send counter
-                    </Button>
-                    {showAi && access.allowed && (
-                      <Button
-                        disabled={aiFetcher.state !== "idle"}
-                        loading={Boolean(generatingAll)}
-                        onClick={() =>
-                          aiFetcher.submit({ intent: "ai-suggest-all" }, { method: "post" })
-                        }
-                      >
-                        ✦ Draft all lines with Claude
-                      </Button>
-                    )}
-                  </InlineStack>
-                </BlockStack>
-              </Form>
-            ) : (
-              <BlockStack gap="300">
-                {lines.map((line) => (
-                  <InlineStack key={line.id} align="space-between" wrap>
-                    <Box minWidth="16rem">
-                      <Text as="p" fontWeight="semibold">
-                        {line.title}
-                      </Text>
-                      {line.sku && (
-                        <Text as="p" tone="subdued" variant="bodySm">
-                          SKU {line.sku}
+                      ))}
+                      {countered && (
+                        <Text as="p" tone="subdued">
+                          You’ve countered this quote. It’s now with the buyer to accept.
                         </Text>
                       )}
-                    </Box>
-                    <Text as="span" numeric>
-                      {line.quantity} × ${money(line.price)}
+                    </BlockStack>
+                  )}
+                </BlockStack>
+              </Card>
+
+              <ShopifyTotals
+                quoteId={quote.id}
+                ordered={quote.status === "ORDERED"}
+                editable={!isTerminal && !countered}
+                lines={lines.map((l) => ({ id: l.id, price: l.priceInput, quantity: l.quantityInput }))}
+              />
+
+              {canConvert && (
+                <Card>
+                  <BlockStack gap="200">
+                    <Text as="h2" variant="headingMd">Turn this into an order</Text>
+                    <Text as="p" tone="subdued" variant="bodyMd">
+                      Creates a Shopify draft order at the agreed prices on the buyer’s company location and
+                      emails them the invoice. Shopify calculates tax and totals.
+                      {quote.status === "COUNTERED" && " Use this once the buyer has agreed to your counter."}
                     </Text>
+                    <InlineStack>
+                      <Button variant="primary" onClick={() => post("convert")} loading={submitting}>
+                        Convert to order
+                      </Button>
+                    </InlineStack>
+                  </BlockStack>
+                </Card>
+              )}
+
+              {/* AI-14 add-ons: useful, not the job — one click away. */}
+              {showAi && access.allowed && (
+                <DisclosureCard
+                  title="Suggested add-ons"
+                  subtitle="Ask Claude for complementary items from your catalog. You decide what to add."
+                >
+                  <UpsellBundle quoteId={quote.id} />
+                </DisclosureCard>
+              )}
+            </BlockStack>
+          </Layout.Section>
+
+          {/* Aside: who, when, and the documents — the summary a merchant scans. */}
+          <Layout.Section variant="oneThird">
+            <BlockStack gap="400">
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingMd">Customer</Text>
+                  <Text as="p" fontWeight="semibold">{quote.companyName}</Text>
+                  <Text as="p" tone="subdued">{quote.buyerEmail}</Text>
+                  {quote.poReference && <Text as="p" tone="subdued">PO {quote.poReference}</Text>}
+                </BlockStack>
+              </Card>
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingMd">Details</Text>
+                  <InlineStack align="space-between">
+                    <Text as="span" tone="subdued">Status</Text>
+                    <Badge tone={badge.tone}>{badge.label}</Badge>
                   </InlineStack>
-                ))}
-              </BlockStack>
-            )}
-          </BlockStack>
-        </Card>
-
-        <ShopifyTotals
-          quoteId={quote.id}
-          ordered={quote.status === "ORDERED"}
-          editable={!isTerminal && !countered}
-          lines={lines.map((l) => ({ id: l.id, price: l.priceInput, quantity: l.quantityInput }))}
-        />
-
-        {countered && (
-          <BlockStack gap="150">
-            <Text as="p" tone="subdued">
-              You’ve countered this quote. It’s now with the buyer to accept.
-            </Text>
-            {aiEnabled && hasAnySuggestion && (
-              <Text as="p" tone="subdued" variant="bodySm">
-                Internal note: a Claude draft was used on this quote. Buyers never
-                see this.
-              </Text>
-            )}
-          </BlockStack>
-        )}
-
-        {quoteOpsEnabled && (
-          <Card>
-            <BlockStack gap="200">
-              <Text as="h2" variant="headingMd">Documents</Text>
-              <Text as="p" tone="subdued" variant="bodyMd">A branded PDF of this quote (line items, totals, validity). Taxes and the final total are calculated by Shopify at checkout.</Text>
-              <InlineStack gap="200">
-                <Button url={`/app/quotes/${quote.id}.pdf`} target="_blank" variant="secondary">Download PDF</Button>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="pdf-email" />
-                  <Button submit loading={submitting}>Email PDF to buyer</Button>
-                </Form>
-                <Form method="post">
-                  <input type="hidden" name="intent" value="duplicate" />
-                  <Button submit loading={submitting}>Create a similar quote</Button>
-                </Form>
-              </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" tone="subdued">Received</Text>
+                    <Text as="span">{formatDate(quote.createdAt)}</Text>
+                  </InlineStack>
+                  <InlineStack align="space-between">
+                    <Text as="span" tone="subdued">Expires</Text>
+                    <Text as="span">{formatDate(quote.expiresAt)}</Text>
+                  </InlineStack>
+                  {orderUrl && (
+                    <InlineStack align="space-between">
+                      <Text as="span" tone="subdued">Order</Text>
+                      <PolarisLink url={orderUrl}>Open in Shopify</PolarisLink>
+                    </InlineStack>
+                  )}
+                  {countered && aiEnabled && hasAnySuggestion && (
+                    <Text as="p" tone="subdued" variant="bodySm">
+                      Internal note: a Claude draft was used on this quote. Buyers never see this.
+                    </Text>
+                  )}
+                </BlockStack>
+              </Card>
+              {quoteOpsEnabled && (
+                <Card>
+                  <BlockStack gap="200">
+                    <Text as="h2" variant="headingMd">Documents</Text>
+                    <Text as="p" tone="subdued" variant="bodySm">
+                      A branded PDF of this quote. Shopify calculates the final tax and total at checkout.
+                    </Text>
+                    <InlineStack gap="200">
+                      <Button url={`/app/quotes/${quote.id}.pdf`} target="_blank">Download PDF</Button>
+                    </InlineStack>
+                  </BlockStack>
+                </Card>
+              )}
             </BlockStack>
-          </Card>
-        )}
-
-        {quoteOpsEnabled && (quote.status === "ACCEPTED" || quote.status === "COUNTERED") && !quote.draftOrderId && !quote.convertedOrderId && (
-          <Card>
-            <BlockStack gap="200">
-              <Text as="h2" variant="headingMd">Turn this into an order</Text>
-              <Text as="p" tone="subdued" variant="bodyMd">
-                Creates a native draft order at the agreed prices on the buyer’s company location and emails them the invoice.
-                Shopify calculates tax and totals — we never re-price from the catalog.
-                {quote.status === "COUNTERED" && " Use this once the buyer has agreed to your counter."}
-              </Text>
-              <Form method="post">
-                <input type="hidden" name="intent" value="convert" />
-                <Button submit variant="primary" loading={submitting}>Convert to order &amp; send invoice</Button>
-              </Form>
-            </BlockStack>
-          </Card>
-        )}
-
-        {(quote.draftOrderId || quote.convertedOrderId) && (
-          <Banner tone="success" title="Order created">
-            The draft order is in Shopify (Orders → Drafts) with the invoice sent. Totals are Shopify’s.
-          </Banner>
-        )}
-
-        {!isTerminal && (
-          <Form method="post">
-            <input type="hidden" name="intent" value="decline" />
-            <Button submit tone="critical" variant="plain" loading={submitting}>
-              Decline quote
-            </Button>
-          </Form>
-        )}
+          </Layout.Section>
+        </Layout>
       </BlockStack>
     </Page>
   );

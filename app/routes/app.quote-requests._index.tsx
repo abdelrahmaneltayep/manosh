@@ -3,7 +3,7 @@ import { storefrontBlockLinks } from "../lib/theme-deep-links";
 import { StorefrontSetupCard } from "../components/StorefrontSetupCard";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
-import { Form, useActionData, useFetcher, useLoaderData, useNavigation } from "@remix-run/react";
+import { Form, useActionData, useFetcher, useLoaderData, useNavigation, useSearchParams } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -45,6 +45,9 @@ import {
 import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftRequestReply } from "../services/quote-request-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
+import { upgradeUrl } from "../lib/upgrade";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { ConfirmAction } from "../components/ConfirmAction";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_QUOTE_WIDGET === "true";
@@ -216,107 +219,66 @@ export default function QuoteRequests() {
   const [cartEnabled, setCartEnabled] = useState(c.cartEnabled);
   const [fields, setFields] = useState(c.customFields.map((f) => `${f.key}=${f.label}`).join("\n"));
   const newRequests = data.requests.filter((r) => r.status === "NEW");
+  // Setup opens on first run (no requests yet) or when Home's setup guide sends the merchant here.
+  const [params] = useSearchParams();
+  const setupOpen = data.requests.length === 0 || params.get("setup") === "1";
+  const STATUS_LABEL: Record<string, string> = { NEW: "New", CONVERTED: "Converted", DECLINED: "Declined" };
+  const SOURCE_LABEL: Record<string, string> = { PDP: "Product page", WIDGET: "Product page", CART: "Cart", FORM: "Quote form" };
 
   return (
     <Page>
-      <TitleBar title="Quote requests" />
+      <TitleBar title="Requests" />
       <SectionTabs active="requests" />
-      <BlockStack gap="500">
+      <BlockStack gap="400">
         {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
 
-        <Text as="p" tone="subdued" variant="bodyMd">
-          Add a “Request a Quote” button to your storefront (no code) and capture
-          B2B leads straight into your quote pipeline. Convert a request to a real
-          quote in one click — it enters the AI counter-offer flow.
-        </Text>
-
-        {/* Widget settings */}
-        <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="save" />
-            <BlockStack gap="300">
-              <Text as="h2" variant="headingMd">Storefront widget</Text>
-              <InlineStack gap="400" blockAlign="center" wrap>
-                <input type="hidden" name="enabled" value={enabled ? "on" : ""} />
-                <Checkbox label="Enable the storefront widget" checked={enabled} onChange={setEnabled} />
-                <Box minWidth="260px"><TextField label="Button label" name="label" value={label} onChange={setLabel} autoComplete="off" placeholder="Request a Quote" /></Box>
-              </InlineStack>
-              <InlineStack gap="400" blockAlign="center" wrap>
-                <input type="hidden" name="gated" value={gated ? "on" : ""} />
-                <Checkbox label="Gate to approved wholesale buyers" checked={gated} onChange={setGated} disabled={!data.features.gatedMode} helpText={data.features.gatedMode ? undefined : "Growth"} />
-                <input type="hidden" name="cartEnabled" value={cartEnabled ? "on" : ""} />
-                <Checkbox label="Cart-level requests" checked={cartEnabled} onChange={setCartEnabled} disabled={!data.features.cartLevel} helpText={data.features.cartLevel ? undefined : "Growth"} />
-              </InlineStack>
-              {data.features.customFields ? (
-                <TextField label="Custom fields (one per line: key=Label)" name="customFields" value={fields} onChange={setFields} multiline={2} autoComplete="off" placeholder={"po_number=PO number\nrequired_by=Required by"} />
-              ) : (
-                <input type="hidden" name="customFields" value="" />
-              )}
-              <InlineStack gap="200" blockAlign="center">
-                <Button variant="primary" submit loading={busy}>Save settings</Button>
-                <Text as="span" tone="subdued" variant="bodySm">Then add the blocks to your theme below.</Text>
-              </InlineStack>
-            </BlockStack>
-          </Form>
-        </Card>
-
-        <StorefrontSetupCard title="Add quote requests to your storefront" links={data.themeLinks} />
-
-        {/* Reply to new requests with a personal (Claude-drafted) note */}
-        {newRequests.length > 0 && (
-          <Card>
-            <BlockStack gap="300">
-              <InlineStack gap="200" blockAlign="center">
-                <Text as="h2" variant="headingMd">Reply to new requests</Text>
-                {data.access.state === "trial" && data.access.daysLeft != null && (
-                  <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
-                )}
-              </InlineStack>
-              <Text as="p" tone="subdued" variant="bodySm">
-                Acknowledge a request while you prepare the quote. Draft the reply with Claude, review, then send.
-              </Text>
-              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl="/app/settings" />}
-              <BlockStack gap="0">
-                {newRequests.map((r, i) => (
-                  <RequestReplyRow key={r.id} r={r} access={data.access as ClaudeAccess} divider={i > 0} />
-                ))}
-              </BlockStack>
-            </BlockStack>
-          </Card>
-        )}
-
-        {/* Requests inbox */}
+        {/* 1 — The inbox: what came in from the storefront, and the next step on each. */}
         <Card padding="0">
-          <Box padding="400"><Text as="h2" variant="headingMd">Requests</Text></Box>
+          <Box padding="400">
+            <BlockStack gap="100">
+              <Text as="h2" variant="headingMd">Requests</Text>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Requests from your storefront’s Request a Quote button. Convert one to a quote to price it.
+              </Text>
+            </BlockStack>
+          </Box>
           {data.requests.length === 0 ? (
-            <EmptyState heading="No requests yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-              <p>When a visitor submits a quote request from your storefront, it lands here.</p>
+            <EmptyState
+              heading="No requests yet"
+              action={{ content: "Add the button to your store", url: "?setup=1" }}
+              image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+            >
+              <p>Requests appear here when a visitor uses the Request a Quote button on your storefront. Add the button below to start.</p>
             </EmptyState>
           ) : (
-            <IndexTable resourceName={{ singular: "request", plural: "requests" }} itemCount={data.requests.length} selectable={false} headings={[{ title: "From" }, { title: "Source" }, { title: "Items" }, { title: "Status" }, { title: "" }]}>
+            <IndexTable resourceName={{ singular: "request", plural: "requests" }} itemCount={data.requests.length} selectable={false} headings={[{ title: "From" }, { title: "Source" }, { title: "Items" }, { title: "Status" }, { title: "Actions" }]}>
               {data.requests.map((r, i) => (
                 <IndexTable.Row id={r.id} key={r.id} position={i}>
                   <IndexTable.Cell>
                     {r.email}
                     {r.companyName && <><br /><Text as="span" tone="subdued" variant="bodySm">{r.companyName}</Text></>}
                   </IndexTable.Cell>
-                  <IndexTable.Cell>{r.source}</IndexTable.Cell>
+                  <IndexTable.Cell>{SOURCE_LABEL[r.source] ?? r.source}</IndexTable.Cell>
                   <IndexTable.Cell>{String(r.itemCount)}{r.note ? " + note" : ""}</IndexTable.Cell>
-                  <IndexTable.Cell><Badge tone={STATUS_TONE[r.status] ?? "attention"}>{r.status}</Badge></IndexTable.Cell>
+                  <IndexTable.Cell><Badge tone={STATUS_TONE[r.status] ?? "attention"}>{STATUS_LABEL[r.status] ?? r.status}</Badge></IndexTable.Cell>
                   <IndexTable.Cell>
                     {r.status === "NEW" ? (
                       <InlineStack gap="150">
                         <Form method="post">
                           <input type="hidden" name="intent" value="convert" />
                           <input type="hidden" name="id" value={r.id} />
-                          <Button submit size="micro" variant="primary" loading={busy}>Convert to quote</Button>
+                          <Button submit size="micro" variant="primary" loading={busy && nav.formData?.get("id") === r.id}>Convert to quote</Button>
                         </Form>
-                        <Form method="post">
-                          <input type="hidden" name="intent" value="decline" />
-                          <input type="hidden" name="id" value={r.id} />
-                          <Button submit size="micro" variant="tertiary" tone="critical" loading={busy}>Decline</Button>
-                        </Form>
+                        <ConfirmAction
+                          label="Decline"
+                          size="micro"
+                          variant="tertiary"
+                          title="Decline this request?"
+                          message={`${r.email} won’t get a quote for this request. You can still reach them by email.`}
+                          confirmLabel="Decline request"
+                          fields={{ intent: "decline", id: r.id }}
+                        />
                       </InlineStack>
                     ) : r.convertedQuoteId ? (
                       <Button url={`/app/quotes/${r.convertedQuoteId}`} size="micro" variant="tertiary">View quote</Button>
@@ -327,6 +289,68 @@ export default function QuoteRequests() {
             </IndexTable>
           )}
         </Card>
+
+        {/* 2 — Acknowledge new requests while the quote is being prepared. */}
+        {newRequests.length > 0 && (
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Reply to new requests</Text>
+                {data.access.state === "trial" && data.access.daysLeft != null && (
+                  <Badge tone="attention">{`Claude trial · ${data.access.daysLeft} ${data.access.daysLeft === 1 ? "day" : "days"} left`}</Badge>
+                )}
+              </InlineStack>
+              <Text as="p" tone="subdued" variant="bodySm">
+                Let the buyer know you’re on it while you prepare the quote. Write the reply, or draft it with Claude and review it first.
+              </Text>
+              {!data.access.allowed && <UpgradeToClaude access={data.access as ClaudeAccess} upgradeUrl={upgradeUrl("growth")} />}
+              <BlockStack gap="0">
+                {newRequests.map((r, i) => (
+                  <RequestReplyRow key={r.id} r={r} access={data.access as ClaudeAccess} divider={i > 0} />
+                ))}
+              </BlockStack>
+            </BlockStack>
+          </Card>
+        )}
+
+        {/* 3 — Set up once: the storefront button and where it shows. */}
+        <DisclosureCard
+          title="Storefront button"
+          subtitle={`${enabled ? "On" : "Off"} · “${label || "Request a Quote"}”. Button settings and adding it to your theme.`}
+          defaultOpen={setupOpen}
+          showLabel="Edit"
+          hideLabel="Close"
+        >
+          <BlockStack gap="400">
+            <Form method="post">
+              <input type="hidden" name="intent" value="save" />
+              <BlockStack gap="300">
+                <InlineStack gap="400" blockAlign="center" wrap>
+                  <input type="hidden" name="enabled" value={enabled ? "on" : ""} />
+                  <Checkbox label="Show the Request a Quote button" checked={enabled} onChange={setEnabled} />
+                  <Box minWidth="260px"><TextField label="Button label" name="label" value={label} onChange={setLabel} autoComplete="off" placeholder="Request a Quote" /></Box>
+                </InlineStack>
+                <InlineStack gap="400" blockAlign="center" wrap>
+                  <input type="hidden" name="gated" value={gated ? "on" : ""} />
+                  <Checkbox label="Only show it to approved wholesale buyers" checked={gated} onChange={setGated} disabled={!data.features.gatedMode} helpText={data.features.gatedMode ? undefined : "Available on Growth"} />
+                  <input type="hidden" name="cartEnabled" value={cartEnabled ? "on" : ""} />
+                  <Checkbox label="Allow requests from the cart" checked={cartEnabled} onChange={setCartEnabled} disabled={!data.features.cartLevel} helpText={data.features.cartLevel ? undefined : "Available on Growth"} />
+                </InlineStack>
+                {data.features.customFields ? (
+                  <TextField label="Extra form fields" helpText="One per line, as key=Label (for example po_number=PO number)." name="customFields" value={fields} onChange={setFields} multiline={2} autoComplete="off" placeholder={"po_number=PO number\nrequired_by=Required by"} />
+                ) : (
+                  <input type="hidden" name="customFields" value="" />
+                )}
+                <InlineStack gap="200" blockAlign="center">
+                  <Button variant="primary" submit loading={busy && nav.formData?.get("intent") === "save"}>Save button settings</Button>
+                </InlineStack>
+              </BlockStack>
+            </Form>
+            <Divider />
+            <Text as="h3" variant="headingSm">Add it to your theme</Text>
+            <StorefrontSetupCard bare title="Add quote requests to your storefront" links={data.themeLinks} />
+          </BlockStack>
+        </DisclosureCard>
       </BlockStack>
     </Page>
   );

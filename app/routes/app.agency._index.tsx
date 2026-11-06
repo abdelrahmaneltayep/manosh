@@ -20,6 +20,9 @@ import {
 } from "@shopify/polaris";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
+import { ConfirmAction } from "../components/ConfirmAction";
+import { DisclosureCard } from "../components/DisclosureCard";
+import { formatDate } from "../lib/format";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { GROWTH_PLAN, agencyAllowed, AGENCY_UPGRADE_MESSAGE } from "../lib/billing";
@@ -36,6 +39,7 @@ import { canManage, roleLabel } from "../lib/org";
 import { getBranding, saveBranding, NotAllowedError } from "../services/branding.server";
 import { DEFAULT_PORTAL_NAME } from "../lib/branding";
 import type { OrgRole } from "@prisma/client";
+import { upgradeUrl } from "../lib/upgrade";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -156,7 +160,7 @@ export default function Agency() {
         <Banner tone="info" title="Manage & white-label multiple stores">
           <p>{data.upgradeMessage}</p>
           <Box paddingBlockStart="200">
-            <Button url={`/app/settings?upgrade=${GROWTH_PLAN}`} variant="primary">See Growth</Button>
+            <Button url={upgradeUrl(GROWTH_PLAN)} variant="primary">See Growth</Button>
           </Box>
         </Banner>
       </Page>
@@ -166,6 +170,7 @@ export default function Agency() {
   return (
     <Page>
       <TitleBar title="Agency" />
+      <SectionTabs active="agency" />
       <BlockStack gap="400">
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
@@ -204,14 +209,14 @@ export default function Agency() {
                 <Text as="h2" variant="headingMd">Connected stores</Text>
                 {!data.rollup || data.rollup.stores.length === 0 ? (
                   <EmptyState heading="No stores yet" image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png">
-                    <p>Invite a client store below to see it here.</p>
+                    <p>Client stores show up here once their owner joins with an invite code. Create one below.</p>
                   </EmptyState>
                 ) : (
                   <IndexTable
                     resourceName={{ singular: "store", plural: "stores" }}
                     itemCount={data.rollup.stores.length}
                     selectable={false}
-                    headings={[{ title: "Store" }, { title: "Role" }, { title: "Quotes" }, { title: "Accepted" }, { title: "Orders" }, { title: "Revenue" }, { title: "" }]}
+                    headings={[{ title: "Store" }, { title: "Role" }, { title: "Quotes" }, { title: "Accepted" }, { title: "Orders" }, { title: "Revenue" }, { title: "Actions", hidden: true }]}
                   >
                     {data.rollup.stores.map((s, i) => (
                       <IndexTable.Row id={s.shop} key={s.shop} position={i}>
@@ -228,13 +233,18 @@ export default function Agency() {
                         <IndexTable.Cell>{fmtRevenue(s.revenue)}</IndexTable.Cell>
                         <IndexTable.Cell>
                           <InlineStack gap="200">
-                            <PolarisLink url={s.adminUrl} target="_blank">Open</PolarisLink>
+                            <PolarisLink url={s.adminUrl} target="_blank" accessibilityLabel={`Open ${s.shop} admin`}>Open</PolarisLink>
                             {canManage(data.org!.myRole) && s.role !== "OWNER" && (
-                              <Form method="post">
-                                <input type="hidden" name="intent" value="unlink-store" />
-                                <input type="hidden" name="shop" value={s.shop} />
-                                <Button submit variant="tertiary" tone="critical" size="slim" disabled={busy}>Remove</Button>
-                              </Form>
+                              <ConfirmAction
+                                label="Remove"
+                                variant="tertiary"
+                                size="slim"
+                                disabled={busy}
+                                title={`Remove ${s.shop}?`}
+                                message="The store leaves your organization and drops out of your rollups. Its own data, branding and billing aren't changed."
+                                confirmLabel="Remove store"
+                                fields={{ intent: "unlink-store", shop: s.shop }}
+                              />
                             )}
                           </InlineStack>
                         </IndexTable.Cell>
@@ -320,7 +330,7 @@ function InviteStoreForm({ busy, invite }: { busy: boolean; invite: { code: stri
           <BlockStack gap="200">
             <Text as="p" variant="headingMd"><code>{invite.code}</code></Text>
             <Text as="p">
-              Role: {invite.role}. Single use; expires {new Date(invite.expiresAt).toLocaleDateString()}. It isn’t shown again.
+              Role: {invite.role}. Single use; expires {formatDate(invite.expiresAt)}. It isn’t shown again.
             </Text>
             <Text as="p">
               The store owner opens <strong>Apps → Mannon → Settings → Agency</strong> in their Shopify admin,
@@ -375,13 +385,18 @@ function BrandingCard({
   const [accentColor, setAccentColor] = useState(branding?.accentColor ?? "");
   const [portalName, setPortalName] = useState(branding?.portalName ?? "");
   const [logoFileId, setLogoFileId] = useState(branding?.logoFileId ?? "");
+  const hasBranding = Boolean(branding?.portalName || branding?.primaryColor || branding?.accentColor || branding?.logoFileId);
   return (
-    <Card>
+    <DisclosureCard
+      title="White-label this store’s buyer portal"
+      subtitle="Apply this client’s brand to buyer-facing pages and emails. The Shopify admin always stays Mannon."
+      badge={hasBranding ? <Badge tone="success">Customized</Badge> : undefined}
+      defaultOpen={!hasBranding && canEdit}
+    >
       <BlockStack gap="300">
-        <Text as="h2" variant="headingMd">White-label this store’s buyer portal</Text>
-        <Text as="p" tone="subdued" variant="bodyMd">
-          Apply this client’s brand to their <b>buyer-facing</b> pages and emails only. The Shopify
-          admin always stays Mannon. Colors are checked for readable contrast before they save.
+        <Text as="p" tone="subdued" variant="bodySm">
+          Colors are checked for readable contrast before they save.
+          {!canEdit ? " You have view-only access, so you can't change branding." : ""}
         </Text>
         <Form method="post">
           <input type="hidden" name="intent" value="save-branding" />
@@ -407,6 +422,6 @@ function BrandingCard({
           </BlockStack>
         </Form>
       </BlockStack>
-    </Card>
+    </DisclosureCard>
   );
 }

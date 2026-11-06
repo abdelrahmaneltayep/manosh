@@ -73,31 +73,39 @@ export interface SectionTab {
 
 /** Tabs per parent group, in display order. First entry = the group's default. */
 export const SECTION_GROUPS: Record<string, SectionTab[]> = {
+  // Jobs-to-be-done order (docs/ux-audit.md): every group opens on the inbox or
+  // list the merchant works in most, setup-only tabs come last.
+  // Quotes — "answer buyers who want a price": every negotiation inbox lives here.
   quotes: [
     { id: "quotes", label: "Quotes", url: "/app/quotes" },
     { id: "requests", label: "Requests", url: "/app/quote-requests", flag: "quoteRequests" },
+    { id: "offers", label: "Offers", url: "/app/offers", flag: "offers" },
     { id: "followups", label: "Follow-ups", url: "/app/followups", flag: "followups" },
   ],
+  // Quote forms — "capture demand on my storefront".
   forms: [
     { id: "quote-forms", label: "Quote forms", url: "/app/quote-forms", flag: "quoteForms" },
     { id: "languages", label: "Languages", url: "/app/i18n", flag: "i18n" },
   ],
+  // Pricing & catalog — "decide who sees which products at which price".
   pricing: [
-    { id: "price-rules", label: "Price rules", url: "/app/price-rules", flag: "priceRules" },
     { id: "price-lists", label: "Price lists", url: "/app/price-lists", flag: "priceLists" },
-    { id: "offers", label: "Offers", url: "/app/offers", flag: "offers" },
-    { id: "wholesale", label: "Wholesale", url: "/app/wholesale", flag: "wholesale" },
     { id: "catalogs", label: "Catalogs", url: "/app/catalogs", flag: "catalogs" },
     { id: "catalog-sharing", label: "Catalog sharing", url: "/app/catalog-sharing", flag: "catalogSharing" },
+    { id: "price-rules", label: "Price rules", url: "/app/price-rules", flag: "priceRules" },
     { id: "order-rules", label: "Order rules", url: "/app/order-rules", flag: "orderRules" },
   ],
+  // Buyers — "onboard and look after B2B accounts" (applications → accounts → reps → credit).
   buyers: [
     { id: "buyers", label: "Buyers", url: "/app/buyers" },
+    { id: "wholesale", label: "Applications", url: "/app/wholesale", flag: "wholesale" },
     { id: "reps", label: "Reps", url: "/app/reps", flag: "reps" },
     { id: "credit", label: "Credit", url: "/app/credit", flag: "credit" },
   ],
+  // Settings — "set it up once".
   settings: [
     { id: "general", label: "General", url: "/app/settings" },
+    { id: "notifications", label: "Notifications", url: "/app/notifications" },
     { id: "payments", label: "Payments", url: "/app/payments", flag: "payments" },
     { id: "tax", label: "Tax & VAT", url: "/app/tax", flag: "tax" },
     { id: "erp", label: "ERP sync", url: "/app/erp", flag: "erp" },
