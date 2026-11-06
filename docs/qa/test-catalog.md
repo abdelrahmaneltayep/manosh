@@ -60,7 +60,7 @@ store, theme and Shopify Admin.
 | C13 | Cron endpoints without the secret | 401/503, never runs |
 | C14 | Responses never contain a stack trace or a secret name | none found |
 | C16 | `/discover` | 404: the cross-store directory is off for the App Store review (`MANNON_FF_DISCOVERY`) |
-| C15 | p95 latency of `/`, `/pricing`, `/api/quote-widget-config` (10 requests each) | < 500 ms (CLAUDE.md definition of done) |
+| C15 | p95 latency of `/`, `/pricing`, `/api/quote-widget-config` (1 untimed warm-up, then 20 requests each) | < 500 ms (CLAUDE.md definition of done) |
 
 ## V — Visitor, public pages in a browser (desktop and phone)
 | ID | Case | Expected |

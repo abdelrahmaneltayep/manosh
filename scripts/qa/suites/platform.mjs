@@ -170,13 +170,16 @@ export async function contract(rec, ctx) {
     });
   }
   for (const path of ["/", "/pricing", "/api/quote-widget-config?shop=example.myshopify.com"]) {
-    await rec.tc("C15", `p95 latency ${path}`, { action: `10 × GET ${L}${path}`, expected: "p95 < 500 ms (definition of done)" }, async () => {
+    await rec.tc("C15", `p95 latency ${path}`, { action: `1 warm-up + 20 × GET ${L}${path}`, expected: "p95 < 500 ms (definition of done)" }, async () => {
+      // One untimed warm-up (TLS handshake, a machine just woken by a deploy),
+      // then 20 timed requests, so p95 isn't simply the single slowest sample.
+      await timed(L + path);
       const ms = [];
-      for (let i = 0; i < 10; i++) ms.push((await timed(L + path)).ms);
+      for (let i = 0; i < 20; i++) ms.push((await timed(L + path)).ms);
       ms.sort((a, b) => a - b);
       const p95 = ms[Math.ceil(0.95 * ms.length) - 1];
       const median = ms[Math.floor(ms.length / 2)];
-      return { status: p95 < 500 ? "PASS" : "FAIL", actual: `p95 ${p95.toFixed(0)} ms, median ${median.toFixed(0)} ms (includes your network)` };
+      return { status: p95 < 500 ? "PASS" : "FAIL", actual: `p95 ${p95.toFixed(0)} ms, median ${median.toFixed(0)} ms, slowest ${ms[ms.length - 1].toFixed(0)} ms (includes your network)` };
     });
   }
   if (!existsSync("build/server/index.js")) ctx.noBuild = true;
