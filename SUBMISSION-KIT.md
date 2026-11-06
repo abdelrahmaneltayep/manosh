@@ -258,7 +258,7 @@ closes on the native-B2B line, the demo, and the resulting draft order. Script i
 
 ---
 
-## Testing instructions for the reviewer  (≤ 2800 characters · 2641/2800)
+## Testing instructions for the reviewer  (≤ 2800 characters · 2648/2800)
 
 Matches the flow verified live on 2026-11-05 by `npm run qa:all` (cases M2–M7,
 B1–B4, D1–D5, M10). Nothing is seeded on install, so step 0 asks the reviewer to
@@ -272,7 +272,7 @@ Customers > Companies: add a company with one location and one contact, using an
 
 STEPS
 1. Install from the App Store and open Mannon. Every left-nav page loads.
-2. Quotes > Requests: under "Add quote requests to your storefront", click "Add to theme" for Request a Quote. The theme editor opens with the block placed; click Save.
+2. Quotes > Requests > "Storefront button" (open on a new store, else click Edit): click "Add to theme" for Request a Quote. The theme editor opens with the block placed; click Save.
 3. On the storefront, open a product, click "Request a Quote" and send it with the contact's email. It appears under Quotes > Requests.
 4. Click "Convert to quote". The quote shows "Totals from Shopify" (subtotal, tax and total priced by Shopify). Change a unit price and click "Recalculate with these prices".
 5. Optional: "✦ Draft all lines with Claude" shows a suggestion; "Use this price" only pre-fills. Click "Send counter".
