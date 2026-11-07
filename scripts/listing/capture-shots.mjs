@@ -36,12 +36,12 @@ mkdirSync(join(OUT, "raw"), { recursive: true });
 
 // The shot list, kept in step with SUBMISSION-KIT.md.
 const SHOTS = {
-  1: { file: "01-quote-shopify-totals", headline: "Counter each line. Shopify prices the quote.", alt: "Mannon quote page with editable unit prices and a Totals from Shopify card showing subtotal, tax and total." },
-  2: { file: "02-draft-with-claude", headline: "Claude suggests a counter. You decide what to send.", alt: "A quote line with a Claude-drafted price, reason and buyer message, and Use this price and Send counter buttons." },
-  3: { file: "03-buyer-accept", headline: "Buyers accept with a secure link. No password.", alt: "Buyer portal showing a countered quote, Net 30 payment terms and a confirm panel before the order is created." },
-  4: { file: "04-storefront-blocks", headline: "Quotes and offers from your product pages.", alt: "A product page with Request a Quote, Add to Quote and Make an Offer buttons and an open quote request form." },
-  5: { file: "05-order-pad", headline: "Paste a PO. Claude matches it to your catalog.", alt: "Buyer order pad with a pasted purchase order and the lines Claude matched, ready for the buyer to confirm." },
-  6: { file: "06-mobile-reorder", headline: "Reorder a past order in one tap.", alt: "Buyer portal on a phone showing a countered quote and a card to reorder a past order." },
+  1: { file: "01-quote-shopify-totals", headline: "Counter each line. Shopify prices the quote.", alt: "Quote page with editable prices and Shopify-calculated totals" },
+  2: { file: "02-draft-with-claude", headline: "Claude suggests a counter. You decide what to send.", alt: "Claude's suggested counter price and buyer message on a quote" },
+  3: { file: "03-buyer-accept", headline: "Buyers accept with a secure link. No password.", alt: "Buyer accepting a countered quote on Net 30 payment terms" },
+  4: { file: "04-storefront-blocks", headline: "Quotes and offers from your product pages.", alt: "Product page with Request a Quote and Make an Offer buttons" },
+  5: { file: "05-order-pad", headline: "Paste a PO. Claude matches it to your catalog.", alt: "Order pad matching a pasted purchase order to catalog items" },
+  6: { file: "06-mobile-reorder", headline: "Reorder a past order in one tap.", alt: "Mobile buyer portal with quotes and a one-tap reorder card" },
 };
 const done = [];
 const log = (n, msg) => console.log(`${String(n).padEnd(2)} ${msg}`);
