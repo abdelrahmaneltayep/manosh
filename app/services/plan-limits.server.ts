@@ -20,13 +20,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** Statuses that count as an "active" quote for the volume cap. */
 export const ACTIVE_QUOTE_STATUSES = ["SUBMITTED", "COUNTERED", "ACCEPTED"] as const;
 
-/** Count a shop's active quotes created since `since` (across all its companies). */
-export async function countActiveQuotes(shopId: string, since: Date): Promise<number> {
+/**
+ * Count a shop's active quotes created since `since` (across all its companies).
+ * A quote past its expiry date is not active even if the expiry sweep hasn't
+ * marked it yet: the inbox already shows it as Expired (`isExpired`), and the
+ * cap must agree with the inbox. Otherwise a Free shop is told "89 / 10 active
+ * quotes" while its inbox shows none open, and buyers stay blocked.
+ */
+export async function countActiveQuotes(shopId: string, since: Date, now: Date = new Date()): Promise<number> {
   return prisma.quote.count({
     where: {
       company: { shopId },
       status: { in: [...ACTIVE_QUOTE_STATUSES] },
       createdAt: { gte: since },
+      expiresAt: { gt: now },
     },
   });
 }
@@ -53,7 +60,7 @@ export async function canCreateQuote(
   }
 
   const since = new Date(now.getTime() - ACTIVE_QUOTE_WINDOW_DAYS * DAY_MS);
-  const used = await countActiveQuotes(shopId, since);
+  const used = await countActiveQuotes(shopId, since, now);
   return evaluateQuoteAllowance(used, cap);
 }
 
@@ -73,7 +80,7 @@ export async function getQuoteUsage(
   });
   const cap = getPlanCapabilities(shop?.plan ?? null, shop?.legacyPlan ?? false).quotesCap;
   const since = new Date(now.getTime() - ACTIVE_QUOTE_WINDOW_DAYS * DAY_MS);
-  const used = await countActiveQuotes(shopId, since);
+  const used = await countActiveQuotes(shopId, since, now);
   return { used, cap: Number.isFinite(cap) ? cap : null };
 }
 

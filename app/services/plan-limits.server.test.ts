@@ -63,6 +63,15 @@ describe.skipIf(!process.env.DATABASE_URL)("getQuoteUsage (DB)", () => {
     expect((await canCreateQuote(shop.id)).allowed).toBe(true);
   });
 
+  it("a quote past its expiry date no longer counts, even before the sweep marks it", async () => {
+    const shop = await shopWithQuotes("usage-stale.myshopify.com", "FREE", 3);
+    const company = await prisma.company.findFirstOrThrow({ where: { shopId: shop.id } });
+    const stale = await prisma.quote.findFirstOrThrow({ where: { companyId: company.id } });
+    await prisma.quote.update({ where: { id: stale.id }, data: { expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000) } });
+    expect(await getQuoteUsage(shop.id)).toEqual({ used: 2, cap: 10 });
+    expect((await canCreateQuote(shop.id)).used).toBe(2);
+  });
+
   it("reports the count against the cap on Free", async () => {
     const shop = await shopWithQuotes("usage-free.myshopify.com", "FREE", 1);
     expect(await getQuoteUsage(shop.id)).toEqual({ used: 1, cap: 10 });
