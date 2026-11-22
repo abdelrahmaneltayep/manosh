@@ -43,6 +43,10 @@ export async function merchant(rec, ctx) {
         const t = await textOf(f);
         if (ERROR_TEXT.test(t)) throw new Error(`error page: ${t.match(ERROR_TEXT)[0]}`);
         if (t.length < 400 && /\b404\b|Not Found|Not found/.test(t)) return { status: "SKIP", actual: "404: this feature is switched off for the shop" };
+        // Review 2.1.1: a link to another site with no target loads in the app's
+        // own frame, and sites like apps.shopify.com refuse that (blank app).
+        const leaks = await f.locator("a[href]").evaluateAll((as) => as.filter((a) => /^https?:/i.test(a.getAttribute("href") || "") && a.host !== location.host && !["_blank", "_top"].includes(a.target)).map((a) => a.getAttribute("href")));
+        if (leaks.length) throw new Error(`link(s) that would load another site inside the app frame: ${leaks.slice(0, 3).join(", ")}`);
         const h = ((await f.locator("h1, h2").first().innerText({ timeout: 3000 }).catch(() => "")) || t.slice(0, 60)).trim();
         return { actual: `"${h}"`, evidence: path === "/app" ? await rec.shot(page, "admin-home") : null };
       }, fail);
@@ -301,6 +305,18 @@ export async function merchant(rec, ctx) {
       } finally {
         await editor.close({ runBeforeUnload: false }).catch(() => {});
       }
+    }, fail);
+
+    // M15 — review prompt uses Shopify's own modal, not a link (review 2.1.1)
+    await rec.tc("M15", "Home: no 'Leave a review' link; reviews go through App Bridge (review 2.1.1)", { action: "open Home; look for a 'Leave a review' control or any link to apps.shopify.com", expected: "none: Mannon asks Shopify to show its native review modal (shopify.reviews.request) and never navigates the app frame" }, async () => {
+      const f = await openApp(page, app, "/app");
+      const t = await textOf(f);
+      if (ERROR_TEXT.test(t)) throw new Error(`error page: ${t.match(ERROR_TEXT)[0]}`);
+      if (/Leave a review/i.test(t)) throw new Error("Home still shows a 'Leave a review' control");
+      const n = await f.locator('a[href*="apps.shopify.com"]').count();
+      if (n) throw new Error(`${n} link(s) to apps.shopify.com on Home`);
+      const asked = app.local ? await page.evaluate(() => (window.__mannonAppBridge || []).some((c) => c.path === "shopify.reviews.request")).catch(() => false) : null;
+      return { actual: `no review link on Home${asked === null ? "" : asked ? "; the review request went to App Bridge" : "; no review request this visit (the store is not due one)"}` };
     }, fail);
 
     // M14 — the app shows the plan Shopify holds, and none when Shopify holds none (review 1.2.2)

@@ -107,6 +107,7 @@ store, theme and Shopify Admin.
 | M13 | Agency: add a client store (App Store 2.3.1) | no field asking for a store domain; stores join with a single-use invite code entered in their own Mannon |
 | M12 | Requests, Offers → widget, Price rules: "Add to theme" (App Store 5.1.3) | one deep link per block in Shopify's format; live, the theme editor opens with the block placed (left unsaved) |
 | M14 | Plan shown matches Shopify (review 1.2.2) | Local: with no subscription, Pricing plans shows "You haven't chosen a plan yet", no Current badge and four Choose buttons, and Settings says "No plan selected"; after Growth is approved, Growth is Current. Live: reports which plan is marked Current, to compare with Shopify's Billing card |
+| M15 | Home: review prompt (review 2.1.1) | no "Leave a review" control and no link to apps.shopify.com; the request goes to Shopify's native review modal through App Bridge. M1 also fails any page with a link that would load another site inside the app frame |
 
 ## B — Buyer in the passwordless portal (magic link from M7)
 | ID | Case | Expected |

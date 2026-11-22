@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, SerializeFrom } from "@remix-run/node";
 import { useFetcher, useLoaderData } from "@remix-run/react";
 import {
@@ -17,7 +17,7 @@ import {
   Collapsible,
   Link as PolarisLink,
 } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getDashboardMetrics } from "../services/dashboard.server";
@@ -25,6 +25,7 @@ import { shouldPromptReview, markReviewPromptShown } from "../services/review-pr
 import { getAttentionCounts, getSetupProgress, dismissSetupGuide } from "../services/home.server";
 import { syncShopPlan } from "../services/billing.server";
 import { selectedPlanHandle } from "../lib/billing-v3";
+import { requestReview } from "../lib/review-request";
 import { attentionItems, setupSteps, setupProgress, type AttentionItem, type SetupStep } from "../lib/home";
 import { navFlags } from "../lib/nav";
 import { EXPIRING_SOON_DAYS } from "../lib/dashboard";
@@ -92,7 +93,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 // Two acknowledgements, both append-only Events so they survive reloads:
-// hiding the setup guide, and the review banner (REVIEW_PROMPT_SHOWN, at most once).
+// hiding the setup guide, and Shopify's review modal having been shown
+// (REVIEW_PROMPT_SHOWN, at most once).
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { id: true } });
@@ -368,35 +370,31 @@ function ExpiringSoonCard({ metrics }: { metrics: Metrics }) {
 
 export default function Index() {
   const { metrics, promptReview, attention, steps, setupDismissed, planSelected, analyticsOn } = useLoaderData<typeof loader>();
+  const shopify = useAppBridge();
   const reviewFetcher = useFetcher();
-  // Hide immediately on click; the action records REVIEW_PROMPT_SHOWN so it
-  // won't return on the next load either.
-  const showReview = promptReview && reviewFetcher.state === "idle" && !reviewFetcher.data;
-  const acknowledgeReview = () => reviewFetcher.submit({ intent: "review" }, { method: "post" });
+  // Review prompt: once the merchant has turned a quote into an order, ask
+  // Shopify to show its own review modal over the app (App Bridge Reviews API).
+  // There is no button and no link: Shopify decides whether the modal appears,
+  // and a declined request shows nothing. Recorded (REVIEW_PROMPT_SHOWN) only
+  // when Shopify showed it, so Mannon asks at most once.
+  useEffect(() => {
+    if (!promptReview) return;
+    let active = true;
+    void requestReview(shopify).then((record) => {
+      if (record && active) reviewFetcher.submit({ intent: "review" }, { method: "post" });
+    });
+    return () => {
+      active = false;
+    };
+    // Ask once per visit to Home; the fetcher and App Bridge handles are stable enough.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [promptReview]);
   const showGuide = !setupDismissed && steps.length > 0 && !setupProgress(steps).complete;
 
   return (
     <Page>
       <TitleBar title="Mannon" />
       <BlockStack gap="400">
-        {showReview && (
-          <Banner
-            tone="info"
-            title="Enjoying Mannon?"
-            onDismiss={acknowledgeReview}
-            action={{
-              content: "Leave a review",
-              url: "https://apps.shopify.com/mannon#modal-show=WriteReview",
-              external: true,
-              onAction: acknowledgeReview,
-            }}
-          >
-            <p>
-              You&rsquo;ve turned a quote into a real order. A quick review helps other B2B
-              merchants find Mannon.
-            </p>
-          </Banner>
-        )}
         <AttentionCard items={attention as AttentionItem[]} />
         {showGuide && <SetupGuide steps={steps} />}
         {/* The guide's "Choose a plan" step covers this while the guide is open. */}

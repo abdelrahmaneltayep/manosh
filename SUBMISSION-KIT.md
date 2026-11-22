@@ -320,6 +320,25 @@ proof (recording steps below).
 
 ---
 
+## Reviewer reply — 2.1.1, ref 126730 (2026-11-18: "Leave a review leads to a blank page")
+
+> **2.1.1 ("Leave a review" led to a blank page):** Fixed. The banner's button linked to
+> the App Store listing, and inside the embedded admin that link loaded in the app's own
+> frame, which apps.shopify.com refuses, so the app went blank until a reload. The banner
+> and the link are removed. Mannon now uses the App Bridge Reviews API: once a merchant
+> has turned a quote into an order, it asks Shopify to show its native review modal over
+> the app. There is no button and nothing navigates; if Shopify declines the request,
+> nothing is shown. No other page in the app links to another site inside the app frame
+> (links that leave the app open in a new tab or at the top level).
+
+**Proof screencast (about 30 seconds, on the store that has an order created through Mannon):**
+1. Open Mannon → Home. There is no "Enjoying Mannon?" banner and no "Leave a review" button.
+   On a development store Shopify's own review modal may open over the app; close it.
+2. Click Quotes, Quote forms, Pricing & catalog, Buyers, Settings: every page loads.
+3. Back to Home: the page loads normally, with no blank frame.
+
+---
+
 ## Reviewer resubmission note  (reply to the 5.1.2 + 1.2.2 suspension, ref 126730)
 
 > **5.1.2 (theme app extension didn't show on the online store):** Fixed. Every
