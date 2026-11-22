@@ -171,7 +171,9 @@ export async function getDashboardMetrics(
       where: {
         company: { shopId },
         status: { in: ["SUBMITTED", "COUNTERED"] },
-        expiresAt: { lte: windowEnd },
+        // Only quotes still to expire. A quote already past its date (waiting for
+        // the expiry sweep to mark it) is not "expiring soon".
+        expiresAt: { gt: now, lte: windowEnd },
       },
       orderBy: { expiresAt: "asc" },
       take: 10,

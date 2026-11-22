@@ -207,6 +207,13 @@ describe.skipIf(!hasDb)("getDashboardMetrics (DB)", () => {
         expiresAt: new Date(now.getTime() + 30 * DAY),
       },
     });
+    // Already past its expiry date (the sweep hasn't marked it yet) → not "expiring soon".
+    await prisma.quote.create({
+      data: {
+        companyId: company.id, buyerId: buyer.id, status: "COUNTERED",
+        expiresAt: new Date(now.getTime() - 7 * DAY),
+      },
+    });
     // Another shop's soon-to-expire quote must not leak in.
     await prisma.quote.create({
       data: {
