@@ -57,6 +57,26 @@ export async function canCreateQuote(
   return evaluateQuoteAllowance(used, cap);
 }
 
+/**
+ * Quote usage for display (Settings › Plan): the real count on every plan.
+ * `canCreateQuote` skips the count on unlimited plans and reports 0, which is
+ * right for enforcement but wrong on screen ("0 active quotes" on a busy store).
+ * `cap` is null when the plan has no limit.
+ */
+export async function getQuoteUsage(
+  shopId: string,
+  now: Date = new Date(),
+): Promise<{ used: number; cap: number | null }> {
+  const shop = await prisma.shop.findUnique({
+    where: { id: shopId },
+    select: { plan: true, legacyPlan: true },
+  });
+  const cap = getPlanCapabilities(shop?.plan ?? null, shop?.legacyPlan ?? false).quotesCap;
+  const since = new Date(now.getTime() - ACTIVE_QUOTE_WINDOW_DAYS * DAY_MS);
+  const used = await countActiveQuotes(shopId, since);
+  return { used, cap: Number.isFinite(cap) ? cap : null };
+}
+
 /** Thrown by creation paths (e.g. reorder) that signal blocking via exceptions. */
 export class QuoteCapReachedError extends Error {
   constructor(

@@ -28,7 +28,7 @@ import {
 import prisma from "../db.server";
 import { syncShopPlan, managedPricingUrlFor } from "../services/billing.server";
 import { NO_PER_ORDER_FEES_COPY, PLAN_DISPLAY_NAME, selectedPlanHandle } from "../lib/billing-v3";
-import { canCreateQuote } from "../services/plan-limits.server";
+import { getQuoteUsage } from "../services/plan-limits.server";
 import { listSeats, canAddSeat, addStaffSeat, removeSeat } from "../services/staff-seats.server";
 import { PLAN_LIMITS } from "../lib/billing";
 import { claudeAccess, CLAUDE_UPGRADE_COPY, type ClaudeAccess } from "../config/plans";
@@ -67,8 +67,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const settings = await getShopSettings(session.shop);
   const shopId = settings?.id ?? null;
 
-  const [quoteAllowance, seatAllowance, seats] = shopId
-    ? await Promise.all([canCreateQuote(shopId), canAddSeat(shopId), listSeats(shopId)])
+  const [quoteUsage, seatAllowance, seats] = shopId
+    ? await Promise.all([getQuoteUsage(shopId), canAddSeat(shopId), listSeats(shopId)])
     : [null, null, []];
 
   const shopClaude = await prisma.shop.findUnique({
@@ -90,9 +90,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     planHandle: selectedPlanHandle(shopClaude?.plan ?? null, shopClaude?.legacyPlan ?? false),
     paid: Boolean(status.plan),
     limits: PLAN_LIMIT_DISPLAY,
-    quoteUsage: quoteAllowance
-      ? { used: quoteAllowance.used, cap: Number.isFinite(quoteAllowance.cap) ? quoteAllowance.cap : null }
-      : null,
+    quoteUsage,
     seatUsage: seatAllowance
       ? { used: seatAllowance.used, cap: seatAllowance.cap, allowed: seatAllowance.allowed }
       : null,
@@ -488,7 +486,9 @@ export default function Settings() {
               <Text as="p" variant="bodyMd">
                 {usage.cap === null
                   ? `${usage.used} active quotes this month. Your plan has no quote limit.`
-                  : `${usage.used} of ${usage.cap} active quotes used this month.`}
+                  : usage.used > usage.cap
+                    ? `${usage.used} active quotes this month. That’s over the limit of ${usage.cap}, so buyers can’t start new quotes until you choose a plan with more.`
+                    : `${usage.used} of ${usage.cap} active quotes used this month.`}
               </Text>
             )}
             <InlineStack gap="200" blockAlign="center">
