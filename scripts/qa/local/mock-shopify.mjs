@@ -46,6 +46,9 @@ function lineErrors(input) {
 }
 
 export function createMockShopify() {
+  // The subscription Shopify holds for the app. Suites change `billing.plan`
+  // (a plan name, or null for none) to play install, approval and cancellation.
+  const billing = { plan: process.env.MANNON_QA_PLAN || "Scale" };
   const calls = [];
   const drafts = new Map();
   const orders = [
@@ -96,13 +99,14 @@ export function createMockShopify() {
     },
     // Shopify's billing check (shopify-api's own query): one active, test-mode
     // subscription named after MANNON_QA_PLAN (default Scale, so every page opens).
+    // `billing.plan = null` plays a fresh install: no plan selected in Shopify.
     appSubscription: () => ({
       currentAppInstallation: {
-        activeSubscriptions: [{
-          id: "gid://shopify/AppSubscription/1", name: process.env.MANNON_QA_PLAN || "Scale", test: true, status: "ACTIVE", trialDays: 0,
+        activeSubscriptions: billing.plan ? [{
+          id: "gid://shopify/AppSubscription/1", name: billing.plan, test: true, status: "ACTIVE", trialDays: 0,
           createdAt: "2026-10-01T00:00:00Z", currentPeriodEnd: "2026-12-01T00:00:00Z", returnUrl: "https://example.com",
           lineItems: [{ id: "gid://shopify/AppSubscriptionLineItem/1", plan: { pricingDetails: { __typename: "AppRecurringPricing", price: { amount: "69.0", currencyCode: "USD" }, interval: "EVERY_30_DAYS", discount: null } } }],
-        }],
+        }] : [],
         oneTimePurchases: { edges: [], pageInfo: { hasNextPage: false, endCursor: null } },
       },
     }),
@@ -154,7 +158,7 @@ export function createMockShopify() {
       }
     });
   });
-  return { server, calls, drafts, orders };
+  return { server, calls, drafts, orders, billing };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

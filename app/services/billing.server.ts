@@ -303,6 +303,65 @@ export async function requirePlan(
   return status;
 }
 
+// --- keeping the stored plan in step with Shopify ---------------------------
+
+const NO_PLAN_STATES: Plan[] = ["TRIAL", "CANCELLED"];
+
+/** The `plan_handle` Shopify appends to the welcome link after a merchant picks
+ *  a plan on the hosted plan page (lowercased), or null. */
+export function returnedPlanHandle(request: Request): string | null {
+  const handle = new URL(request.url).searchParams.get("plan_handle");
+  return handle ? handle.trim().toLowerCase() : null;
+}
+
+/**
+ * Read Shopify's billing state and bring the Shop row in line with it. Call
+ * from every loader that SHOWS the plan (Home, Pricing plans, Settings), so the
+ * app never shows a plan Shopify doesn't hold, and a plan approved a second ago
+ * is reflected on the page the merchant lands on (App Store review 1.2.2).
+ *
+ * One extra case: the Free plan. Shopify returns the merchant with
+ * `plan_handle=free`; if no subscription is reported for it, that return is the
+ * only signal that a plan was chosen, so it is recorded as FREE. The parameter
+ * is never trusted for a paid tier: those come from the subscription alone.
+ */
+export async function syncShopPlan(
+  request: Request,
+  shopDomain: string,
+  billing: BillingLike,
+): Promise<BillingStatus> {
+  const status = await requireBilling(billing);
+  await reconcileShopPlan(shopDomain, status);
+  if (!status.unverified && !status.activeSubscriptionName && returnedPlanHandle(request) === "free") {
+    await prisma.shop.updateMany({
+      where: { shopifyDomain: shopDomain, plan: { in: NO_PLAN_STATES } },
+      data: { plan: "FREE" },
+    });
+  }
+  return status;
+}
+
+/**
+ * app/uninstalled: Shopify ends the subscription when the app is removed, so
+ * the stored plan is cleared too. A paid plan is recorded as cancelled (with its
+ * funnel event); Free goes back to "no plan selected". After a reinstall the
+ * merchant chooses a plan again on Shopify's plan page, and until then the app
+ * shows none, the same as Shopify.
+ */
+export async function clearPlanOnUninstall(shopDomain: string): Promise<void> {
+  await reconcileShopPlan(shopDomain, {
+    plan: null,
+    hasActivePayment: false,
+    onTrial: true,
+    activeSubscriptionName: null,
+    activeSubscriptionId: null,
+  });
+  await prisma.shop.updateMany({
+    where: { shopifyDomain: shopDomain, plan: "FREE" },
+    data: { plan: "TRIAL" },
+  });
+}
+
 // --- plan persistence + funnel events ---------------------------------------
 
 /** The Prisma Plan enum value implied by a live billing status. */

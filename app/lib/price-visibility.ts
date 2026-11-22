@@ -102,9 +102,9 @@ export function evaluateVisibility(rules: PriceRuleLite[], ctx: StorefrontContex
 /**
  * Plan gate for a scope (pure). Broad audience scopes (ALL, LOGGED_OUT) need
  * Starter or above; targeted scopes (customer tag / product / collection) need
- * Growth or above. Reads the v3 ladder (billing-v3) so Scale, and a trial
- * (which grants Starter-level access), are covered; legacy "Starter"/"Growth"
- * subscription names still work. Free and cancelled shops get no rules.
+ * Growth or above. Reads the v3 ladder (billing-v3) so Scale is covered; legacy
+ * "Starter"/"Growth" subscription names still work. Free, cancelled and
+ * no-plan-selected shops get no rules.
  */
 export function priceRuleScopeAllowed(plan: string | null | undefined, scope: PriceScope, legacy = false): boolean {
   if (!plan) return false;

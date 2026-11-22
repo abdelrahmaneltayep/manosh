@@ -28,7 +28,7 @@ export async function getAttentionCounts(shopId: string, now = new Date()): Prom
 }
 
 type Progress = Omit<SetupState,
-  "quoteWidget" | "catalogs" | "credit" | "tax" | "i18n" | "payments" | "erp" | "accounting" | "reps" | "catalogSharing" | "growthTier" | "onPaidPlan">;
+  "quoteWidget" | "catalogs" | "credit" | "tax" | "i18n" | "payments" | "erp" | "accounting" | "reps" | "catalogSharing" | "growthTier" | "planSelected">;
 
 /** Which setup steps the shop has already done (the setup guide ticks them off). */
 export async function getSetupProgress(shopId: string): Promise<Progress & { dismissed: boolean }> {

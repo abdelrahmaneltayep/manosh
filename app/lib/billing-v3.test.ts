@@ -7,6 +7,7 @@ import {
   PLAN_CAPABILITIES,
   getPlanCapabilities,
   effectivePlanHandle,
+  selectedPlanHandle,
   resolveGrandfather,
   prismaPlanForHandle,
   formatPriceCents,
@@ -92,10 +93,22 @@ describe("grandfathering — nobody's price is silently raised", () => {
     expect(effectivePlanHandle("GROWTH", false)).toBe("growth"); // non-legacy growth = growth caps ($29)
     expect(effectivePlanHandle("SCALE", false)).toBe("scale");
   });
-  it("trial gets starter-level access; cancelled falls to free", () => {
-    expect(effectivePlanHandle("TRIAL", false)).toBe("starter");
+  // App Store review 1.2.2: a fresh install has no subscription in Shopify, so
+  // the app must not grant (or show) a paid tier on its own.
+  it("no plan selected (TRIAL), cancelled and unknown all get Free access", () => {
+    expect(effectivePlanHandle("TRIAL", false)).toBe("free");
     expect(effectivePlanHandle("CANCELLED", false)).toBe("free");
     expect(effectivePlanHandle(null, false)).toBe("free");
+  });
+  it("selectedPlanHandle is null until Shopify holds a plan, so nothing shows as Current", () => {
+    expect(selectedPlanHandle("TRIAL")).toBeNull();
+    expect(selectedPlanHandle("CANCELLED")).toBeNull();
+    expect(selectedPlanHandle(null)).toBeNull();
+    expect(selectedPlanHandle("FREE")).toBe("free");
+    expect(selectedPlanHandle("STARTER")).toBe("starter");
+    expect(selectedPlanHandle("GROWTH")).toBe("growth");
+    expect(selectedPlanHandle("SCALE")).toBe("scale");
+    expect(selectedPlanHandle("STARTER", true)).toBe("growth"); // grandfathered maps up
   });
   it("handle ↔ Prisma enum round-trips", () => {
     expect(prismaPlanForHandle("scale")).toBe("SCALE");

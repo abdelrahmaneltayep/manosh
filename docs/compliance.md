@@ -92,7 +92,24 @@ Notes:
 - [ ] Declared scopes == used scopes == this table.
 - [ ] Secrets hashed (magic-link tokens), no raw tokens stored.
 - [ ] No PII in Event payloads or analytics events.
-- [ ] Billing works fresh install → trial → paid across both tiers.
+- [ ] Billing works fresh install → no plan → plan approved in Shopify → shown in the app, on every tier.
+
+## Plan state follows Shopify (App Store 1.2.2)
+
+Shopify App Pricing holds the subscription; the app only mirrors it.
+
+- `syncShopPlan` (`app/services/billing.server.ts`) runs in the Home, Pricing plans and
+  Settings loaders: it reads the active subscription and stores the tier on `Shop.plan`.
+- No subscription (fresh install, reinstall, cancelled) is stored as `TRIAL` or
+  `CANCELLED`. The app then grants **Free** capabilities and shows **no** plan as
+  Current (`selectedPlanHandle` returns null). It never grants a paid tier or a trial
+  on its own.
+- Shopify returns the merchant with `plan_handle=<handle>`. Only `free` is honoured from
+  that parameter (recorded as `FREE` when no subscription is reported); paid tiers come
+  from the subscription alone.
+- `app/uninstalled` clears the stored plan (`clearPlanOnUninstall`), so a reinstall
+  starts at "no plan selected", the same as Shopify.
+- QA: case M14 (`npm run qa:local`).
 
 ## Agency store linking (App Store 2.3.1)
 

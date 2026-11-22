@@ -20,8 +20,8 @@ describe("quote cap number (canCreateQuote source)", () => {
     expect(getPlanCapabilities("SCALE").quotesCap).toBe(Infinity);
   });
 
-  it("trial gets Starter-level (unlimited), never the Free cap", () => {
-    expect(getPlanCapabilities("TRIAL").quotesCap).toBe(Infinity);
+  it("no plan selected (TRIAL) gets the Free cap: paid limits start with a Shopify plan", () => {
+    expect(getPlanCapabilities("TRIAL").quotesCap).toBe(getPlanCapabilities("FREE").quotesCap);
   });
 
   it("a grandfathered legacy Starter is unlimited (maps up to Growth caps)", () => {

@@ -18,6 +18,9 @@ import {
   planEnumFor,
   planChangeEvent,
   reconcileShopPlan,
+  syncShopPlan,
+  clearPlanOnUninstall,
+  returnedPlanHandle,
   type BillingStatus,
 } from "./billing.server";
 
@@ -321,6 +324,66 @@ describe.skipIf(!hasDb)("reconcileShopPlan (DB)", () => {
     expect(next).toBe("GROWTH");
     expect((await prisma.shop.findUnique({ where: { id: shop.id } }))!.plan).toBe("GROWTH");
     expect(await prisma.event.count({ where: { shopId: shop.id } })).toBe(0);
+  });
+
+  // --- App Store review 1.2.2: the stored plan follows Shopify, nothing else ---
+  const noSubscription = { check: async () => ({ hasActivePayment: false, appSubscriptions: [] }) };
+  const subscribed = (name: string) => ({
+    check: async () => ({ hasActivePayment: true, appSubscriptions: [{ id: "gid://shopify/AppSubscription/1", name, status: "ACTIVE" }] }),
+  });
+  const at = (qs = "") => new Request(`https://manosh.fly.dev/app${qs}`);
+  const planOf = async (domain: string) => (await prisma.shop.findUnique({ where: { shopifyDomain: domain } }))!.plan;
+
+  it("syncShopPlan: a fresh install with no subscription stays 'no plan selected'", async () => {
+    await seedShop("g.myshopify.com", "TRIAL");
+    await syncShopPlan(at(), "g.myshopify.com", noSubscription);
+    expect(await planOf("g.myshopify.com")).toBe("TRIAL");
+  });
+
+  it("syncShopPlan: a plan approved in Shopify is stored on the next load", async () => {
+    await seedShop("h.myshopify.com", "TRIAL");
+    await syncShopPlan(at("?plan_handle=growth"), "h.myshopify.com", subscribed("Growth"));
+    expect(await planOf("h.myshopify.com")).toBe("GROWTH");
+  });
+
+  it("syncShopPlan: returning from Shopify's plan page with plan_handle=free records Free", async () => {
+    await seedShop("i.myshopify.com", "TRIAL");
+    await syncShopPlan(at("?plan_handle=free"), "i.myshopify.com", noSubscription);
+    expect(await planOf("i.myshopify.com")).toBe("FREE");
+    // and it stays Free on later loads without the parameter
+    await syncShopPlan(at(), "i.myshopify.com", noSubscription);
+    expect(await planOf("i.myshopify.com")).toBe("FREE");
+  });
+
+  it("syncShopPlan: plan_handle never grants a paid tier without a subscription", async () => {
+    await seedShop("j.myshopify.com", "TRIAL");
+    await syncShopPlan(at("?plan_handle=scale"), "j.myshopify.com", noSubscription);
+    expect(await planOf("j.myshopify.com")).toBe("TRIAL");
+  });
+
+  it("syncShopPlan: a failed billing read changes nothing, even with plan_handle=free", async () => {
+    await seedShop("k.myshopify.com", "GROWTH");
+    const failing = { check: async () => { throw new Error("boom"); } };
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    await syncShopPlan(at("?plan_handle=free"), "k.myshopify.com", failing);
+    quiet.mockRestore();
+    expect(await planOf("k.myshopify.com")).toBe("GROWTH");
+  });
+
+  it("clearPlanOnUninstall: a paid plan is cancelled (with its event), Free returns to no plan", async () => {
+    const paid = await seedShop("l.myshopify.com", "GROWTH");
+    await clearPlanOnUninstall("l.myshopify.com");
+    expect(await planOf("l.myshopify.com")).toBe("CANCELLED");
+    expect(await prisma.event.count({ where: { shopId: paid.id, type: "PLAN_CANCELLED" } })).toBe(1);
+
+    await prisma.shop.create({ data: { shopifyDomain: "m.myshopify.com", plan: "FREE" } });
+    await clearPlanOnUninstall("m.myshopify.com");
+    expect(await planOf("m.myshopify.com")).toBe("TRIAL");
+  });
+
+  it("returnedPlanHandle reads Shopify's welcome-link parameter", () => {
+    expect(returnedPlanHandle(at("?plan_handle=Free"))).toBe("free");
+    expect(returnedPlanHandle(at())).toBeNull();
   });
 
   it("does not flip TRIAL to CANCELLED when there was never a paid plan", async () => {

@@ -26,7 +26,7 @@ describe("attentionItems", () => {
 
 const BASE: SetupState = {
   quoteWidget: true, catalogs: false, credit: false, tax: false, i18n: false, payments: false, erp: false,
-  accounting: false, reps: false, catalogSharing: false, growthTier: false, onPaidPlan: false,
+  accounting: false, reps: false, catalogSharing: false, growthTier: false, planSelected: false,
   hasQuoteWidget: false, hasBuyer: false, hasSentQuote: false, hasCustomCatalog: false, hasCreditProfile: false,
   hasTaxRules: false, hasI18nSetup: false, hasDepositPolicy: false, hasErpConnection: false,
   hasAccountingConnection: false, hasRep: false, hasPublicCatalog: false,
@@ -51,7 +51,7 @@ describe("setupSteps", () => {
   it("counts progress from the done flags", () => {
     const steps = setupSteps({ ...BASE, hasQuoteWidget: true, hasBuyer: true });
     expect(setupProgress(steps)).toEqual({ done: 2, total: 4, complete: false });
-    const all = setupSteps({ ...BASE, hasQuoteWidget: true, hasBuyer: true, hasSentQuote: true, onPaidPlan: true });
+    const all = setupSteps({ ...BASE, hasQuoteWidget: true, hasBuyer: true, hasSentQuote: true, planSelected: true });
     expect(setupProgress(all).complete).toBe(true);
   });
 });

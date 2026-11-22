@@ -26,8 +26,8 @@ import {
   TERM_DAYS_OPTIONS,
 } from "../services/settings.server";
 import prisma from "../db.server";
-import { requireBilling, reconcileShopPlan, managedPricingUrlFor } from "../services/billing.server";
-import { NO_PER_ORDER_FEES_COPY, PLAN_DISPLAY_NAME, effectivePlanHandle } from "../lib/billing-v3";
+import { syncShopPlan, managedPricingUrlFor } from "../services/billing.server";
+import { NO_PER_ORDER_FEES_COPY, PLAN_DISPLAY_NAME, selectedPlanHandle } from "../lib/billing-v3";
 import { canCreateQuote } from "../services/plan-limits.server";
 import { listSeats, canAddSeat, addStaffSeat, removeSeat } from "../services/staff-seats.server";
 import { PLAN_LIMITS } from "../lib/billing";
@@ -37,7 +37,6 @@ import { SectionTabs } from "../components/SectionTabs";
 import { ConfirmAction } from "../components/ConfirmAction";
 import { upgradeUrl } from "../lib/upgrade";
 
-const IS_TEST = process.env.NODE_ENV !== "production";
 const SAVE_BAR_ID = "settings-general-save-bar";
 
 /**
@@ -63,8 +62,7 @@ const PLAN_LIMIT_DISPLAY = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
 
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  await reconcileShopPlan(session.shop, status);
+  const status = await syncShopPlan(request, session.shop, billing);
 
   const settings = await getShopSettings(session.shop);
   const shopId = settings?.id ?? null;
@@ -88,8 +86,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     minMarginPercent: settings ? Math.round(settings.minMarginPct * 100) : 15,
     defaultTermsDays: settings?.defaultTermsDays ?? 30,
     termDaysOptions: TERM_DAYS_OPTIONS,
-    planHandle: effectivePlanHandle(shopClaude?.plan ?? null, shopClaude?.legacyPlan ?? false),
-    onTrial: status.onTrial,
+    // null until the merchant has chosen a plan on Shopify's plan page.
+    planHandle: selectedPlanHandle(shopClaude?.plan ?? null, shopClaude?.legacyPlan ?? false),
     paid: Boolean(status.plan),
     limits: PLAN_LIMIT_DISPLAY,
     quoteUsage: quoteAllowance
@@ -281,7 +279,7 @@ export default function Settings() {
   const seatError = actionData && !actionData.ok && actionData.kind === "seat" ? actionData.error : null;
 
   const usage = data.quoteUsage;
-  const planName = PLAN_DISPLAY_NAME[data.planHandle];
+  const planName = data.planHandle ? PLAN_DISPLAY_NAME[data.planHandle] : null;
 
   return (
     <Page>
@@ -479,8 +477,13 @@ export default function Settings() {
                 <Text as="h2" variant="headingMd">Plan</Text>
                 <Text as="p" tone="subdued" variant="bodySm">{NO_PER_ORDER_FEES_COPY}</Text>
               </BlockStack>
-              <Badge tone="success">{data.onTrial ? `${planName} · trial` : planName}</Badge>
+              {planName ? <Badge tone="success">{planName}</Badge> : <Badge tone="attention">No plan selected</Badge>}
             </InlineStack>
+            {!planName && (
+              <Text as="p" variant="bodyMd">
+                Until you choose a plan, Mannon works within the Free plan’s limits.
+              </Text>
+            )}
             {usage && (
               <Text as="p" variant="bodyMd">
                 {usage.cap === null
@@ -489,7 +492,7 @@ export default function Settings() {
               </Text>
             )}
             <InlineStack gap="200" blockAlign="center">
-              <Button url="/app/plans">Compare plans</Button>
+              <Button url="/app/plans">{planName ? "Compare plans" : "Choose a plan"}</Button>
               {data.paid && (
                 <Form method="post">
                   <input type="hidden" name="intent" value="billing-cancel" />

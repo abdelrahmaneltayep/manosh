@@ -258,39 +258,65 @@ closes on the native-B2B line, the demo, and the resulting draft order. Script i
 
 ---
 
-## Testing instructions for the reviewer  (≤ 2800 characters · 2648/2800)
+## Testing instructions for the reviewer  (≤ 2800 characters · 2794/2800)
 
 Matches the flow verified live on 2026-11-05 by `npm run qa:all` (cases M2–M7,
-B1–B4, D1–D5, M10). Nothing is seeded on install, so step 0 asks the reviewer to
+B1–B4, D1–D5, M10); steps 1–2 (no plan until one is chosen) is case M14, added 2026-11-22. Nothing is seeded on install, so step 0 asks the reviewer to
 create one B2B company contact; the public demo needs no setup.
 
 ```
-Quick look with no setup: open https://manosh.fly.dev/demo and click "Open the buyer demo" (steps 9-10). The full flow on your test store takes about 10 minutes.
+Quick look with no setup: open https://manosh.fly.dev/demo and click "Open the buyer demo" (steps 10-11). The full flow on your test store takes about 10 minutes.
 
 BEFORE YOU START (test store)
 Customers > Companies: add a company with one location and one contact, using an email you can read. Mannon reads companies, locations and contacts from Shopify; it never asks for a store domain.
 
 STEPS
-1. Install from the App Store and open Mannon. Every left-nav page loads.
-2. Quotes > Requests > "Storefront button" (open on a new store, else click Edit): click "Add to theme" for Request a Quote. The theme editor opens with the block placed; click Save.
-3. On the storefront, open a product, click "Request a Quote" and send it with the contact's email. It appears under Quotes > Requests.
-4. Click "Convert to quote". The quote shows "Totals from Shopify" (subtotal, tax and total priced by Shopify). Change a unit price and click "Recalculate with these prices".
-5. Optional: "✦ Draft all lines with Claude" shows a suggestion; "Use this price" only pre-fills. Click "Send counter".
-6. Buyers: click "Generate link" for that buyer. Open the link in a private window and click Continue. There is no password.
-7. Open the Countered quote, choose Payment terms "Net 30", click "Accept & create order", then "Confirm & create order". Nothing is written before the confirm. Orders > Drafts shows the draft for the company, with Net 30 and Shopify's totals.
-8. In the portal, open the order pad, paste a PO under "Paste a PO or email" and click "Read my order". Claude's matches appear; nothing is ordered until you click "Request quote for these items".
-9. Public demo: https://manosh.fly.dev/demo > "Open the buyer demo". You are a sample buyer with a Countered quote; accept it as in step 7.
-10. On the demo portal home, click Reorder, then "Send reorder". It becomes a draft order, or waits for the merchant when it's over the auto-approve tolerance.
-11. Pricing plans: "Choose Growth" opens Shopify's plan page. Approve or decline; you return to the app.
+1. Install and open Mannon. Every left-nav page loads. No plan is selected yet: Pricing plans marks none as Current, matching Shopify's Billing card.
+2. Pricing plans: click "Choose Growth". Shopify's plan page opens; approve it. You return to Mannon and Growth is Current. Go back without approving and nothing changes.
+3. Quotes > Requests > "Storefront button" (open on a new store, else click Edit): click "Add to theme" for Request a Quote. The theme editor opens with the block placed; click Save.
+4. On the storefront, open a product, click "Request a Quote" and send it with the contact's email. It appears under Quotes > Requests.
+5. Click "Convert to quote". The quote shows "Totals from Shopify" (subtotal, tax and total priced by Shopify). Change a unit price and click "Recalculate with these prices".
+6. Optional: "✦ Draft all lines with Claude" shows a suggestion; "Use this price" only pre-fills. Click "Send counter".
+7. Buyers: click "Generate link" for that buyer. Open the link in a private window and click Continue. There is no password.
+8. Open the Countered quote, choose Payment terms "Net 30", click "Accept & create order", then "Confirm & create order". Nothing is written before the confirm. Orders > Drafts shows the draft for the company, with Net 30 and Shopify's totals.
+9. In the portal, open the order pad, paste a PO under "Paste a PO or email" and click "Read my order". Claude's matches appear; nothing is ordered until you click "Request quote for these items".
+10. Public demo: https://manosh.fly.dev/demo > "Open the buyer demo". You are a sample buyer with a Countered quote; accept it as in step 8.
+11. On the demo portal home, click Reorder, then "Send reorder". It becomes a draft order, or waits for the merchant when it's over the auto-approve tolerance.
 
 NOTES
-- ✦ Claude features are on Growth and Scale (and a one-time trial). If the ✦ buttons are missing, choose Growth (step 11) first.
+- Until a plan is chosen the app works within the Free limits. ✦ Claude and Net terms are on Growth and Scale, so do step 2 first.
 - Claude never acts on its own: every output lands on a confirm screen, and every product id it returns is checked against the live catalog.
 - Pricing: Shopify App Pricing. Free $0, Starter $9, Growth $29, Scale $69 per month; 14-day trial on paid plans; no per-order fees.
 - GDPR and app/uninstalled webhooks are HMAC-verified; bad signatures get 401.
 - The public demo allows 5 starts per hour per network.
 - Privacy policy: https://manosh.fly.dev/privacy
 ```
+
+---
+
+## Reviewer reply — 1.2.2, ref 126730 (2026-11-18: "Starter shown as current on a fresh install")
+
+Paste into **Ask a question / Proof of resolution** notes, with a screencast link as the
+proof (recording steps below).
+
+> **1.2.2 (fresh install showed Starter as the current plan while Shopify showed "No
+> plan selected"):** Fixed. Mannon used to treat "installed, no plan chosen" as
+> Starter-level access and labelled it Current. It now reads the plan only from the
+> shop's Shopify subscription:
+> - Fresh install or reinstall, no plan chosen: Pricing plans shows "You haven't
+>   chosen a plan yet", no plan is marked Current, and all four plans (Free included)
+>   have a Choose button that opens Shopify's plan page. Settings shows "No plan
+>   selected". Until a plan is chosen the app works within the Free plan's limits.
+> - After approving a plan on Shopify's page you return to Mannon, and that plan is
+>   marked Current on Home, Pricing plans and Settings, matching Shopify's Billing card.
+> - Going back without approving changes nothing. Uninstalling clears the plan, so a
+>   reinstall asks for a plan again.
+
+**Proof screencast (about 1 minute, on a store where Mannon is freshly installed):**
+1. Shopify Settings → Apps → Mannon: the Billing card says "No plan selected".
+2. Open Mannon → Pricing plans: the "You haven't chosen a plan yet" banner, no Current badge.
+3. Click Choose Growth → Shopify's plan page → approve.
+4. Back in Mannon: Pricing plans marks Growth Current; Shopify's Billing card says Growth.
 
 ---
 

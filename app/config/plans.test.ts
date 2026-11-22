@@ -75,10 +75,11 @@ describe("claudeAccess", () => {
     expect(a.daysLeft).toBe(6);
   });
 
-  it("treats a TRIAL (Shopify trial) shop as Starter-level → Claude trial", () => {
+  it("a shop with no plan selected (TRIAL) is Free-level → Claude locked, no trial started", () => {
     const a = claudeAccess({ plan: "TRIAL", claudeTrialStartedAt: null }, NOW);
-    expect(a.state).toBe("trial");
-    expect(a.shouldStartTrial).toBe(true);
+    expect(a.state).toBe("locked");
+    expect(a.allowed).toBe(false);
+    expect(a.shouldStartTrial).toBe(false);
   });
 
   describe("planGrantsClaude", () => {

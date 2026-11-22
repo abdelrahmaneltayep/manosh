@@ -77,8 +77,8 @@ describe("priceRuleScopeAllowed gate (v3 ladder)", () => {
       expect(priceRuleScopeAllowed(plan, "COLLECTION")).toBe(true);
     }
   });
-  it("a trial gets Starter-level rules; Free and cancelled get none", () => {
-    expect(priceRuleScopeAllowed("TRIAL", "LOGGED_OUT")).toBe(true);
+  it("no plan selected (TRIAL), Free and cancelled get no rules", () => {
+    expect(priceRuleScopeAllowed("TRIAL", "LOGGED_OUT")).toBe(false);
     expect(priceRuleScopeAllowed("TRIAL", "PRODUCT")).toBe(false);
     expect(priceRuleScopeAllowed("FREE", "ALL")).toBe(false);
     expect(priceRuleScopeAllowed("CANCELLED", "LOGGED_OUT")).toBe(false);

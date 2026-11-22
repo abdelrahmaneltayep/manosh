@@ -115,9 +115,12 @@ export type PrismaPlan = "TRIAL" | "FREE" | "STARTER" | "GROWTH" | "SCALE" | "CA
  * paid shop UP so it never loses ground when the ladder is re-priced:
  *   legacy STARTER ($29)  → growth capabilities
  *   legacy GROWTH  ($79)  → scale  capabilities
- * A fresh (non-legacy) shop maps by its own tier. Trial gets Starter-level
- * capabilities (matching pre-v3 behaviour); cancelled/unknown fall to Free.
- * Pure.
+ * A fresh (non-legacy) shop maps by its own tier. A shop with NO plan selected
+ * in Shopify (TRIAL = installed, nothing chosen yet; CANCELLED; unknown) gets
+ * Free capabilities: Shopify is the only place a plan or a free trial starts,
+ * so the app never grants a paid tier on its own (App Store review 1.2.2).
+ * This answers "what can the shop do"; use `selectedPlanHandle` for "which
+ * plan is the shop on". Pure.
  */
 export function effectivePlanHandle(prismaPlan: PrismaPlan | string | null | undefined, legacy = false): PlanHandle {
   if (legacy && prismaPlan === "STARTER") return "growth";
@@ -127,9 +130,27 @@ export function effectivePlanHandle(prismaPlan: PrismaPlan | string | null | und
     case "GROWTH": return "growth";
     case "STARTER": return "starter";
     case "FREE": return "free";
-    case "TRIAL": return "starter"; // trial grants Starter-level access
+    case "TRIAL": // installed, no plan selected in Shopify yet
     case "CANCELLED":
     default: return "free";
+  }
+}
+
+/**
+ * The plan the shop has actually selected in Shopify, or null when it has none
+ * (fresh install, or the subscription ended). Display-only: a plan is shown as
+ * "current" only when Shopify holds a subscription for it, so the app and
+ * Shopify's own Billing card always agree. Pure.
+ */
+export function selectedPlanHandle(prismaPlan: PrismaPlan | string | null | undefined, legacy = false): PlanHandle | null {
+  switch (prismaPlan) {
+    case "SCALE":
+    case "GROWTH":
+    case "STARTER":
+    case "FREE":
+      return effectivePlanHandle(prismaPlan, legacy);
+    default:
+      return null;
   }
 }
 

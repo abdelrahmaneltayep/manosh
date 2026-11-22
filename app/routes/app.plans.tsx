@@ -16,17 +16,15 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { requireBilling, reconcileShopPlan, managedPricingUrlFor } from "../services/billing.server";
+import { syncShopPlan, managedPricingUrlFor } from "../services/billing.server";
 import {
   PLAN_PRICING_V3,
   PLAN_DISPLAY_NAME,
-  effectivePlanHandle,
+  selectedPlanHandle,
   planIndex,
   NO_PER_ORDER_FEES_COPY,
   type PlanHandle,
 } from "../lib/billing-v3";
-
-const IS_TEST = process.env.NODE_ENV !== "production";
 
 /** The published ladder, in order. `free` is the downgrade target, not a charge. */
 const LADDER: PlanHandle[] = ["free", "starter", "growth", "scale"];
@@ -53,19 +51,22 @@ const HIGHLIGHTS: Record<PlanHandle, string[]> = {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  await reconcileShopPlan(session.shop, status);
+  await syncShopPlan(request, session.shop, billing);
 
   const shop = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
     select: { plan: true, legacyPlan: true },
   });
-  const current = effectivePlanHandle(shop?.plan ?? null, shop?.legacyPlan ?? false);
+  // The plan Shopify holds a subscription for, or null when the merchant hasn't
+  // chosen one (fresh install, reinstall, cancelled). Nothing is shown as
+  // "Current" in that state: the app must agree with Shopify's own Billing card
+  // (App Store review 1.2.2).
+  const current = selectedPlanHandle(shop?.plan ?? null, shop?.legacyPlan ?? false);
   // ?upgrade=growth — set by every "Upgrade" / "See Growth" button (lib/upgrade.ts)
   // so this page can say why the merchant is here and highlight the plan they need.
   const asked = (new URL(request.url).searchParams.get("upgrade") || "").toLowerCase();
   const needed = (LADDER as string[]).includes(asked) ? (asked as PlanHandle) : null;
-  return { current, needed: needed && planIndex(needed) > planIndex(current) ? needed : null };
+  return { current, needed: needed && (!current || planIndex(needed) > planIndex(current)) ? needed : null };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -86,9 +87,10 @@ function dollars(cents: number): string {
 export default function Plans() {
   const { current, needed } = useLoaderData<typeof loader>();
   // The one highlighted (primary) plan: the plan a feature asked for, else the
-  // next plan up from the current one. A Scale merchant sees no primary button.
-  const next = LADDER[planIndex(current) + 1] ?? null;
-  const highlight: PlanHandle | null = needed ?? (next && next !== "free" ? next : null);
+  // next plan up from the current one. A Scale merchant sees no primary button,
+  // and neither does a merchant with no plan yet: that choice is theirs.
+  const next = current ? LADDER[planIndex(current) + 1] ?? null : null;
+  const highlight: PlanHandle | null = needed ?? next;
   const nav = useNavigation();
   const submitting = nav.state === "submitting";
   const pendingPlan = submitting ? String(nav.formData?.get("plan") ?? "") : null;
@@ -105,6 +107,14 @@ export default function Plans() {
             </p>
           </Banner>
         )}
+        {!current && (
+          <Banner tone="info" title="You haven’t chosen a plan yet">
+            <p>
+              Until you choose one, Mannon works within the Free plan’s limits. Pick any
+              plan below, Free included. Shopify’s plan page opens so you can confirm it.
+            </p>
+          </Banner>
+        )}
         <Text as="p" tone="subdued" variant="bodySm">
           {NO_PER_ORDER_FEES_COPY}
         </Text>
@@ -113,10 +123,10 @@ export default function Plans() {
           {LADDER.map((handle) => {
             const price = PLAN_PRICING_V3[handle];
             const isCurrent = handle === current;
-            const isDowngrade = planIndex(handle) < planIndex(current);
+            const isDowngrade = current !== null && planIndex(handle) < planIndex(current);
             const cta = isCurrent
               ? "Current plan"
-              : handle === "free"
+              : handle === "free" && isDowngrade
                 ? "Downgrade to Free"
                 : isDowngrade
                   ? `Switch to ${PLAN_DISPLAY_NAME[handle]}`
@@ -158,7 +168,7 @@ export default function Plans() {
                         submit
                         variant={handle === highlight ? "primary" : "secondary"}
                         loading={pendingPlan === handle}
-                        tone={handle === "free" ? "critical" : undefined}
+                        tone={handle === "free" && isDowngrade ? "critical" : undefined}
                       >
                         {cta}
                       </Button>

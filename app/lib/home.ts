@@ -89,8 +89,8 @@ export interface SetupState {
   catalogSharing: boolean;
   /** Growth or Scale — several optional steps need it. */
   growthTier: boolean;
-  /** On a paid plan (not Free / not the unpaid trial). */
-  onPaidPlan: boolean;
+  /** A plan is selected in Shopify (Free counts). False on a fresh install. */
+  planSelected: boolean;
   // progress signals from the database
   hasQuoteWidget: boolean;
   hasBuyer: boolean;
@@ -148,8 +148,8 @@ export function setupSteps(s: SetupState): SetupStep[] {
   add({
     id: "plan",
     title: "Choose a plan",
-    description: "Pick the plan that fits your volume. Billing is handled by Shopify.",
-    done: s.onPaidPlan,
+    description: "Pick the plan that fits your volume, Free included. Shopify's plan page opens so you can confirm it.",
+    done: s.planSelected,
     optional: false,
     action: { content: "Compare plans", url: "/app/plans" },
   });

@@ -1,6 +1,7 @@
 import prisma from "../db.server";
 import { sendEmail } from "./mailer.server";
 import { captureException } from "../lib/sentry.server";
+import { clearPlanOnUninstall } from "./billing.server";
 
 /**
  * GDPR mandatory-webhook handlers (F6). See /docs/compliance.md for the exact
@@ -118,6 +119,9 @@ export async function deliverCustomerData(
  *     nothing renders on the storefront until the merchant re-enables it. Today
  *     that's the F17 Request-a-Quote widget toggle; new extension toggles are
  *     added here as they ship.
+ *  3. Clear the stored plan — Shopify ends the subscription on uninstall, so a
+ *     reinstall must show "no plan selected" until the merchant chooses again
+ *     on Shopify's plan page (App Store review 1.2.2).
  */
 export async function cleanupUninstall(shopDomain: string): Promise<void> {
   await prisma.session.deleteMany({ where: { shop: shopDomain } });
@@ -125,4 +129,5 @@ export async function cleanupUninstall(shopDomain: string): Promise<void> {
     where: { shopifyDomain: shopDomain },
     data: { quoteWidgetEnabled: false },
   });
+  await clearPlanOnUninstall(shopDomain);
 }

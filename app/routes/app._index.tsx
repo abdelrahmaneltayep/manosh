@@ -23,6 +23,8 @@ import prisma from "../db.server";
 import { getDashboardMetrics } from "../services/dashboard.server";
 import { shouldPromptReview, markReviewPromptShown } from "../services/review-prompt.server";
 import { getAttentionCounts, getSetupProgress, dismissSetupGuide } from "../services/home.server";
+import { syncShopPlan } from "../services/billing.server";
+import { selectedPlanHandle } from "../lib/billing-v3";
 import { attentionItems, setupSteps, setupProgress, type AttentionItem, type SetupStep } from "../lib/home";
 import { navFlags } from "../lib/nav";
 import { EXPIRING_SOON_DAYS } from "../lib/dashboard";
@@ -42,15 +44,20 @@ type Metrics = NonNullable<SerializeFrom<typeof loader>["metrics"]>;
  *      built from the append-only Event stream; read-only, never computes money).
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, billing } = await authenticate.admin(request);
+  // Home is where Shopify returns the merchant after they approve a plan, so
+  // read the plan from Shopify first: "Choose a plan" must agree with Shopify's
+  // own Billing card the moment they land (App Store review 1.2.2).
+  await syncShopPlan(request, session.shop, billing);
   const shop = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
-    select: { id: true, plan: true },
+    select: { id: true, plan: true, legacyPlan: true },
   });
   const flags = navFlags(process.env);
   if (!shop) {
-    return { metrics: null, promptReview: false, attention: [], steps: [] as SetupStep[], setupDismissed: false, analyticsOn: flags.analytics };
+    return { metrics: null, promptReview: false, attention: [], steps: [] as SetupStep[], setupDismissed: false, planSelected: true, analyticsOn: flags.analytics };
   }
+  const planSelected = selectedPlanHandle(shop.plan, shop.legacyPlan) !== null;
   const [metrics, promptReview, counts, progress] = await Promise.all([
     getDashboardMetrics(shop.id),
     shouldPromptReview(shop.id),
@@ -70,7 +77,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     reps: flags.reps,
     catalogSharing: flags.catalogSharing,
     growthTier,
-    onPaidPlan: growthTier || shop.plan === "STARTER",
+    planSelected,
     ...progress,
   });
   const attention = attentionItems(counts, {
@@ -81,7 +88,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     credit: flags.credit,
     tax: flags.tax,
   });
-  return { metrics, promptReview, attention, steps, setupDismissed: progress.dismissed, analyticsOn: flags.analytics };
+  return { metrics, promptReview, attention, steps, setupDismissed: progress.dismissed, planSelected, analyticsOn: flags.analytics };
 };
 
 // Two acknowledgements, both append-only Events so they survive reloads:
@@ -360,7 +367,7 @@ function ExpiringSoonCard({ metrics }: { metrics: Metrics }) {
 }
 
 export default function Index() {
-  const { metrics, promptReview, attention, steps, setupDismissed, analyticsOn } = useLoaderData<typeof loader>();
+  const { metrics, promptReview, attention, steps, setupDismissed, planSelected, analyticsOn } = useLoaderData<typeof loader>();
   const reviewFetcher = useFetcher();
   // Hide immediately on click; the action records REVIEW_PROMPT_SHOWN so it
   // won't return on the next load either.
@@ -392,6 +399,12 @@ export default function Index() {
         )}
         <AttentionCard items={attention as AttentionItem[]} />
         {showGuide && <SetupGuide steps={steps} />}
+        {/* The guide's "Choose a plan" step covers this while the guide is open. */}
+        {!planSelected && !showGuide && (
+          <Banner tone="info" title="You haven’t chosen a plan yet" action={{ content: "Choose a plan", url: "/app/plans" }}>
+            <p>Until you choose one, Mannon works within the Free plan’s limits.</p>
+          </Banner>
+        )}
         <PerformanceCard metrics={metrics} analyticsOn={analyticsOn} />
         {metrics && <ExpiringSoonCard metrics={metrics} />}
       </BlockStack>

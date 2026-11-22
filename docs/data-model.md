@@ -178,10 +178,12 @@ model Event {
 }
 
 enum Plan {
-  TRIAL
-  STARTER   // $29
-  GROWTH    // $79
-  CANCELLED
+  TRIAL     // installed, no plan selected in Shopify yet → Free limits, nothing shown as Current
+  FREE
+  STARTER
+  GROWTH
+  SCALE
+  CANCELLED // the subscription ended → treated like "no plan selected"
 }
 
 enum QuoteStatus {

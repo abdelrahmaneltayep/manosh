@@ -303,6 +303,44 @@ export async function merchant(rec, ctx) {
       }
     }, fail);
 
+    // M14 — the app shows the plan Shopify holds, and none when Shopify holds none (review 1.2.2)
+    await rec.tc("M14", "Plan shown matches Shopify: no plan selected → none marked Current (review 1.2.2)", { action: "Local: Shopify reports no subscription (a fresh install) → Pricing plans, Settings; then Shopify reports Growth → Home (as Shopify's welcome link) → Pricing plans. Live: read which plan the app marks Current", expected: "with no subscription: 'You haven't chosen a plan yet', no Current badge, four Choose buttons, Settings says 'No plan selected'; after approval: Growth is Current" }, async () => {
+      const currentCount = (f) => f.getByRole("button", { name: "Current plan", exact: true }).count();
+      if (!app.local) {
+        const f = await openApp(page, app, "/app/plans");
+        const t = await textOf(f);
+        const n = await currentCount(f);
+        const none = /haven['’]t chosen a plan yet/i.test(t);
+        if (n > 1 || (n === 1 && none)) throw new Error(`${n} plans marked Current${none ? " and the no-plan banner" : ""}`);
+        return { status: "INFO", actual: none ? "no plan selected: nothing marked Current (compare with Settings → Apps → Mannon → Billing in Shopify)" : "one plan marked Current (compare with Settings → Apps → Mannon → Billing in Shopify)", evidence: await rec.shot(page, "plan-current") };
+      }
+      const billing = ctx.localStack.shopify.billing;
+      const before = billing.plan;
+      try {
+        billing.plan = null; // fresh install: Shopify holds no subscription
+        let f = await openApp(page, app, "/app/plans");
+        let t = await textOf(f);
+        if (!/haven['’]t chosen a plan yet/i.test(t)) throw new Error("no subscription, but the no-plan banner is missing");
+        if (await currentCount(f)) throw new Error("no subscription, but a plan is marked Current (the 1.2.2 bug)");
+        for (const n of ["Choose Free", "Choose Starter", "Choose Growth", "Choose Scale"]) if (!(await f.getByRole("button", { name: n, exact: true }).count())) throw new Error(`no "${n}" button`);
+        const ev = await rec.shot(page, "plan-none");
+        f = await openApp(page, app, "/app/settings");
+        if (!/No plan selected/.test(await textOf(f))) throw new Error("Settings does not say 'No plan selected'");
+        billing.plan = "Growth"; // the merchant approves Growth on Shopify's page…
+        f = await openApp(page, app, "/app?plan_handle=growth"); // …and Shopify returns them to Home
+        if (ERROR_TEXT.test(await textOf(f))) throw new Error("Home shows an error after the plan was approved");
+        f = await openApp(page, app, "/app/plans");
+        t = await textOf(f);
+        if (/haven['’]t chosen a plan yet/i.test(t) || (await currentCount(f)) !== 1) throw new Error("Growth approved in Shopify, but the app does not mark exactly one plan Current");
+        const card = await f.getByRole("button", { name: "Current plan", exact: true }).locator("xpath=ancestor::*[.//h2][1]").innerText();
+        if (!/^Growth/.test(card.trim())) throw new Error(`the Current plan card is not Growth: ${card.slice(0, 40)}`);
+        return { actual: "no subscription → banner, no Current badge, four Choose buttons, Settings 'No plan selected'; Growth approved → Growth is Current", evidence: ev };
+      } finally {
+        billing.plan = before;
+        await openApp(page, app, "/app/plans").catch(() => {}); // re-sync the stored plan for the suites that follow
+      }
+    }, fail);
+
     // M13 — agency stores join by invite code, never by a typed store domain (App Store 2.3.1)
     await rec.tc("M13", "Agency: stores join by invite code, no store-domain field (App Store 2.3.1)", { action: "open Agency; look for a visible field named shop and for the invite / join controls", expected: "no field asking for a store domain; 'Create invite code' (in an organization) or 'Join an organization'" }, async () => {
       const f = await openApp(page, app, "/app/agency");
