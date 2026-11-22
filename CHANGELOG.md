@@ -11,6 +11,8 @@ All notable changes to Mannon are recorded here. Format loosely follows
   past `expiresAt` stayed New / Countered in the database (seen on the dev store one to
   two weeks overdue). New `/internal/cron/expire-quotes` (CRON_SECRET, POST/GET, not
   feature-flagged) runs it for every shop, one `QUOTE_EXPIRED` event per quote, idempotent.
+- **Home's "quotes to price" count leaves out overdue quotes**, so it matches the Needs
+  reply view it links to (the inbox already shows those quotes as Expired).
 - **Needs a schedule outside the repo.** An external scheduler must call it (hourly);
   `docs/cron.md` lists every `/internal/cron/*` job, its cadence and how to set one up.
 
