@@ -41,6 +41,10 @@ terminal ones — so scheduling self-heals even if a call site is missed) then
 **dispatches** due reminders/warnings and runs expiries via `expireQuote`.
 Schedule it a few times a day so quiet-hours sends land in business hours.
 
+This job only expires quotes that have a follow-up schedule (policy enabled). The
+authoritative sweep for every shop is `/internal/cron/expire-quotes`, which is not
+flag-gated. Scheduling for all jobs: `cron.md`.
+
 Eager hooks: `scheduleForQuote` on submit (`portal-quote.server`), `cancelForQuote`
 on accept (`quote-accept.server`).
 

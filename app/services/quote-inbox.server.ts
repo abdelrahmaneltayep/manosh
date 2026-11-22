@@ -38,8 +38,8 @@ export type QuoteDetail = Quote & {
 /**
  * List a shop's quotes for the inbox. This is a read (GET) path, so it does NOT
  * write: expiry is reflected via `displayStatus` computed from the clock. The
- * authoritative flip happens on the cron (`expireQuotesDue`) or when a quote's
- * detail is opened.
+ * authoritative flip happens on the cron (`expireQuotesDue`, called by
+ * `/internal/cron/expire-quotes`) or when a quote's detail is opened.
  */
 export async function listQuotesForShop(shopDomain: string): Promise<InboxRow[]> {
   const quotes = await prisma.quote.findMany({

@@ -27,6 +27,9 @@ changes nothing for live merchants until you flip a flag.
 - [ ] Runtime secrets set (`fly secrets list`): `SHOPIFY_API_KEY/SECRET`, `SHOPIFY_APP_URL`,
       `SESSION_SECRET`, `DATABASE_URL`.
 - [ ] `/healthz` → `configOk: true`; app boots and loads in Admin.
+- [ ] `CRON_SECRET` is set and an external scheduler calls the `/internal/cron/*` jobs —
+      at minimum `expire-quotes` hourly, or overdue quotes are never marked Expired. Nothing
+      in the repo schedules them; setup and cadences are in `docs/cron.md`.
 
 ---
 

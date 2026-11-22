@@ -147,8 +147,8 @@ tc "Customer-account quotes without a token fails closed" "401|410|200" "" "" --
 echo "### E. Internal endpoints (shared secrets, never open)" >> "$REPORT"
 tc "Cron without secret → 401" "401" "" "" -- -X POST "$BASE/internal/cron/reminders"
 tc "Cron with the secret → 200 JSON" "200" "" "" -- -X POST -H "x-cron-secret: $CRON" "$BASE/internal/cron/reminders"
-for job in followups analytics accounting erp reorder-push tax-reminders payment-reminders; do
-  tc "Cron $job without secret → 401/503/skip, never runs" "401|503|200" "" "\"sent\":[1-9]" -- -X POST "$BASE/internal/cron/$job"
+for job in expire-quotes followups analytics accounting erp reorder-push tax-reminders payment-reminders; do
+  tc "Cron $job without secret → 401/503/skip, never runs" "401|503|200" "" "\"sent\":[1-9]|\"expired\":" -- -X POST "$BASE/internal/cron/$job"
 done
 tc "ERP stock without secret → 400/401" "40[01]" "" "" -- -X POST -H "content-type: application/json" -d '{}' "$BASE/internal/erp/stock"
 tc "ERP stock GET → 405" "405" "" "" -- "$BASE/internal/erp/stock"
