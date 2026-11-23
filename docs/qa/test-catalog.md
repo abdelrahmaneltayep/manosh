@@ -40,7 +40,7 @@ store, theme and Shopify Admin.
 | L1 | Typecheck (`tsc --noEmit`) | exit 0 |
 | L2 | Unit and integration tests (Vitest) | every file passes |
 | L3 | End-to-end tests on the served build (`npm run test:e2e`) | every test passes |
-| L4 | HTTP contract smoke in tmux (`scripts/qa-smoke.sh`, ~78 cases) | 0 failures, 0 server errors |
+| L4 | HTTP contract smoke in tmux (`scripts/qa-smoke.sh`, ~80 cases) | 0 failures, 0 server errors |
 
 ## C — Live HTTP contract (no secrets needed)
 | ID | Case | Expected |

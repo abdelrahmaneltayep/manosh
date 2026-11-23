@@ -35,7 +35,8 @@ Rules:
 - **Illegal transitions throw.** Only the arrows above are allowed. e.g. you cannot accept a
   `SUBMITTED` quote (it must be `COUNTERED` first), you cannot re-open an `EXPIRED` or `ORDERED`
   quote.
-- **Expiry auto-flips** on read and via cron: any non-terminal quote past `expiresAt` becomes
+- **Expiry auto-flips** when a quote is opened and via cron (`/internal/cron/expire-quotes`,
+  scheduled externally — see `/docs/cron.md`): any non-terminal quote past `expiresAt` becomes
   `EXPIRED`.
 - **Every transition appends an `Event`** (`QUOTE_SUBMITTED`, `QUOTE_COUNTERED`, `QUOTE_ACCEPTED`,
   `QUOTE_ORDERED`, `QUOTE_EXPIRED`).

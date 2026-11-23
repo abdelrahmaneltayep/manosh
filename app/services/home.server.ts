@@ -12,7 +12,10 @@ export async function getAttentionCounts(shopId: string, now = new Date()): Prom
   const [requests, quotesToPrice, expiringSoon, offers, applications, accessRequests, overdueInvoices, taxToVerify] =
     await Promise.all([
       prisma.quoteRequest.count({ where: { shopId, status: "NEW" } }),
-      prisma.quote.count({ where: { company: { shopId }, status: "SUBMITTED" } }),
+      // Still open only: a quote past its expiry date shows as Expired in the
+      // inbox (and is marked by the expiry sweep), so it is not waiting on a price.
+      // Keeps this count equal to the "Needs reply" view it links to.
+      prisma.quote.count({ where: { company: { shopId }, status: "SUBMITTED", expiresAt: { gt: now } } }),
       prisma.quote.count({
         where: { company: { shopId }, status: { in: ["SUBMITTED", "COUNTERED"] }, expiresAt: { gt: now, lte: soon } },
       }),

@@ -372,7 +372,8 @@ export async function getQuote(
 }
 
 /**
- * Cron entry point: expire every non-terminal quote whose expiry has passed.
+ * Cron entry point (`/internal/cron/expire-quotes`, all shops): expire every
+ * non-terminal quote whose expiry has passed.
  * Returns the number expired. Each writes a QUOTE_EXPIRED event.
  */
 export async function expireQuotesDue(

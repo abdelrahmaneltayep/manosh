@@ -2,7 +2,8 @@ import { describe, test } from "@e2e-dev/web";
 import { expect } from "e2e";
 
 // Public HTTP surface: health, the storefront quote-request endpoint's CORS
-// contract, and the customer-account quotes endpoint failing closed.
+// contract, the customer-account quotes endpoint failing closed, and the
+// quote-expiry cron refusing callers without the shared secret.
 describe("public API", { tags: ["smoke", "api"] }, () => {
   test("/healthz answers with a value-free config signal", async ({ app }) => {
     const res = await fetch(new URL("/healthz", app.baseUrl));
@@ -37,6 +38,21 @@ describe("public API", { tags: ["smoke", "api"] }, () => {
     expect([401, 410, 200]).toContain(res.status);
     if (res.status === 200) {
       expect(await res.json()).toMatchObject({ enabled: false, quotes: [] });
+    }
+  });
+
+  test("/internal/cron/expire-quotes never runs without the cron secret", async ({ app }) => {
+    const url = new URL("/internal/cron/expire-quotes", app.baseUrl);
+    for (const init of [
+      { method: "POST" },
+      { method: "GET" },
+      { method: "POST", headers: { "x-cron-secret": "not-the-secret" } },
+      { method: "POST", headers: { "x-cron-secret": "" } },
+    ]) {
+      const res = await fetch(url, init);
+      // 401 with CRON_SECRET set on the server, 503 when it is not configured.
+      expect([401, 503]).toContain(res.status);
+      expect(await res.text()).not.toMatch(/"expired"|"ok":true/);
     }
   });
 });

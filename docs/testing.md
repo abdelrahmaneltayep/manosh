@@ -104,7 +104,7 @@ what a Shopify reviewer and a scanner hit without a store: public pages, the
 install hand-off, portal and rep sign-in walls, every mandatory webhook with a
 missing, wrong and valid HMAC, the storefront endpoints' CORS and error
 contracts, the internal cron and ERP secrets, and secret and stack-trace
-leakage in every body. 77 cases today; the report lands in the scratchpad
+leakage in every body. 80 cases today; the report lands in the scratchpad
 (`report.md` plus one evidence file per case) and the latest is checked in
 under `docs/qa/`.
 
