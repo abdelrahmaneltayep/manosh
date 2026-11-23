@@ -189,7 +189,8 @@ export async function computeAndStoreDaily(shopDomain: string, day: Date): Promi
 
 /** Rollup yesterday for every Growth shop (cron entrypoint helper). */
 export async function rollupAllShops(now: Date = new Date()): Promise<number> {
-  const shops = await prisma.shop.findMany({ where: { plan: "GROWTH" }, select: { shopifyDomain: true } });
+  // Growth and Scale: Scale includes everything Growth has.
+  const shops = await prisma.shop.findMany({ where: { plan: { in: ["GROWTH", "SCALE"] } }, select: { shopifyDomain: true } });
   const yesterday = new Date(now.getTime() - DAY_MS);
   let n = 0;
   for (const s of shops) {

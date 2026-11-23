@@ -28,9 +28,9 @@ async function run(request: Request): Promise<Response> {
 
   let digests = 0;
   if (now.getUTCDay() === 1) {
-    // Monday — weekly digest for opted-in Growth shops.
+    // Monday — weekly digest for opted-in Growth and Scale shops.
     const shops = await prisma.shop.findMany({
-      where: { plan: "GROWTH", weeklyDigest: true },
+      where: { plan: { in: ["GROWTH", "SCALE"] }, weeklyDigest: true },
       select: { shopifyDomain: true, emailTemplates: true },
     });
     const to = process.env.MANNON_MAIL_FROM; // best-effort recipient until owner email is wired

@@ -161,7 +161,7 @@ export async function contract(rec, ctx) {
   }
   await page("C12a", "Portal without a session", "/portal", { status: /^(200|30[1278])$/ });
   await page("C12b", "Magic link with a bad token", "/portal/auth?token=not-a-real-token", { status: /^(200|40[01])$/, must: /expired|invalid|sign in|link/i });
-  for (const job of ["followups", "reminders", "payment-reminders"]) {
+  for (const job of ["quote-expiry", "followups", "reminders", "payment-reminders"]) {
     await rec.tc("C13", `Cron ${job} without the secret`, { action: `POST ${L}/internal/cron/${job}`, expected: "401/503, or 200 'skipped' when the feature is off; never runs" }, async () => {
       const { r, body: b } = await timed(`${L}/internal/cron/${job}`, { method: "POST" });
       if (r.status === 200 && /"skipped"/.test(b) && !/"sent":[1-9]/.test(b)) return { actual: `HTTP 200 ${b.slice(0, 60)}` };
