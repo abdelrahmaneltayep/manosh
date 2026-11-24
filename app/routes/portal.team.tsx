@@ -14,7 +14,7 @@ import {
   MemberExistsError,
   LastAdminError,
 } from "../services/company-members.server";
-import { getPlanLimits } from "../lib/billing";
+import { getPlanLimits, isGrowthTier } from "../lib/billing";
 import {
   canManageMembers,
   evaluateMemberAllowance,
@@ -49,7 +49,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     company: me.company.name,
     isAdmin: canManageMembers(me.role),
-    isGrowth: me.company.shop.plan === "GROWTH",
+    isGrowth: isGrowthTier(me.company.shop.plan),
     myId: me.id,
     approvalThreshold: me.company.approvalThreshold ? Number(me.company.approvalThreshold) : null,
     members,
@@ -68,20 +68,22 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const cap = getPlanLimits(me.company.shop.plan).memberCap;
+  // Growth features are also Scale features: Scale includes everything in Growth.
+  const growthTier = isGrowthTier(me.company.shop.plan);
 
   try {
     if (intent === "invite") {
       const email = String(form.get("email") ?? "");
       const role = (String(form.get("role") ?? "BUYER") as CompanyRole) || "BUYER";
       // Approver role + the 2nd seat are Growth-only.
-      if (me.company.shop.plan !== "GROWTH" && (role === "APPROVER" || cap <= 1)) {
+      if (!growthTier && (role === "APPROVER" || cap <= 1)) {
         return { ok: false, error: memberCapMessage(cap) };
       }
       await inviteMember(me.companyId, { email, role, baseUrl: new URL(request.url).origin }, cap);
       return { ok: true, message: `Invited ${email}.` };
     }
     if (intent === "set-role") {
-      if (me.company.shop.plan !== "GROWTH") return { ok: false, error: "Roles are a Growth feature." };
+      if (!growthTier) return { ok: false, error: "Roles are a Growth feature." };
       await setMemberRole(me.companyId, String(form.get("memberId") ?? ""), String(form.get("role") ?? "BUYER") as CompanyRole);
       return { ok: true, message: "Role updated." };
     }
@@ -90,7 +92,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       return { ok: true, message: "Member removed." };
     }
     if (intent === "set-threshold") {
-      if (me.company.shop.plan !== "GROWTH") return { ok: false, error: "Approval thresholds are a Growth feature." };
+      if (!growthTier) return { ok: false, error: "Approval thresholds are a Growth feature." };
       const raw = String(form.get("threshold") ?? "").trim();
       const value = raw === "" ? null : Number(raw);
       if (value != null && (!Number.isFinite(value) || value < 0)) {

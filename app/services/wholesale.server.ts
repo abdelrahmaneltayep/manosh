@@ -9,6 +9,7 @@ import {
   isHoneypotTripped,
   type FieldSpec,
 } from "../lib/wholesale";
+import { isGrowthTier } from "../lib/billing";
 
 /**
  * F6 — wholesale registration. Merchant builds a form; a public URL collects
@@ -235,9 +236,9 @@ export async function submitApplication(
     },
   });
 
-  // Auto-approve (Growth only) when the domain is allowlisted.
+  // Auto-approve (Growth and Scale) when the domain is allowlisted.
   let status: WholesaleStatus = "PENDING";
-  if (shop.plan === "GROWTH" && shouldAutoApprove(contactEmail, form.autoApproveDomains)) {
+  if (isGrowthTier(shop.plan) && shouldAutoApprove(contactEmail, form.autoApproveDomains)) {
     await provisionApproval(application.id, shopDomain, "auto", payload.baseUrl);
     status = "APPROVED";
   }

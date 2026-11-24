@@ -20,7 +20,7 @@ import {
 } from "../services/saved-order.server";
 import { submitBuyerQuote } from "../services/portal-quote.server";
 import { appendEvent } from "../services/events.server";
-import { getPlanLimits, savedListCapMessage } from "../lib/billing";
+import { getPlanLimits, isGrowthTier, savedListCapMessage } from "../lib/billing";
 import { resolvePrice } from "../lib/price-resolver";
 import { orderPadSubtotal, parseOrderPadCsv, type PricedLine } from "../lib/order-pad";
 import { UNRESOLVED_MESSAGE } from "../lib/quick-order";
@@ -80,7 +80,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     moqEnabled,
     orderRules,
     companyId: buyer.companyId,
-    isGrowth: plan === "GROWTH",
+    isGrowth: isGrowthTier(plan),
     savedListCap: Number.isFinite(limits.savedListCap) ? limits.savedListCap : null,
     savedUsed: savedLists.length,
     prefill,
@@ -163,7 +163,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
   // CSV upload is Growth-only.
   if (intent === "import-csv") {
     if (!ENABLED()) return { kind: "error", error: "CSV upload isn’t available yet." };
-    if (plan !== "GROWTH") {
+    if (!isGrowthTier(plan)) {
       return { kind: "error", error: "CSV upload is a Growth feature. Ask the store to upgrade." };
     }
     const { rows, errors } = parseOrderPadCsv(String(form.get("csv") ?? ""));

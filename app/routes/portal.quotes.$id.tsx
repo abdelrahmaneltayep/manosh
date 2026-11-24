@@ -25,6 +25,7 @@ import {
 import { needsApproval, canApprove, type CompanyRole } from "../lib/company-accounts";
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate, formatMoney } from "../lib/format";
+import { isGrowthTier } from "../lib/billing";
 
 const ACCOUNTS_ENABLED = () => process.env.MANNON_FF_COMPANY_ACCOUNTS === "true";
 
@@ -76,7 +77,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   // F5 — approval state, when company accounts are on and the plan is Growth.
-  const accountsOn = ACCOUNTS_ENABLED() && quote.company.shop.plan === "GROWTH";
+  const accountsOn = ACCOUNTS_ENABLED() && isGrowthTier(quote.company.shop.plan);
   const threshold =
     accountsOn && quote.company.approvalThreshold != null
       ? Number(quote.company.approvalThreshold)
@@ -160,7 +161,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
     // F5 — spending-approval gate (Growth). If the order reaches the company's
     // threshold, it can't be placed until an approver approves.
-    const accountsOn = ACCOUNTS_ENABLED() && quote.company.shop.plan === "GROWTH";
+    const accountsOn = ACCOUNTS_ENABLED() && isGrowthTier(quote.company.shop.plan);
     const threshold = quote.company.approvalThreshold != null ? Number(quote.company.approvalThreshold) : null;
     if (accountsOn && threshold != null) {
       const amount = await estimateQuoteAmount(quoteId);

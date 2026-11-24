@@ -353,9 +353,13 @@ Lessons that still apply:
    Free on Shopify's plan page yields a subscription the app can read. The app also
    accepts `plan_handle=free` on return from Shopify as a fallback. Test: choose Free
    on a clean store and confirm Pricing plans marks Free as Current.
-4. **Scale is missed by some Growth checks** in the buyer portal: `portal.team.tsx`,
-   `portal.quick-order.tsx`, `portal.quotes.$id.tsx`, `services/wholesale.server.ts`
-   compare the plan to the literal `"GROWTH"`. Fix with `isGrowthTier`.
+4. **Home shows "We couldn't load your home page" on the dev store** (reported
+   2026-11-24, cause not found). Ruled out locally: Shopify refusing every Admin API
+   call (the IP allowlist case), quotes in the expiring card, the review prompt, no
+   plan selected, and the shop being erased while installed. Found and fixed on the
+   way: dates were printed in the viewer's time zone, which failed page hydration for
+   any merchant outside UTC (`app/lib/format.ts`, now fixed to UTC). Still needed: the
+   browser console error and `fly logs` for a failing `GET /app`.
 5. **Billing reads use the Admin API.** Shopify now recommends the Partner API's active
    subscription query.
 6. **The IP allowlist uses shared networks**, not exact addresses (section 9.4).

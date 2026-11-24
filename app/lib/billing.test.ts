@@ -62,4 +62,34 @@ describe("isGrowthTier (Scale includes Growth)", () => {
     for (const p of ["STARTER", "TRIAL", "FREE", "CANCELLED", "Starter", null, undefined]) expect(isGrowthTier(p as string | null)).toBe(false);
     expect(agencyAllowed("SCALE")).toBe(true);
   });
+
+  // A feature check that compares the stored plan to "GROWTH" alone locks
+  // Scale stores out of something they pay for. Checks go through
+  // isGrowthTier() (or a query for both plans). The billing files are exempt:
+  // they map plan names to and from Shopify rather than gate a feature.
+  it("no feature check compares the plan to GROWTH alone", async () => {
+    const { readFileSync, readdirSync, statSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const exempt = new Set(["app/services/billing.server.ts", "app/lib/billing.ts", "app/lib/billing-v3.ts"]);
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) walk(path);
+        else if (/\.tsx?$/.test(path) && !/\.test\.tsx?$/.test(path) && !exempt.has(path)) files.push(path);
+      }
+    };
+    walk("app");
+    expect(files.length).toBeGreaterThan(50);
+
+    const offenders: string[] = [];
+    for (const file of files) {
+      readFileSync(file, "utf8").split("\n").forEach((line, index) => {
+        const comparesToGrowth = /[!=]==?\s*"GROWTH"|"GROWTH"\s*[!=]==?/.test(line);
+        const growthOnlyQuery = /plan:\s*"GROWTH"/.test(line);
+        if ((comparesToGrowth && !line.includes('"SCALE"')) || growthOnlyQuery) offenders.push(`${file}:${index + 1}`);
+      });
+    }
+    expect(offenders).toEqual([]);
+  });
 });

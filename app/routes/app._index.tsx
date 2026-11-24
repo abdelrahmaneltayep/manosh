@@ -25,6 +25,7 @@ import { shouldPromptReview, markReviewPromptShown } from "../services/review-pr
 import { getAttentionCounts, getSetupProgress, dismissSetupGuide } from "../services/home.server";
 import { syncShopPlan } from "../services/billing.server";
 import { selectedPlanHandle } from "../lib/billing-v3";
+import { isGrowthTier } from "../lib/billing";
 import { requestReview } from "../lib/review-request";
 import { attentionItems, setupSteps, setupProgress, type AttentionItem, type SetupStep } from "../lib/home";
 import { navFlags } from "../lib/nav";
@@ -65,7 +66,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     getAttentionCounts(shop.id),
     getSetupProgress(shop.id),
   ]);
-  const growthTier = shop.plan === "GROWTH" || shop.plan === "SCALE";
+  const growthTier = isGrowthTier(shop.plan);
   const steps = setupSteps({
     quoteWidget: flags.quoteRequests,
     catalogs: flags.catalogs,
