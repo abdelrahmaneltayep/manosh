@@ -90,8 +90,10 @@ computes money itself.
 - Any customer count, logo or review. There are none yet.
 - "Best", "number one", "official", or any ranking.
 - Features not listed above. In particular: no WhatsApp, no CRM sync, no mobile app.
-- Automatic follow-up or reminder emails, until the founder confirms the scheduled
-  jobs are switched on (`docs/scheduled-jobs.md`).
+- Any email sent by the app (follow-ups, reminders, invoices, emailed PDFs). The app
+  has no email transport yet, and its scheduled jobs are not switched on
+  (`docs/mannon-handoff.md`, section 11). Buyers get their sign-in link from the
+  merchant, who copies it from Buyers > Generate link.
 - That Claude acts on its own. Every AI output is a draft that a person confirms.
 - AI features on Free or Starter. Claude drafting is Growth and Scale only.
 
