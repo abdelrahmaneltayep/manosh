@@ -139,7 +139,14 @@ export function formatNumber(value: number, locale = DEFAULT_LOCALE): string {
 
 export function formatDate(date: Date, locale = DEFAULT_LOCALE): string {
   try {
-    return new Intl.DateTimeFormat(tagFor(locale), { year: "numeric", month: "short", day: "numeric" }).format(date);
+    // Time zone is pinned for the same reason as lib/format.ts: the portal
+    // hydrates, so server and browser must print the same day.
+    return new Intl.DateTimeFormat(tagFor(locale), {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    }).format(date);
   } catch {
     return date.toISOString().slice(0, 10);
   }

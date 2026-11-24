@@ -49,6 +49,9 @@ export function createMockShopify() {
   // The subscription Shopify holds for the app. Suites change `billing.plan`
   // (a plan name, or null for none) to play install, approval and cancellation.
   const billing = { plan: process.env.MANNON_QA_PLAN || "Scale" };
+  // Set `outage.status` (for example 403) to make every Admin API call fail the
+  // way Shopify fails it when the app's IP allowlist rejects the caller.
+  const outage = { status: 0 };
   const calls = [];
   const drafts = new Map();
   const orders = [
@@ -146,6 +149,10 @@ export function createMockShopify() {
         calls.push({ at: new Date().toISOString(), shop, op: `${req.method} ${url.pathname}`, known: false });
         return send(404, { errors: "Not Found" });
       }
+      if (outage.status) {
+        calls.push({ at: new Date().toISOString(), shop, op: `refused ${outage.status}`, known: true });
+        return send(outage.status, { errors: "Forbidden" });
+      }
       let q = {};
       try { q = JSON.parse(body || "{}"); } catch { return send(400, { errors: "bad json" }); }
       const name = (String(q.query || "").match(/\b(?:query|mutation)\s+([A-Za-z0-9_]+)/) || [])[1] || q.operationName || "(anonymous)";
@@ -158,7 +165,7 @@ export function createMockShopify() {
       }
     });
   });
-  return { server, calls, drafts, orders, billing };
+  return { server, calls, drafts, orders, billing, outage };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -1,10 +1,16 @@
-// Fixed-locale formatters so server and client render identically (no
-// hydration mismatch) and output is deterministic in tests.
+// Fixed-locale, fixed-time-zone formatters so server and client render
+// identically and output is deterministic in tests. Both must be pinned: the
+// server runs in UTC, and a browser in any other zone would otherwise print a
+// different day for a late-evening timestamp, which fails React hydration
+// (errors #418/#425) and re-renders the whole document.
+
+export const DISPLAY_TIME_ZONE = "UTC";
 
 const DATE_FMT = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   month: "short",
   day: "numeric",
+  timeZone: DISPLAY_TIME_ZONE,
 });
 
 export function formatDate(value: Date | string): string {

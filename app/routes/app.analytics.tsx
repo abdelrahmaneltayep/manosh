@@ -85,7 +85,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<InsightRe
 };
 
 function money(currency: string, n: number): string {
-  return `${currency} ${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${currency} ${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function pct(n: number | null): string {
   return n == null ? "—" : `${Math.round(n * 100)}%`;
