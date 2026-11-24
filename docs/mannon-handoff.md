@@ -16,7 +16,7 @@ anything here.
 | **Listing** | https://apps.shopify.com/mannon |
 | **App** | https://manosh.fly.dev (health: `/healthz`) |
 | **Public demo** | https://manosh.fly.dev/demo (no install, no sign-up) |
-| **Repo** | `abdelrahmaneltayep/manosh`, default branch `claude/mannon-feature-slices-w3epbf` |
+| **Repo** | `abdelrahmaneltayep/manosh`, default branch `claude/mannon-feature-slices-w3epbf`. **The repo is public**: never commit anything private to it |
 | **Latest commit** | See `git log`. The last code change is `518bb35` (quote-expiry job) |
 | **Deployed build** | **Behind the repo.** On 2026-11-24 production returned 404 for `/internal/cron/quote-expiry`, so `518bb35` is not deployed yet |
 | **Customers** | None yet. Goal: 10 by 2026-12-23 |
@@ -294,8 +294,9 @@ and exits with a notice until the secret exists.
 Enforced since 2026-11-23 in the Dev Dashboard (app settings › IP allowlist). Shopify
 rejects Admin API calls from networks not on the list with a 403.
 
-- Allowed today: networks AS30081 and AS60068, which is where Fly's outgoing traffic
-  for this app came from in the logs. No single IP addresses are listed.
+- Allowed today: the two hosting networks that Fly's outgoing traffic for this app
+  came from, read from Shopify's request logs. The exact entries are in the Dev
+  Dashboard, not in this public repo. No single IP addresses are listed.
 - **Risk:** if Fly routes through a third network, every Admin API call fails. That is
   why Pricing plans is loaded after each deploy. To recover: turn Enforce off, add the
   new network from the Dev Dashboard logs, turn Enforce back on.
@@ -445,14 +446,15 @@ from the conversation itself.
 
 | Date | What the owner asked | What was done |
 |---|---|---|
-| Before Sep 19 | (from git history) | App built in slices: quoting, buyer portal, reorder, demo hub, Claude features, 22 pages merged into 7 tabbed nav items, move to Shopify App Pricing |
+| Aug 9 to Sep 12 | (from git history) | App built in slices: quoting, buyer portal, reorder, Claude features, 22 pages merged into 7 tabbed nav items, move to Shopify App Pricing |
+| Sep 12 to 19 | A demo to try before installing; listing assets kept in step with every change | Public demo: hub, live buyer demo on the dev store and a guided merchant tour, with the portal in Mannon's branding. An accepted demo quote verified as a real Shopify draft order. Customer account extension rewritten for the 2026-07 API. Privacy policy updated. Nine listing slides, a four-minute scripted walkthrough, and listing copy rewritten without pricing or outcome claims |
 | Sep 19 | Verify the customer account block and the reorder cards on the dev store; update everything that mentions them | Block and reorder card verified; reviewer instructions, screenshots, screencast script, listing copy and landing page updated |
 | Sep 22 | Check the app against the App Store requirements before submitting | Pre-submission pass; `.gitignore` cleaned up for generated extension files |
 | Sep 27 | A reusable brand document | `docs/brand.md`: logo, colour tokens, type, components, voice, plus a video section (motion graphics, voice-over, audio mix) |
 | Oct 2 | Use the tester-army e2e runner | `tests/*.e2e.ts` and `npm run test:e2e` |
 | Nov 1 | Shopify suspended the submission until Nov 4 for repeated failures. Fix the two issues and test every case | Fixed 5.1.2 (theme blocks now render as soon as added) and 1.2.2 (plan page URL built from the app's real handle). QA harness with 77 HTTP cases. Live admin click-through through Remote Control into the owner's Chrome. Protected customer data declared as Level 1 plus email only. Data protection answers and an incident response policy written |
 | Nov 1 to 2 | Fix what the live run found | Added the `write_payment_terms` scope so Net 30 attaches to a draft order; drafts priced in the agreed currency; buyers linked to their Shopify company; accept refused without a company contact; demo reorder card made reliable. Reorder tolerance set to 5% on the dev store and the reorder step re-verified |
-| Nov 3 | A walkthrough video in the "Menna" voice, produced from the terminal | Narration generated with ElevenLabs (voice "Menna", used with the voice owner's consent as the owner confirmed), take B chosen for every scene. `npm run video` downloads the takes, records the app through the owner's signed-in Chrome, and assembles the cut with captions, pointer and transitions |
+| Nov 3 | A walkthrough video in the "Menna" voice, produced from the terminal | Narration generated with ElevenLabs in the brand's "Menna" voice, take B chosen for every scene. `npm run video` downloads the takes, records the app through the owner's signed-in Chrome, and assembles the cut with captions, pointer and transitions |
 | Nov 5 | Redesign the landing page, with options to choose from | Several options built as a preview artifact (https://claude.ai/code/artifact/c357d351-8120-4492-9686-286c92eb2857). Owner chose option B with animations, a demo store page and a pricing page. New logo, favicon and capital-M wordmark. Deployed |
 | Nov 5 | Test the whole app from the terminal, including the Shopify admin | `npm run qa:all` (live) and `npm run qa:local` (mocks), with the catalogue in `docs/qa/test-catalog.md` |
 | Nov 5 | "Can I submit now?" (asked several times, with the pre-submission review skill) | Fixed 2.3.1 (no typed store domain on login; agency stores join by invite code), 5.1.3 (theme-editor deep links), 1.1.6 (cross-store discovery directory switched off). Wrote the reviewer instructions, the network access request reason for the customer account extension, and the screenshot shot list; captured the screenshots |
@@ -501,6 +503,7 @@ already has copies of these:
 | Review screencast, walkthrough video, narration takes | Sent to the owner as files |
 | Listing images (thumbnail and six screenshots, with alt text) | Sent to the owner as a zip |
 | Proof videos for review issues 1.2.2 and 2.1.1 | Sent to the owner as files |
+| Full conversation log, message by message (`mannon-conversation-log.md`) | Sent to the owner as a file. Kept out of the repo because the repo is public |
 
 ### 15.5 Facts learned the hard way
 
