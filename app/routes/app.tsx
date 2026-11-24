@@ -7,6 +7,7 @@ import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 
 import { authenticate } from "../shopify.server";
 import { navFlags, visibleNavParents } from "../lib/nav";
+import { emailDeliveryEnabled } from "../services/mailer.server";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
@@ -18,7 +19,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   // Only link to ENABLED features. A flag-gated route 404s when off, and linking
   // to it makes the embedded app throw "Something went wrong" on tab click
   // (App Store review 2.1.1). Core routes below have no flag and always show.
-  return { apiKey: process.env.SHOPIFY_API_KEY || "", nav: navFlags(process.env) };
+  return {
+    apiKey: process.env.SHOPIFY_API_KEY || "",
+    nav: navFlags(process.env),
+    // One switch for every "send" label in the admin (lib/email-delivery.ts).
+    emailDelivery: emailDeliveryEnabled(),
+  };
 };
 
 // Embedded admin shell. The nav grows as later slices land their routes

@@ -6,6 +6,8 @@ import { authenticate } from "../shopify.server";
 import { getEmailTemplates } from "../services/settings.server";
 import { SectionTabs } from "../components/SectionTabs";
 import { TEMPLATE_GROUPS, TEMPLATE_INFO } from "../lib/notification-templates";
+import { emailCopy } from "../lib/email-delivery";
+import { useEmailDelivery } from "../lib/use-email-delivery";
 
 /**
  * Settings › Notifications — every email Mannon sends, grouped by job, one row
@@ -21,15 +23,29 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 export default function Notifications() {
   const { customized } = useLoaderData<typeof loader>();
   const edited = new Set(customized);
+  const emailDelivery = useEmailDelivery();
+  const copy = emailCopy(emailDelivery);
   return (
     <Page>
       <TitleBar title="Notifications" />
       <SectionTabs active="notifications" />
       <BlockStack gap="400">
-        <Text as="p" tone="subdued">
-          The emails Mannon sends for you. Open one to change its subject and message, or draft new
-          wording with Claude. Emails you haven’t changed use Mannon’s default wording.
-        </Text>
+        {!emailDelivery && (
+          <Card>
+            <BlockStack gap="200">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Sender</Text>
+                <Badge tone="attention">Not connected</Badge>
+              </InlineStack>
+              <Text as="p" variant="bodyMd">
+                Mannon isn’t connected to a sender yet, so none of the messages below are delivered.
+                Until it is, use the Copy actions on quotes, follow-ups and applications to share links
+                and wording yourself.
+              </Text>
+            </BlockStack>
+          </Card>
+        )}
+        <Text as="p" tone="subdued">{copy.notificationsIntro}</Text>
         {TEMPLATE_GROUPS.map((group) => (
           <Card key={group.id} padding="0">
             <BlockStack gap="0">
@@ -44,19 +60,19 @@ export default function Notifications() {
                 </BlockStack>
               </div>
               <ResourceList
-                resourceName={{ singular: "email", plural: "emails" }}
+                resourceName={{ singular: "message", plural: "messages" }}
                 items={group.keys.map((key) => ({ id: key, key }))}
                 renderItem={({ key }: { id: string; key: string }) => {
                   const info = TEMPLATE_INFO[key] ?? { label: key, to: "Buyer" as const };
                   return (
-                    <ResourceItem id={key} url={`/app/notifications/${key}`} accessibilityLabel={`Edit ${info.label} email`}>
+                    <ResourceItem id={key} url={`/app/notifications/${key}`} accessibilityLabel={`Edit ${info.label} wording`}>
                       <InlineStack align="space-between" blockAlign="center" gap="200" wrap={false}>
                         <BlockStack gap="050">
                           <Text as="span" fontWeight="semibold">
                             {info.label}
                           </Text>
                           <Text as="span" tone="subdued" variant="bodySm">
-                            {`Sent to: ${info.to === "You" ? "you" : info.to.toLowerCase()}`}
+                            {copy.notificationsRecipient(info.to === "You" ? "you" : info.to.toLowerCase())}
                           </Text>
                         </BlockStack>
                         <InlineStack gap="200" blockAlign="center" wrap={false}>
@@ -83,7 +99,7 @@ export function ErrorBoundary() {
     <Page>
       <TitleBar title="Notifications" />
       <Banner tone="critical" title="We couldn’t load your notifications" action={{ content: "Try again", url: "/app/notifications" }}>
-        <p>Your email wording is safe. Reload the page, and if this keeps happening contact Mannon support.</p>
+        <p>Your wording is safe. Reload the page, and if this keeps happening contact Mannon support.</p>
       </Banner>
     </Page>
   );

@@ -130,7 +130,7 @@ export function FeaturesBlock({ buyerHref }: { buyerHref: string }) {
             Every request with status, follow-ups and Totals from Shopify. Claude drafts counters and add-ons; you review and send. It never acts on its own.
           </Feature>
           <Feature ic="$" title="PDF, net terms & draft orders" where="Shopify · Orders → Drafts" href="/demo/tour" link="See a draft order →" delay="d1">
-            Branded quote PDFs by download or email. Accepting creates a Shopify draft order with PO number, Net 30 and payment due later. Deposits and pay-by-link on Growth.
+            Branded quote PDFs to download and share. Accepting creates a Shopify draft order with PO number, Net 30 and payment due later. Deposits and pay-by-link on Growth.
           </Feature>
           <Feature ic="↻" title="Buyer portal, reorder & order pad" where="Portal · no login" href={buyerHref} link="Open the buyer demo →" delay="d2">
             Passwordless quote history, one-tap reorder re-priced live, an order pad that reads SKUs, CSV or a pasted PO. English, Arabic and French.
@@ -143,7 +143,7 @@ export function FeaturesBlock({ buyerHref }: { buyerHref: string }) {
         <div className="steps">
           <div className="s rv"><i>1</i><b>Buyers add products and send a request</b>From Add to Quote, Make an Offer or the quote form. Email and company only.</div>
           <div className="s rv d1"><i>2</i><b>You review and counter</b>In the inbox, with Totals from Shopify. Claude drafts the counter; you decide.</div>
-          <div className="s rv d2"><i>3</i><b>Send the quote with pricing and terms</b>The buyer gets a passwordless link and a PDF. Follow-ups go out on your schedule.</div>
+          <div className="s rv d2"><i>3</i><b>Send the quote with pricing and terms</b>Share a passwordless link and a PDF with the buyer. Follow-ups are flagged when they’re due.</div>
           <div className="s rv d3"><i>4</i><b>The buyer accepts and Shopify orders</b>Net 30 from your templates, then a draft order with the PO. Reorder in one tap later.</div>
         </div>
 

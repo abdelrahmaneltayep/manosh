@@ -400,8 +400,7 @@ export default function Credit() {
           <Banner tone="warning" title="Credit control is a Growth feature">
             <p>
               Starter includes net terms and due dates on invoices. Upgrade to
-              Growth for credit limits, the aging dashboard, automatic reminders,
-              and invoice PDFs.
+              Growth for credit limits, the aging dashboard and invoice PDFs.
             </p>
             <Box paddingBlockStart="200">
               <Button url={upgradeUrl("growth")} variant="primary">

@@ -48,7 +48,7 @@ export default function RepAuth() {
       <p className="error">
         {data.state === "expired" ? "This sign-in link has expired." : "This sign-in link is invalid or has already been used."}
       </p>
-      <p className="muted">Ask your manager to send you a new invite link.</p>
+      <p className="muted">Ask your manager for a new invite link.</p>
     </section>
   );
 }

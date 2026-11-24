@@ -389,7 +389,7 @@ function BrandingCard({
   return (
     <DisclosureCard
       title="White-label this store’s buyer portal"
-      subtitle="Apply this client’s brand to buyer-facing pages and emails. The Shopify admin always stays Mannon."
+      subtitle="Apply this client’s brand to buyer-facing pages. The Shopify admin always stays Mannon."
       badge={hasBranding ? <Badge tone="success">Customized</Badge> : undefined}
       defaultOpen={!hasBranding && canEdit}
     >

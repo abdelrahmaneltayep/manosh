@@ -45,6 +45,10 @@ import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
+import { emailDeliveryEnabled } from "../services/mailer.server";
+import { emailCopy } from "../lib/email-delivery";
+import { useEmailDelivery } from "../lib/use-email-delivery";
+import { CopyPanel } from "../components/CopyPanel";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_REP_PORTAL === "true";
@@ -104,7 +108,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       if (!email) return { ok: false, error: "Enter an email." };
       const note = String(form.get("note") ?? "").trim() || undefined;
       const { url } = await inviteRep(session.shop, { email, name: String(form.get("name") ?? ""), note }, status.plan, baseUrl);
-      return { ok: true, message: "Rep invited.", inviteUrl: url };
+      return { ok: true, message: emailCopy(emailDeliveryEnabled()).repInviteDone, inviteUrl: url };
     }
     if (intent === "assign") {
       await assignCompany(session.shop, String(form.get("repId") ?? ""), String(form.get("companyId") ?? ""));
@@ -168,6 +172,8 @@ export default function Reps() {
     );
   }
 
+  const emailDelivery = useEmailDelivery();
+  const copy = emailCopy(emailDelivery);
   const focusInvite = () => {
     if (typeof document !== "undefined") document.getElementById(INVITE_EMAIL_ID)?.focus();
   };
@@ -177,12 +183,15 @@ export default function Reps() {
       <TitleBar title="Reps" />
       <SectionTabs active="reps" />
       <BlockStack gap="500">
-        {actionData?.ok === true && (
-          <Banner tone="success" title={actionData.message}>
-            {actionData.inviteUrl && (
-              <p>Share this secure sign-in link if email isn’t configured: <code>{actionData.inviteUrl}</code></p>
-            )}
-          </Banner>
+        {actionData?.ok === true && actionData.message && <Banner tone="success" title={actionData.message} />}
+        {actionData?.ok === true && actionData.inviteUrl && !emailDelivery && (
+          <CopyPanel
+            title="Rep sign-in link ready"
+            description="Share this link with the rep. It signs them in and shows only the accounts you assign. It isn’t shown again."
+            text={actionData.inviteUrl}
+            toast="Sign-in link copied"
+            copyLabel="Copy link"
+          />
         )}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
 
@@ -260,6 +269,7 @@ export default function Reps() {
               <BlockStack gap="200">
                 <TextField
                   label="Personal note (optional)"
+                  helpText={emailDelivery ? undefined : "Saved with the rep. Mannon doesn’t deliver it yet, so add it to your own message."}
                   name="note"
                   value={note}
                   onChange={setNote}
@@ -301,7 +311,7 @@ export default function Reps() {
               </BlockStack>
 
               <InlineStack>
-                <Button variant="primary" submit loading={busyIntent === "invite"}>Send invite</Button>
+                <Button variant="primary" submit loading={busyIntent === "invite"}>{copy.repInviteAction}</Button>
               </InlineStack>
             </BlockStack>
           </Form>

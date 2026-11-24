@@ -1,18 +1,19 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { Form, useLoaderData } from "@remix-run/react";
-import { verifyMagicToken } from "../services/magic-link.server";
+import { safePortalPath, verifyMagicToken } from "../services/magic-link.server";
 import { commitBuyerSession } from "../services/buyer-session.server";
 
 type LoaderData =
-  | { state: "valid"; email: string; token: string }
+  | { state: "valid"; email: string; token: string; next: string | null }
   | { state: "invalid" }
   | { state: "expired" };
 
 // GET: peek at the token (no consumption) so email link-scanners can't burn it,
 // then show a "Continue" button that POSTs to actually sign in.
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const token = new URL(request.url).searchParams.get("token");
+  const params = new URL(request.url).searchParams;
+  const token = params.get("token");
   const result = await verifyMagicToken(token, { consume: false });
   if (!result.ok) {
     return { state: result.reason } satisfies LoaderData;
@@ -21,6 +22,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     state: "valid",
     email: result.buyer.email,
     token: token as string,
+    // A link made for one quote lands on that quote (portal paths only).
+    next: safePortalPath(params.get("next")),
   } satisfies LoaderData;
 };
 
@@ -35,7 +38,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return redirect(`/portal/auth?token=${encodeURIComponent(token)}`);
   }
   const cookie = await commitBuyerSession(result.buyer.id);
-  return redirect("/portal", { headers: { "Set-Cookie": cookie } });
+  const next = safePortalPath(String(form.get("next") ?? ""));
+  return redirect(next ?? "/portal", { headers: { "Set-Cookie": cookie } });
 };
 
 export default function PortalAuth() {
@@ -50,6 +54,7 @@ export default function PortalAuth() {
         </p>
         <Form method="post" style={{ marginTop: "1rem" }}>
           <input type="hidden" name="token" value={data.token} />
+          {data.next && <input type="hidden" name="next" value={data.next} />}
           <button type="submit" className="portal-button">
             Continue
           </button>
@@ -67,7 +72,7 @@ export default function PortalAuth() {
           : "This sign-in link is invalid or has already been used."}
       </p>
       <p className="muted">
-        Ask your supplier to send you a new link, then open it from your email.
+        Ask your supplier for a new link, then open it.
       </p>
     </section>
   );

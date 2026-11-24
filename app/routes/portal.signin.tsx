@@ -4,13 +4,13 @@
 export default function PortalSignin() {
   return (
     <section className="portal-card">
-      <h1>Check your email</h1>
+      <h1>Open your sign-in link</h1>
       <p className="muted">
         Your wholesale portal is passwordless. Open the sign-in link your
-        supplier emailed you to get in.
+        supplier gave you to get in.
       </p>
       <p className="muted">
-        If your link has expired, ask your supplier to send a new one.
+        If your link has expired, ask your supplier for a new one.
       </p>
     </section>
   );

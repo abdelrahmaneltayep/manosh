@@ -108,6 +108,7 @@ store, theme and Shopify Admin.
 | M12 | Requests, Offers → widget, Price rules: "Add to theme" (App Store 5.1.3) | one deep link per block in Shopify's format; live, the theme editor opens with the block placed (left unsaved) |
 | M14 | Plan shown matches Shopify (review 1.2.2) | Local: with no subscription, Pricing plans shows "You haven't chosen a plan yet", no Current badge and four Choose buttons, and Settings says "No plan selected"; after Growth is approved, Growth is Current. Live: reports which plan is marked Current, to compare with Shopify's Billing card |
 | M15 | Home: review prompt (review 2.1.1) | no "Leave a review" control and no link to apps.shopify.com; the request goes to Shopify's native review modal through App Bridge. M1 also fails any page with a link that would load another site inside the app frame |
+| M16 | Honest email labels (dashboard review slice 1) | with no email sender connected, no screen offers to send or email: quote detail offers "Copy buyer link", Follow-ups offers "Copy reminder", Applications and Requests hand over the message to copy, Reps hand over the sign-in link, Settings › Notifications shows "Sender: Not connected". Each copy action puts the text on the clipboard and shows a toast. Nothing is recorded as sent. Covered by `app/lib/email-delivery.test.ts`, `app/services/email-delivery.server.test.ts` and `tests/portal-signin.e2e.ts` |
 
 ## B — Buyer in the passwordless portal (magic link from M7)
 | ID | Case | Expected |

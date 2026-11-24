@@ -3,7 +3,8 @@ import type { FollowupKind } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { expireQuote } from "./quote.server";
-import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
+import { emailDeliveryEnabled, resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
+import { issueMagicLink } from "./magic-link.server";
 import { getPlanLimits } from "../lib/billing";
 import {
   computeSchedule,
@@ -151,7 +152,14 @@ export async function dispatchForShop(shopDomain: string, baseUrl: string, now: 
       continue;
     }
 
-    // Reminder / expiry warning.
+    // Reminder / expiry warning. With no sender connected nothing can go out,
+    // so leave it SCHEDULED: it stays "Due" on the Follow-ups page, where the
+    // merchant copies the reminder and sends it themselves. Never record a
+    // reminder as sent when it wasn't.
+    if (!emailDeliveryEnabled()) {
+      skipped++;
+      continue;
+    }
     if (isUnsubscribed(quote.reminderState) || !businessHoursOk) {
       skipped++;
       continue; // leave SCHEDULED; a later run in-hours picks it up
@@ -249,13 +257,61 @@ export async function sendNow(
   options: { now?: Date; customBody?: string } = {},
 ): Promise<boolean> {
   const now = options.now ?? new Date();
+  const reminder = await buildReminder(shopDomain, quoteId, baseUrl, options.customBody);
+  if (!reminder) return false;
+  const result = await sendEmail({ to: reminder.to, subject: reminder.subject, html: reminder.body, text: reminder.body });
+  // Only record a send that happened.
+  if (!result.sent) return false;
+  await recordManualReminder(reminder.shopId, quoteId, now, "email");
+  return true;
+}
+
+/**
+ * The reminder as text for the merchant to copy and send themselves, used while
+ * no sender is connected. The link in it is a fresh sign-in link that opens the
+ * quote (the buyer has no other way in), so it replaces any earlier unused link
+ * for that buyer. The cadence advances exactly as a sent reminder would, so the
+ * quote leaves "Needs a nudge" once the merchant has dealt with it.
+ */
+export async function copyReminder(
+  shopDomain: string,
+  quoteId: string,
+  baseUrl: string,
+  options: { now?: Date; customBody?: string } = {},
+): Promise<{ to: string; subject: string; body: string } | null> {
+  const now = options.now ?? new Date();
+  const base = await buildReminder(shopDomain, quoteId, baseUrl, options.customBody);
+  if (!base) return null;
+  const { url } = await issueMagicLink(base.buyerId, { baseUrl, now, next: `/portal/quotes/${quoteId}` });
+  const reminder = await buildReminder(shopDomain, quoteId, baseUrl, options.customBody, url);
+  if (!reminder) return null;
+  await recordManualReminder(reminder.shopId, quoteId, now, "copy");
+  // The unsubscribe line is for automatic reminders. A message the merchant
+  // sends personally doesn't need it, so drop any line that carries that link.
+  const body = reminder.body
+    .split("\n")
+    .filter((line) => !line.includes("/portal/unsubscribe/"))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { to: reminder.to, subject: reminder.subject, body };
+}
+
+/** Render the reminder for an open quote owned by the shop. `quoteLink` overrides the portal URL. */
+async function buildReminder(
+  shopDomain: string,
+  quoteId: string,
+  baseUrl: string,
+  customBody?: string,
+  quoteLink?: string,
+): Promise<{ shopId: string; buyerId: string; to: string; subject: string; body: string } | null> {
   const owned = await prisma.quote.findFirst({
     where: { id: quoteId, company: { shop: { shopifyDomain: shopDomain } } },
-    include: { company: { include: { shop: { select: { id: true, emailTemplates: true } } } }, buyer: { select: { email: true, name: true } } },
+    include: { company: { include: { shop: { select: { id: true, emailTemplates: true } } } }, buyer: { select: { id: true, email: true, name: true } } },
   });
-  if (!owned || !ACTIVE.includes(owned.status as "SUBMITTED" | "COUNTERED")) return false;
+  if (!owned || !ACTIVE.includes(owned.status as "SUBMITTED" | "COUNTERED")) return null;
 
-  const quoteUrl = `${baseUrl}/portal/quotes/${owned.id}`;
+  const quoteUrl = quoteLink ?? `${baseUrl}/portal/quotes/${owned.id}`;
   const unsubscribeUrl = `${baseUrl}/portal/unsubscribe/${owned.id}?t=${unsubscribeToken(owned.id)}`;
   const template = resolveTemplate("followup_reminder", owned.company.shop.emailTemplates);
   const rendered = renderTemplate(template, {
@@ -265,13 +321,15 @@ export async function sendNow(
     unsubscribeUrl,
     shopName: shopDomain,
   });
-  const custom = options.customBody?.trim();
-  const subject = rendered.subject;
+  const custom = customBody?.trim();
   const body = custom
     ? `${custom}\n\nView your quote: ${quoteUrl}\n\nTo stop these reminders: ${unsubscribeUrl}`
     : rendered.body;
-  await sendEmail({ to: owned.buyer.email, subject, html: body, text: body });
+  return { shopId: owned.company.shop.id, buyerId: owned.buyer.id, to: owned.buyer.email, subject: rendered.subject, body };
+}
 
+/** Advance the cadence and log the reminder. `via` says how it left: email, or copied by the merchant. */
+async function recordManualReminder(shopId: string, quoteId: string, now: Date, via: "email" | "copy"): Promise<void> {
   // Mark the earliest scheduled reminder as sent (so the cadence advances).
   const next = await prisma.quoteFollowup.findFirst({
     where: { quoteId, status: "SCHEDULED", kind: "REMINDER" },
@@ -280,16 +338,14 @@ export async function sendNow(
   if (next) await prisma.quoteFollowup.update({ where: { id: next.id }, data: { status: "SENT", sentAt: now } });
 
   await appendEvent({
-    shopId: owned.company.shop.id,
+    shopId,
     type: "FOLLOWUP_SENT",
     entityType: "Quote",
     entityId: quoteId,
-    payload: { kind: "REMINDER", manual: true },
+    payload: { kind: "REMINDER", manual: true, via },
   });
-  return true;
 }
 
-/** Buyer unsubscribe (from an email link): stop nudges for this quote. */
 export async function unsubscribeQuote(quoteId: string): Promise<void> {
   await prisma.quote.update({
     where: { id: quoteId },

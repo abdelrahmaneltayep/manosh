@@ -2,6 +2,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "@remi
 import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { getPublicForm, submitApplication } from "../services/wholesale.server";
 import { HONEYPOT_FIELD } from "../lib/wholesale";
+import { emailDeliveryEnabled } from "../services/mailer.server";
 
 const ENABLED = () => process.env.MANNON_FF_WHOLESALE_REG === "true";
 
@@ -12,10 +13,11 @@ export const loader = async ({ params }: LoaderFunctionArgs) => {
   const shop = params.shop!;
   const form = await getPublicForm(shop);
   if (!form) {
-    return { shop, form: null as null };
+    return { shop, form: null as null, emailDelivery: emailDeliveryEnabled() };
   }
   return {
     shop,
+    emailDelivery: emailDeliveryEnabled(),
     form: {
       name: form.name,
       fields: form.fields.map((f) => ({
@@ -52,7 +54,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 };
 
 export default function Apply() {
-  const { shop, form } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
+  const { shop, form } = data;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const busy = nav.state === "submitting";
@@ -102,15 +105,19 @@ export default function Apply() {
           </h1>
           <p style={{ margin: 0, color: "#3a4a12" }}>
             {actionData && "status" in actionData && actionData.status === "APPROVED"
-              ? "Check your email for a secure link to start ordering at your trade prices."
-              : "Thanks — we’ll review your application and email you a decision. Your trade pricing unlocks once you’re approved."}
+              ? data.emailDelivery
+                ? "Check your email for a secure link to start ordering at your trade prices."
+                : "We’ll be in touch with a secure link so you can start ordering at your trade prices."
+              : data.emailDelivery
+                ? "Thanks — we’ll review your application and email you a decision. Your trade pricing unlocks once you’re approved."
+                : "Thanks — we’ll review your application and be in touch with a decision. Your trade pricing unlocks once you’re approved."}
           </p>
         </div>
       ) : (
         <>
           <p style={{ color: "#5b5670", marginTop: 0 }}>
             Tell us about your business. We review each application before unlocking
-            trade pricing — no password needed, we’ll email you a secure link.
+            trade pricing — no password needed, {data.emailDelivery ? "we’ll email you a secure link." : "you sign in with a secure link."}
           </p>
           {topError && <p style={{ color: "#8a1f11" }} role="alert">{topError}</p>}
           {errs && errs.length > 0 && (

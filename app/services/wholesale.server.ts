@@ -364,7 +364,7 @@ export async function decideApplication(
   reviewedBy: string,
   baseUrl: string,
   options: { customNote?: string } = {},
-): Promise<void> {
+): Promise<DecisionMessage> {
   const shop = await shopFor(shopDomain);
   if (!shop) throw new NotFoundError();
   const app = await prisma.wholesaleApplication.findFirst({ where: { id: applicationId, shopId: shop.id } });
@@ -402,7 +402,20 @@ export async function decideApplication(
   // template body (with the portal link) follows so the message stays actionable.
   const note = options.customNote?.trim();
   const body = note ? `${note}\n\n${rendered.body}` : rendered.body;
-  await sendEmail({ to: app.contactEmail, subject: rendered.subject, html: body, text: body });
+  const result = await sendEmail({ to: app.contactEmail, subject: rendered.subject, html: body, text: body });
+  return { to: app.contactEmail, subject: rendered.subject, body, sent: result.sent };
+}
+
+/**
+ * The decision message for an applicant. `sent` is false while no sender is
+ * connected; the merchant then copies `body` (it carries the applicant's
+ * sign-in link when approved) and sends it themselves.
+ */
+export interface DecisionMessage {
+  to: string;
+  subject: string;
+  body: string;
+  sent: boolean;
 }
 
 /** Bulk approve a set of applications. */

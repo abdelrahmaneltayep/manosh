@@ -145,12 +145,12 @@ export default function PublicCatalog() {
         <h2 style={{ margin: "0 0 0.35rem", fontSize: "1.35rem" }}>Request wholesale access</h2>
         {done ? (
           <div style={{ background: "#f0f7d6", border: "1px solid #dbe9a8", borderRadius: "0.8rem", padding: "1.1rem", color: "#3a4a12" }}>
-            <strong>Request sent.</strong> {view.shopDomain} will review it and email you a secure link once you’re approved.
+            <strong>Request sent.</strong> {view.shopDomain} will review it and get you a secure link once you’re approved.
           </div>
         ) : (
           <>
             <p style={{ color: "#5b5670", marginTop: 0 }}>
-              Tell us about your business. We review each request and email you a secure link — no password needed.
+              Tell us about your business. We review each request and get you a secure link — no password needed.
             </p>
             {error && <p style={{ color: "#8a1f11" }} role="alert">{error}</p>}
             <Form method="post">

@@ -22,7 +22,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { requireBilling } from "../services/billing.server";
 import { isGrowthTier } from "../lib/billing";
-import { getPolicy, upsertPolicy, needsNudgeList, sendNow } from "../services/followups.server";
+import { getPolicy, upsertPolicy, needsNudgeList, sendNow, copyReminder } from "../services/followups.server";
 import { clampCadence } from "../lib/followups";
 import { formatDate } from "../lib/format";
 import {
@@ -38,6 +38,10 @@ import { draftFollowupMessage } from "../services/followups-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
 import { DisclosureCard } from "../components/DisclosureCard";
+import { emailDeliveryEnabled } from "../services/mailer.server";
+import { EMAIL_OFF_NOTICE, emailCopy, type EmailCopy } from "../lib/email-delivery";
+import { useEmailDelivery } from "../lib/use-email-delivery";
+import { CopyPanel } from "../components/CopyPanel";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_FOLLOWUPS === "true";
@@ -63,7 +67,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 type ActionResult =
-  | { ok: true; message?: string; draft?: { quoteId: string; message: string } }
+  | { ok: true; message?: string; draft?: { quoteId: string; message: string }; copy?: { quoteId: string; to: string; text: string } }
   | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
@@ -92,8 +96,16 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
 
   if (intent === "send-now") {
     const customBody = String(form.get("message") ?? "").trim() || undefined;
-    const ok = await sendNow(session.shop, String(form.get("quoteId") ?? ""), baseUrl, { customBody });
-    return ok ? { ok: true, message: "Reminder sent." } : { ok: false, error: "Couldn’t send that reminder." };
+    const quoteId = String(form.get("quoteId") ?? "");
+    // No sender connected: hand the merchant the reminder to send themselves.
+    if (!emailDeliveryEnabled()) {
+      const reminder = await copyReminder(session.shop, quoteId, baseUrl, { customBody });
+      return reminder
+        ? { ok: true, message: "", copy: { quoteId, to: reminder.to, text: reminder.body } }
+        : { ok: false, error: "That quote is no longer open." };
+    }
+    const ok = await sendNow(session.shop, quoteId, baseUrl, { customBody });
+    return ok ? { ok: true, message: emailCopy(true).reminderDone } : { ok: false, error: "Couldn’t send that reminder." };
   }
 
   if (intent === "save-policy") {
@@ -130,6 +142,9 @@ export default function Followups() {
 
   const err = actionData && !actionData.ok ? actionData.error : null;
   const msg = actionData && actionData.ok ? actionData.message : null;
+  const copied = (actionData && actionData.ok ? actionData.copy : null) ?? null;
+  const emailDelivery = useEmailDelivery();
+  const copy = emailCopy(emailDelivery);
 
   return (
     <Page>
@@ -138,6 +153,20 @@ export default function Followups() {
       <BlockStack gap="500">
         {err && <Banner tone="critical" title="Something went wrong"><p>{err}</p></Banner>}
         {msg && <Banner tone="success" title={msg} />}
+        {copied && (
+          <CopyPanel
+            title="Reminder ready"
+            description={`Paste this into a message to ${copied.to}. The link signs them in and opens the quote; it works once and replaces any earlier link you made for this buyer.`}
+            text={copied.text}
+            toast="Reminder copied"
+            copyLabel="Copy reminder"
+          />
+        )}
+        {!emailDelivery && (
+          <Banner tone="info" title="Reminders aren’t delivered automatically yet">
+            <p>{EMAIL_OFF_NOTICE} Quotes that are due stay in the list below until you copy their reminder.</p>
+          </Banner>
+        )}
 
         {/* 1 — The job: open quotes that need a reminder now. */}
         <Card>
@@ -156,7 +185,7 @@ export default function Followups() {
             ) : (
               <BlockStack gap="0">
                 {data.nudge.map((n, i) => (
-                  <NudgeRow key={n.id} n={n} access={data.access as ClaudeAccess} divider={i > 0} />
+                  <NudgeRow key={n.id} n={n} access={data.access as ClaudeAccess} divider={i > 0} copy={copy} />
                 ))}
               </BlockStack>
             )}
@@ -168,7 +197,9 @@ export default function Followups() {
           subtitle={
             data.policy.enabled
               ? `On · ${data.effectiveCadence.length ? data.effectiveCadence.map((d) => `day ${d}`).join(", ") : "expiry reminder only"} · quotes expire after ${data.policy.expiryDays} days`
-              : "Off. Turn it on so open quotes get a reminder before they expire."
+              : emailDelivery
+                ? "Off. Turn it on so open quotes get a reminder before they expire."
+                : "Off. Turn it on so open quotes are flagged here when a reminder is due."
           }
           defaultOpen={!data.policy.enabled}
           showLabel="Edit"
@@ -177,16 +208,24 @@ export default function Followups() {
           <Form method="post">
             <input type="hidden" name="intent" value="save-policy" />
             <BlockStack gap="300">
-              <Checkbox label="Automatically follow up on open quotes" name="enabled" checked={enabled} onChange={setEnabled} />
+              <Checkbox
+                label={emailDelivery ? "Automatically follow up on open quotes" : "Flag open quotes when a reminder is due"}
+                helpText={emailDelivery ? undefined : "Quotes still expire on schedule. Reminders wait in “Needs a nudge” for you to copy."}
+                name="enabled"
+                checked={enabled}
+                onChange={setEnabled}
+              />
               <InlineGrid columns={{ xs: 1, sm: 3 }} gap="300">
                 <TextField label="Expire quotes after (days)" type="number" name="expiryDays" value={expiryDays} onChange={setExpiryDays} min={1} max={365} autoComplete="off" />
                 <TextField label="Nudge on days after submit" name="cadenceDays" value={cadence} onChange={setCadence} autoComplete="off" helpText="Comma-separated, e.g. 3, 7, 12" disabled={!data.isGrowth} />
                 <TextField label="Max nudges" type="number" name="maxNudges" value={maxNudges} onChange={setMaxNudges} min={0} max={10} autoComplete="off" disabled={!data.isGrowth} />
               </InlineGrid>
-              <TextField label="Store time zone" name="timezone" value={tz} onChange={setTz} autoComplete="off" placeholder="e.g. Asia/Riyadh" helpText="Reminders only go out during business hours (Mon–Fri, 9–18) in this time zone. Use a name like Asia/Riyadh or America/New_York." />
+              <TextField label="Store time zone" name="timezone" value={tz} onChange={setTz} autoComplete="off" placeholder="e.g. Asia/Riyadh" helpText={emailDelivery
+                  ? "Reminders only go out during business hours (Mon–Fri, 9–18) in this time zone. Use a name like Asia/Riyadh or America/New_York."
+                  : "Used to work out business hours (Mon–Fri, 9–18). Use a name like Asia/Riyadh or America/New_York."} />
               {!data.isGrowth && (
                 <Banner tone="warning">
-                  <p>Starter sends a <b>single</b> reminder per quote plus the expiry. Upgrade to Growth for a multi-nudge cadence and auto-expiry actions.</p>
+                  <p>Starter includes a <b>single</b> reminder per quote plus the expiry. Upgrade to Growth for a multi-nudge cadence and auto-expiry actions.</p>
                   <Box paddingBlockStart="200"><Button url={upgradeUrl("growth")} variant="primary">Upgrade to Growth</Button></Box>
                 </Banner>
               )}
@@ -207,10 +246,12 @@ function NudgeRow({
   n,
   access,
   divider,
+  copy,
 }: {
   n: { id: string; companyName: string; expiresAt: string | Date; overdue: boolean };
   access: ClaudeAccess;
   divider: boolean;
+  copy: EmailCopy;
 }) {
   const draftFetcher = useFetcher<typeof action>();
   const drafting = draftFetcher.state !== "idle";
@@ -271,10 +312,10 @@ function NudgeRow({
                 onChange={setMessage}
                 multiline={2}
                 autoComplete="off"
-                placeholder="Leave blank to send your default reminder, or draft one with Claude above."
+                placeholder={copy.reminderPlaceholder}
               />
               <InlineStack>
-                <Button size="slim" submit>{message.trim() ? "Send this message" : "Send default reminder"}</Button>
+                <Button size="slim" submit accessibilityLabel={`${copy.reminderAction(Boolean(message.trim()))} for ${n.companyName}`}>{copy.reminderAction(Boolean(message.trim()))}</Button>
               </InlineStack>
             </BlockStack>
           </Form>

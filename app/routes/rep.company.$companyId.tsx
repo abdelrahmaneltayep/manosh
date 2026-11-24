@@ -9,6 +9,7 @@ import { getCompanyPricing } from "../services/price-list.server";
 import { resolvePrice } from "../lib/price-resolver";
 import { parseQuoteSelections, submitBuyerQuote } from "../services/portal-quote.server";
 import { impersonationBannerText } from "../lib/rep";
+import { emailDeliveryEnabled } from "../services/mailer.server";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!REP_PORTAL_ENABLED()) throw new Response("Not found", { status: 404 });
@@ -51,6 +52,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     items,
     catalogError,
     placed: url.searchParams.get("placed"),
+    emailDelivery: emailDeliveryEnabled(),
   };
 };
 
@@ -110,7 +112,9 @@ export default function RepCompany() {
 
       {data.placed && (
         <p className="save-badge" role="status" style={{ display: "inline-block", marginBottom: "0.5rem" }}>
-          Order placed on behalf of the buyer — they’ve been notified.
+          {data.emailDelivery
+            ? "Order placed on behalf of the buyer — they’ve been notified."
+            : "Order placed on behalf of the buyer. Let them know it’s in."}
         </p>
       )}
 

@@ -340,13 +340,18 @@ Lessons that still apply:
 
 ## 11. Known gaps (verified, most important first)
 
-1. **No email is delivered.** `sendEmail` in `app/services/mailer.server.ts` has no
-   transport. With `MANNON_MAIL_FROM` unset it skips; with it set it returns
-   `sent: true` without sending. This affects follow-ups, payment and tax reminders,
-   invoice emails, "Email PDF to buyer", the weekly digest and reorder nudges. Buyers
-   get their sign-in link because the merchant copies it from Buyers › Generate link.
-   Needs a provider decision (for example Resend, Postmark or SES), then a real
-   `deliver()` and honest UI states. Do not promise any automatic email until done.
+1. **No email is delivered, and the app now says so.** No provider is connected.
+   `emailDeliveryEnabled()` in `app/services/mailer.server.ts` is the single switch:
+   true only when a provider is installed with `setMailTransport()` and
+   `MANNON_MAIL_FROM` is set. While it is false, `sendEmail` reports `skipped`,
+   nothing is recorded as sent, and every "send" action is a Copy action
+   (`app/lib/email-delivery.ts`): Copy buyer link on a quote, Copy reminder on
+   Follow-ups, a copyable message for application decisions, request replies and
+   catalog access, a copyable sign-in link for reps and buyer team invites.
+   Settings › Notifications shows "Sender: Not connected". Connecting a provider
+   means writing one transport function and calling `setMailTransport`; the labels
+   switch back on their own. Not yet covered: payment, tax and invoice reminder jobs
+   still write their records when run (they are not scheduled in production).
 2. **Scheduled jobs are off** in production (section 9.3), and the latest build is not
    deployed (section 1).
 3. **The Free plan path is untested on a real store.** It is unknown whether choosing

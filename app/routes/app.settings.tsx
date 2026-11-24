@@ -160,7 +160,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
     const result = await addStaffSeat(settings.id, String(form.get("email") ?? ""));
     return result.ok
-      ? ({ ok: true, kind: "seat", message: `Invited ${result.seat.email}.` } satisfies ActionResult)
+      ? ({ ok: true, kind: "seat", message: `Added ${result.seat.email} to your team.` } satisfies ActionResult)
       : ({ ok: false, kind: "seat", error: result.error } satisfies ActionResult);
   }
 
@@ -203,7 +203,7 @@ function ClaudeToggle({ initialEnabled }: { initialEnabled: boolean }) {
     <BlockStack gap="150">
       <Checkbox
         label="Use Claude to draft"
-        helpText="Adds ✦ Draft with Claude to quotes, offers, follow-ups and emails across this store. Turn it off to keep every screen manual."
+        helpText="Adds ✦ Draft with Claude to quotes, offers, follow-ups and message wording across this store. Turn it off to keep every screen manual."
         checked={enabled}
         disabled={saving}
         onChange={(next) => fetcher.submit({ intent: "claude-toggle", claudeEnabled: String(next) }, { method: "post" })}
@@ -412,7 +412,7 @@ export default function Settings() {
 
               {data.seats.length === 0 ? (
                 <Text as="p" tone="subdued" variant="bodyMd">
-                  No teammates yet. Invite someone to help manage quotes.
+                  No teammates yet. Add someone who helps manage quotes.
                 </Text>
               ) : (
                 <BlockStack gap="0">
@@ -426,7 +426,7 @@ export default function Settings() {
                             label="Remove"
                             variant="plain"
                             title={`Remove ${seat.email}?`}
-                            message="They lose access to Mannon right away. You can invite them again later."
+                            message="They lose access to Mannon right away. You can add them again later."
                             confirmLabel="Remove teammate"
                             fields={{ intent: "seat-remove", seatId: seat.id }}
                           />
@@ -443,7 +443,7 @@ export default function Settings() {
                   <InlineStack gap="200" blockAlign="end" wrap>
                     <Box minWidth="18rem">
                       <TextField
-                        label="Invite a teammate by email"
+                        label="Teammate’s email address"
                         type="email"
                         name="email"
                         value={seatEmail}
@@ -452,7 +452,7 @@ export default function Settings() {
                         placeholder="teammate@yourstore.com"
                       />
                     </Box>
-                    <Button submit loading={submitting && navigation.formData?.get("intent") === "seat-invite"}>Send invite</Button>
+                    <Button submit loading={submitting && navigation.formData?.get("intent") === "seat-invite"}>Add teammate</Button>
                   </InlineStack>
                 </Form>
               ) : (

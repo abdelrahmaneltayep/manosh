@@ -13,7 +13,7 @@ export const TEMPLATE_GROUPS: TemplateGroup[] = [
   {
     id: "quotes",
     title: "Quotes and follow-ups",
-    description: "Sent while a quote is open.",
+    description: "Messages about a quote while it is open.",
     keys: ["quote_request_ack", "quote_request_created", "followup_reminder", "followup_expiry_warning", "followup_expired", "weekly_digest"],
   },
   {

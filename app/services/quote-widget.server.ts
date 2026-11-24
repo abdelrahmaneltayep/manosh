@@ -241,14 +241,26 @@ export async function getQuoteRequestForShop(shopDomain: string, id: string): Pr
  * declines separately.
  */
 export async function replyToRequest(shopDomain: string, id: string, body: string): Promise<boolean> {
+  const reply = await prepareRequestReply(shopDomain, id, body);
+  if (!reply) return false;
+  const result = await sendEmail({ to: reply.to, subject: "About your quote request", html: reply.text.replace(/\n/g, "<br>"), text: reply.text });
+  // Only report a reply that actually went out.
+  return result.sent;
+}
+
+/**
+ * The reply and who it is for, scoped to the shop. A storefront requester has
+ * no portal login, so email is the only way to reach them: while no sender is
+ * connected the merchant copies this and sends it from their own inbox.
+ */
+export async function prepareRequestReply(shopDomain: string, id: string, body: string): Promise<{ to: string; text: string } | null> {
   const shop = await shopFor(shopDomain);
-  if (!shop) return false;
+  if (!shop) return null;
   const request = await prisma.quoteRequest.findFirst({ where: { id, shopId: shop.id }, select: { id: true, email: true } });
-  if (!request) return false;
+  if (!request) return null;
   const text = body.trim();
-  if (!text) return false;
-  await sendEmail({ to: request.email, subject: "About your quote request", html: text.replace(/\n/g, "<br>"), text });
-  return true;
+  if (!text) return null;
+  return { to: request.email, text };
 }
 
 /**

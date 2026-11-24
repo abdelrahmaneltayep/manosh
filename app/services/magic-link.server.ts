@@ -18,6 +18,17 @@ const DEFAULT_EXPIRY_DAYS = 7; // fallback if a shop has no setting (it always s
 
 export type BuyerWithCompany = Buyer & { company: Company };
 
+/**
+ * Where a sign-in link may land after sign-in: a path inside the buyer portal
+ * and nothing else. Anything that could leave the portal (another site, a
+ * scheme, "//host", "..", a query) is dropped, so the link can never be used as
+ * an open redirect. Pure.
+ */
+export function safePortalPath(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return /^\/portal(\/[A-Za-z0-9_-]+)*$/.test(value) ? value : null;
+}
+
 /** SHA-256 hex of the raw token. Deterministic, one-way. */
 export function hashToken(rawToken: string): string {
   return createHash("sha256").update(rawToken).digest("hex");
@@ -36,7 +47,7 @@ export function generateMagicToken(): { raw: string; hash: string } {
  */
 export async function issueMagicLink(
   buyerId: string,
-  options: { baseUrl: string; now?: Date },
+  options: { baseUrl: string; now?: Date; next?: string },
 ): Promise<{ url: string; expiresAt: Date }> {
   const now = options.now ?? new Date();
   const buyer = await prisma.buyer.findUnique({
@@ -58,6 +69,8 @@ export async function issueMagicLink(
 
   const url = new URL("/portal/auth", options.baseUrl);
   url.searchParams.set("token", raw);
+  const next = safePortalPath(options.next);
+  if (next) url.searchParams.set("next", next);
 
   return { url: url.toString(), expiresAt };
 }

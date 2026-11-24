@@ -49,6 +49,7 @@ import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
+import { CopyPanel } from "../components/CopyPanel";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -82,7 +83,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-type ActionResult = { ok: boolean; error?: string; message?: string; draft?: string; upgrade?: boolean };
+type ActionResult = { ok: boolean; error?: string; message?: string; draft?: string; upgrade?: boolean; copy?: { to: string; text: string } };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
@@ -138,7 +139,11 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
         return { ok: true, message: "Public catalog removed." };
       case "approve-lead": {
         const res = await approveLead(session.shop, String(form.get("leadId") ?? ""), session.shop, baseUrl);
-        return res.ok ? { ok: true, message: "Approved — the buyer has been emailed a secure link." } : { ok: false, error: res.error };
+        if (!res.ok) return { ok: false, error: res.error };
+        // Not delivered (no sender connected): the merchant copies the welcome message.
+        return res.access
+          ? { ok: true, message: "Approved.", copy: res.access }
+          : { ok: true, message: "Approved — the buyer has been emailed a secure link." };
       }
       case "decline-lead": {
         const res = await declineLead(session.shop, String(form.get("leadId") ?? ""));
@@ -214,6 +219,15 @@ export default function CatalogSharing() {
       <SectionTabs active="catalog-sharing" />
       <BlockStack gap="400">
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}
+        {actionData?.copy && (
+          <CopyPanel
+            title="Welcome message for the buyer"
+            description={`Mannon doesn’t deliver messages yet. Paste this into a message to ${actionData.copy.to}. It includes their sign-in link, which works once.`}
+            text={actionData.copy.text}
+            toast="Message copied"
+            copyLabel="Copy message"
+          />
+        )}
         {actionData?.error && <Banner tone="critical">{actionData.error}</Banner>}
 
         {/* 1. The inbox: access requests (only once there's a page to request from) */}

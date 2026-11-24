@@ -63,6 +63,31 @@ describe.skipIf(!hasDb)("portal.auth route", () => {
     expect(res.headers.get("Location")).toBe("/portal");
   });
 
+  it("a link made for a quote lands on that quote after sign-in", async () => {
+    const { token } = await seedBuyerWithLink();
+    const data = await loader(args(new Request(`${BASE_URL}/portal/auth?token=${token}&next=/portal/quotes/abc123`)));
+    expect(data).toMatchObject({ state: "valid", next: "/portal/quotes/abc123" });
+
+    const form = new FormData();
+    form.set("token", token);
+    form.set("next", "/portal/quotes/abc123");
+    const res = (await action(args(new Request(`${BASE_URL}/portal/auth`, { method: "POST", body: form })))) as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get("Location")).toBe("/portal/quotes/abc123");
+  });
+
+  it("ignores a next that points outside the portal (no open redirect)", async () => {
+    const { token } = await seedBuyerWithLink();
+    const data = await loader(args(new Request(`${BASE_URL}/portal/auth?token=${token}&next=https://evil.example`)));
+    expect(data).toMatchObject({ state: "valid", next: null });
+
+    const form = new FormData();
+    form.set("token", token);
+    form.set("next", "//evil.example/portal");
+    const res = (await action(args(new Request(`${BASE_URL}/portal/auth`, { method: "POST", body: form })))) as Response;
+    expect(res.headers.get("Location")).toBe("/portal");
+  });
+
   it("POST consumes the token and sets a buyer session cookie", async () => {
     const { buyer, token } = await seedBuyerWithLink();
     const form = new FormData();

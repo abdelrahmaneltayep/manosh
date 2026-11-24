@@ -45,6 +45,10 @@ import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftDecisionNote, isWholesaleDecision } from "../services/wholesale-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
+import { emailDeliveryEnabled } from "../services/mailer.server";
+import { emailCopy } from "../lib/email-delivery";
+import { useEmailDelivery } from "../lib/use-email-delivery";
+import { CopyPanel } from "../components/CopyPanel";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_WHOLESALE_REG === "true";
@@ -85,7 +89,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 type ActionResult =
-  | { ok: true; message?: string; draft?: { applicationId: string; decision: string; note: string } }
+  | { ok: true; message?: string; draft?: { applicationId: string; decision: string; note: string }; copy?: { to: string; text: string } }
   | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<Response | ActionResult> => {
@@ -120,9 +124,12 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
       const id = String(form.get("applicationId") ?? "");
       const decision = String(form.get("decision") ?? "") as "APPROVED" | "REJECTED" | "MORE_INFO";
       const customNote = String(form.get("note") ?? "").trim() || undefined;
-      await decideApplication(session.shop, id, decision, session.shop, baseUrl, { customNote });
+      const sentMessage = await decideApplication(session.shop, id, decision, session.shop, baseUrl, { customNote });
       const verb = decision === "APPROVED" ? "approved" : decision === "REJECTED" ? "rejected" : "marked for more info";
-      return { ok: true, message: `Application ${verb}.` };
+      // Not delivered (no sender connected): give the merchant the message to send.
+      return sentMessage.sent
+        ? { ok: true, message: `Application ${verb}.` }
+        : { ok: true, message: `Application ${verb}.`, copy: { to: sentMessage.to, text: sentMessage.body } };
     }
     return { ok: false, error: "Unknown action." };
   } catch (error) {
@@ -182,6 +189,7 @@ function WholesaleReplyRow({
   access: ClaudeAccess;
   divider: boolean;
 }) {
+  const copy = emailCopy(useEmailDelivery());
   const draftFetcher = useFetcher<typeof action>();
   const drafting = draftFetcher.state !== "idle";
   const [decision, setDecision] = useState("APPROVED");
@@ -249,14 +257,10 @@ function WholesaleReplyRow({
                 onChange={setNote}
                 multiline={2}
                 autoComplete="off"
-                helpText={
-                  access.allowed
-                    ? "Leave blank to send the default decision email, or draft a note with Claude."
-                    : "Leave blank to send the default decision email."
-                }
+                helpText={copy.decisionHelp(access.allowed)}
               />
               <InlineStack>
-                <Button size="slim" submit accessibilityLabel={`Send decision to ${app.companyName}`}>Send decision</Button>
+                <Button size="slim" submit accessibilityLabel={`${copy.decisionAction} for ${app.companyName}`}>{copy.decisionAction}</Button>
               </InlineStack>
             </BlockStack>
           </Form>
@@ -276,6 +280,9 @@ export default function WholesaleQueue() {
 
   const error = actionData && !actionData.ok ? actionData.error : null;
   const message = actionData && actionData.ok ? actionData.message : null;
+  const copied = (actionData && actionData.ok ? actionData.copy : null) ?? null;
+  const emailDelivery = useEmailDelivery();
+  const copy = emailCopy(emailDelivery);
   const pending = data.applications.filter((a) => a.status === "PENDING");
   const respondable = data.applications.filter((a) => a.status === "PENDING" || a.status === "MORE_INFO");
   const hasPublished = data.forms.some((f) => f.published);
@@ -315,6 +322,15 @@ export default function WholesaleQueue() {
       <BlockStack gap="500">
         {error && <Banner tone="critical" title="Couldn’t complete that"><p>{error}</p></Banner>}
         {message && <Banner tone="success" title={message} />}
+        {copied && (
+          <CopyPanel
+            title="Message for the applicant"
+            description={`Mannon doesn’t notify applicants yet. Paste this into a message to ${copied.to}. If you approved them, it includes their sign-in link, which works once.`}
+            text={copied.text}
+            toast="Message copied"
+            copyLabel="Copy message"
+          />
+        )}
 
         {/* 1. The job: review applications */}
         <Card padding="0">
@@ -325,7 +341,7 @@ export default function WholesaleQueue() {
                 {pending.length > 0 && <Badge tone="attention">{`${pending.length} pending`}</Badge>}
               </InlineStack>
               <Text as="p" tone="subdued" variant="bodySm">
-                Approve buyers before they see your wholesale prices. Each decision emails the applicant.
+                {copy.applicationsIntro}
               </Text>
             </BlockStack>
           </Box>
@@ -374,7 +390,7 @@ export default function WholesaleQueue() {
                           size="micro"
                           variant="plain"
                           title={`Reject ${a.companyName}?`}
-                          message="The applicant gets the default decline email and won't see your wholesale prices. To add a personal note, use “Respond with a note” below instead."
+                          message={copy.rejectConfirm}
                           confirmLabel="Reject application"
                           fields={{ intent: "decide", applicationId: a.id, decision: "REJECTED" }}
                         />
@@ -401,7 +417,9 @@ export default function WholesaleQueue() {
                   )}
                 </InlineStack>
                 <Text as="p" tone="subdued" variant="bodySm">
-                  Pick a decision and add a personal note. You review every note before it's sent.
+                  {emailDelivery
+                    ? "Pick a decision and add a personal note. You review every note before it's sent."
+                    : "Pick a decision and add a personal note. You get the finished message to copy."}
                 </Text>
               </BlockStack>
               <BlockStack gap="0">

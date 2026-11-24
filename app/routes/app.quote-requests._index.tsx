@@ -32,6 +32,7 @@ import {
   convertToQuote,
   declineRequest,
   replyToRequest,
+  prepareRequestReply,
 } from "../services/quote-widget.server";
 import prisma from "../db.server";
 import {
@@ -48,6 +49,9 @@ import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
 import { DisclosureCard } from "../components/DisclosureCard";
 import { ConfirmAction } from "../components/ConfirmAction";
+import { emailDeliveryEnabled } from "../services/mailer.server";
+import { useEmailDelivery } from "../lib/use-email-delivery";
+import { CopyPanel } from "../components/CopyPanel";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_QUOTE_WIDGET === "true";
@@ -67,7 +71,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 type ActionResult =
-  | { ok: true; message?: string; draft?: { requestId: string; message: string } }
+  | { ok: true; message?: string; draft?: { requestId: string; message: string }; copy?: { to: string; text: string } }
   | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<Response | ActionResult> => {
@@ -93,6 +97,11 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
   }
   if (intent === "reply") {
     const body = String(form.get("message") ?? "");
+    // No sender connected: hand the merchant the reply to send themselves.
+    if (!emailDeliveryEnabled()) {
+      const reply = await prepareRequestReply(session.shop, String(form.get("id") ?? ""), body);
+      return reply ? { ok: true, copy: reply } : { ok: false, error: "Write a reply first." };
+    }
     const ok = await replyToRequest(session.shop, String(form.get("id") ?? ""), body);
     return ok ? { ok: true, message: "Reply sent to the requester." } : { ok: false, error: "Couldn’t send that reply." };
   }
@@ -139,6 +148,7 @@ function RequestReplyRow({
   const draftFetcher = useFetcher<typeof action>();
   const drafting = draftFetcher.state !== "idle";
   const [message, setMessage] = useState("");
+  const emailDelivery = useEmailDelivery();
   const d = draftFetcher.data;
   const draft = d && d.ok && d.draft && d.draft.requestId === r.id ? d.draft : null;
   const draftErr = d && !d.ok ? d.error : null;
@@ -196,7 +206,7 @@ function RequestReplyRow({
                 placeholder="Draft a reply with Claude above, or write one here."
               />
               <InlineStack>
-                <Button size="slim" submit disabled={!message.trim()}>Send reply</Button>
+                <Button size="slim" submit disabled={!message.trim()}>{emailDelivery ? "Send reply" : "Copy reply"}</Button>
               </InlineStack>
             </BlockStack>
           </Form>
@@ -230,7 +240,16 @@ export default function QuoteRequests() {
       <TitleBar title="Requests" />
       <SectionTabs active="requests" />
       <BlockStack gap="400">
-        {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
+        {actionData?.ok === true && actionData.message && <Banner tone="success" title={actionData.message} />}
+        {actionData?.ok === true && actionData.copy && (
+          <CopyPanel
+            title="Reply ready"
+            description={`Mannon doesn’t deliver messages yet. Paste this into a message to ${actionData.copy.to}.`}
+            text={actionData.copy.text}
+            toast="Reply copied"
+            copyLabel="Copy reply"
+          />
+        )}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
 
         {/* 1 — The inbox: what came in from the storefront, and the next step on each. */}

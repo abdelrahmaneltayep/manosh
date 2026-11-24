@@ -273,22 +273,43 @@ export function resolveTemplate(
   return { subject: o.subject || base.subject, body: o.body || base.body };
 }
 
-/** Is a mail transport configured? (Delivery no-ops otherwise.) */
-export function isMailerConfigured(): boolean {
-  return Boolean(process.env.MANNON_MAIL_FROM);
+/**
+ * Hands one message to an email provider. None is wired yet: choosing a provider
+ * is an open decision, so `transport` stays null and nothing is delivered.
+ */
+export type MailTransport = (message: EmailMessage, from: string) => Promise<void>;
+
+let transport: MailTransport | null = null;
+
+/** Install (or clear) the provider. The future provider module calls this; tests use it too. */
+export function setMailTransport(next: MailTransport | null): void {
+  transport = next;
 }
 
 /**
- * Actually deliver a message. Placeholder for a real transport — kept isolated so
- * production can drop in SMTP/Resend without changing callers. Returns skipped
- * when unconfigured. Never throws (errors go to Sentry).
+ * The single switch for "can this app deliver email?". True only when a provider
+ * is installed AND a sender address is set. Every screen that offers to email
+ * someone reads this, so the app never promises a message it cannot send: while
+ * it is false the UI offers Copy actions instead (see lib/email-delivery.ts).
+ */
+export function emailDeliveryEnabled(): boolean {
+  return transport !== null && Boolean(process.env.MANNON_MAIL_FROM);
+}
+
+/** @deprecated Same as emailDeliveryEnabled(); kept for existing callers. */
+export function isMailerConfigured(): boolean {
+  return emailDeliveryEnabled();
+}
+
+/**
+ * Deliver a message through the installed provider. Returns `skipped` when
+ * delivery is off and never reports `sent: true` unless the provider accepted
+ * the message. Never throws (errors go to Sentry).
  */
 export async function sendEmail(message: EmailMessage): Promise<SendResult> {
-  if (!isMailerConfigured()) return { sent: false, skipped: "unconfigured" };
+  if (!emailDeliveryEnabled() || !transport) return { sent: false, skipped: "unconfigured" };
   try {
-    // TODO: integrate the chosen provider here. Intentionally a no-op body until
-    // a transport + MANNON_MAIL_FROM are provisioned; the reminder pipeline and
-    // PaymentReminder records already work end-to-end around it.
+    await transport(message, process.env.MANNON_MAIL_FROM as string);
     return { sent: true };
   } catch (error) {
     captureException(error);

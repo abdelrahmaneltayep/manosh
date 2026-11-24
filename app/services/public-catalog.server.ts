@@ -268,7 +268,11 @@ export async function listDiscovery(limit = 60): Promise<Array<{ shopDomain: str
 
 // --- leads -------------------------------------------------------------------
 
-export type LeadResult = { ok: true } | { ok: false; error: string };
+/**
+ * `access` is set when a lead was approved but the welcome message could not be
+ * delivered (no sender connected): the merchant copies it and sends it.
+ */
+export type LeadResult = { ok: true; access?: { to: string; text: string } } | { ok: false; error: string };
 
 /**
  * Capture a "request wholesale access" submission from a public page. Honeypot +
@@ -421,7 +425,8 @@ export async function approveLead(shopDomain: string, leadId: string, reviewedBy
       portalUrl: provision?.magicUrl ?? `${baseUrl.replace(/\/$/, "")}/portal`,
       shopName: shopDomain,
     });
-    await sendEmail({ to: lead.email, subject, html: body.replace(/\n/g, "<br>"), text: body });
+    const result = await sendEmail({ to: lead.email, subject, html: body.replace(/\n/g, "<br>"), text: body });
+    if (!result.sent) return { ok: true, access: { to: lead.email, text: body } };
   } catch (error) {
     captureException(error);
   }

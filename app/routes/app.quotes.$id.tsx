@@ -58,9 +58,13 @@ import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { DraftedByClaude } from "../components/DraftedByClaude";
 import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
 import { DraftOrderError } from "../services/draft-order.server";
+import { issueBuyerQuoteLink } from "../services/buyer-sign-in-link.server";
+import { emailCopy } from "../lib/email-delivery";
+import { useEmailDelivery } from "../lib/use-email-delivery";
+import { CopyPanel } from "../components/CopyPanel";
 import { renderQuotePdf } from "../services/quote-pdf.server";
 import { duplicateQuote, QuoteNotFoundForShopError } from "../services/quote-duplicate.server";
-import { sendEmail } from "../services/mailer.server";
+import { emailDeliveryEnabled, sendEmail } from "../services/mailer.server";
 import { appendEvent } from "../services/events.server";
 import { getCatalog } from "../services/catalog.server";
 import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
@@ -145,8 +149,25 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     throw new Response("Not found", { status: 404 });
   }
 
+  // --- Buyer link: the merchant copies a sign-in link that lands on this quote.
+  // Offered while no email sender is connected, so nothing promises a send.
+  if (intent === "buyer-link") {
+    const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
+    const link = await issueBuyerQuoteLink(session.shop, quoteId, baseUrl);
+    if (!link) return { ok: false as const, kind: "quote" as const, error: "Quote not found." };
+    return {
+      ok: true as const,
+      kind: "quote" as const,
+      message: "",
+      buyerLink: { url: link.url, email: link.buyerEmail, expiresAt: link.expiresAt.toISOString() },
+    };
+  }
+
   // --- F25.1 email the branded quote PDF to the buyer (paid) -----------------
   if (intent === "pdf-email") {
+    if (!emailDeliveryEnabled()) {
+      return { ok: false as const, kind: "quote" as const, error: "Mannon isn’t connected to a sender yet. Use Copy buyer link instead." };
+    }
     const status = await requireBilling(billing, { isTest: IS_TEST });
     if (!featureAccess(status, STARTER_PLAN).allowed) {
       return { ok: false as const, kind: "quote" as const, error: "Emailing the quote PDF needs a paid plan.", upgrade: true as const };
@@ -278,7 +299,7 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         return { ok: false as const, kind: "quote" as const, error: parsed.error };
       }
       await counterQuoteForShop(session.shop, quoteId, parsed.lines);
-      return { ok: true as const, kind: "quote" as const, message: "Counter sent to the buyer." };
+      return { ok: true as const, kind: "quote" as const, message: emailCopy(emailDeliveryEnabled()).counterDone };
     }
 
     return { ok: false as const, kind: "quote" as const, error: "Unknown action." };
@@ -416,13 +437,25 @@ export default function QuoteDetail() {
       ? `shopify://admin/orders/${orderNumericId}`
       : `shopify://admin/draft_orders/${orderNumericId}`
     : null;
+  // While no sender is connected, the email action becomes "Copy buyer link"
+  // (always available: a sign-in link needs no paid plan).
+  const emailDelivery = useEmailDelivery();
+  const copy = emailCopy(emailDelivery);
+  const buyerLink =
+    (quoteAction && quoteAction.ok
+      ? (quoteAction as { buyerLink?: { url: string; email: string; expiresAt: string } }).buyerLink
+      : null) ?? null;
   const secondaryActions = [
     ...(quoteOpsEnabled
-      ? [
-          { content: "Download PDF", url: `/app/quotes/${quote.id}.pdf`, target: "_blank" as const },
-          { content: "Email PDF to buyer", onAction: () => post("pdf-email"), disabled: submitting },
-          { content: "Duplicate quote", onAction: () => post("duplicate"), disabled: submitting },
-        ]
+      ? [{ content: "Download PDF", url: `/app/quotes/${quote.id}.pdf`, target: "_blank" as const }]
+      : []),
+    ...(emailDelivery
+      ? quoteOpsEnabled
+        ? [{ content: copy.quotePdfAction, onAction: () => post("pdf-email"), disabled: submitting }]
+        : []
+      : [{ content: copy.quotePdfAction, onAction: () => post("buyer-link"), disabled: submitting }]),
+    ...(quoteOpsEnabled
+      ? [{ content: "Duplicate quote", onAction: () => post("duplicate"), disabled: submitting }]
       : []),
     ...(!isTerminal
       ? [{ content: "Decline quote", destructive: true, onAction: () => setConfirmDecline(true), disabled: submitting }]
@@ -460,7 +493,9 @@ export default function QuoteDetail() {
       >
         <Modal.Section>
           <Text as="p">
-            The buyer is told you can’t quote this order and the quote closes. This can’t be undone.
+            {emailDelivery
+              ? "The buyer is told you can’t quote this order and the quote closes. This can’t be undone."
+              : "The quote closes and the buyer sees that in their portal. Mannon doesn’t notify them, so tell them yourself. This can’t be undone."}
           </Text>
         </Modal.Section>
       </Modal>
@@ -470,7 +505,16 @@ export default function QuoteDetail() {
             <p>{quoteAction.error}</p>
           </Banner>
         )}
-        {quoteAction && quoteAction.ok && <Banner tone="success" title={quoteAction.message} />}
+        {quoteAction && quoteAction.ok && quoteAction.message && <Banner tone="success" title={quoteAction.message} />}
+        {buyerLink && (
+          <CopyPanel
+            title="Buyer link ready"
+            description={`Share this with ${buyerLink.email}. It signs them in and opens this quote. It works once, expires ${formatDate(buyerLink.expiresAt)}, and replaces any earlier link you made for this buyer.`}
+            text={buyerLink.url}
+            toast="Buyer link copied"
+            copyLabel="Copy link"
+          />
+        )}
         {(aiActionError || aiFetcherError) && (
           <Banner tone="warning" title="Draft with Claude">
             <p>{aiActionError || aiFetcherError}</p>

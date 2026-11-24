@@ -20,6 +20,8 @@ import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
+import { emailCopy } from "../lib/email-delivery";
+import { useEmailDelivery } from "../lib/use-email-delivery";
 
 const SAVE_BAR_ID = "notification-template-save-bar";
 
@@ -106,6 +108,8 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
 
 export default function NotificationTemplate() {
   const data = useLoaderData<typeof loader>();
+  const emailDelivery = useEmailDelivery();
+  const copy = emailCopy(emailDelivery);
   const result = useActionData<typeof action>();
   const nav = useNavigation();
   const submit = useSubmit();
@@ -151,7 +155,7 @@ export default function NotificationTemplate() {
       backAction={{ content: "Notifications", url: "/app/notifications" }}
       title={data.label}
       titleMetadata={data.edited ? <Badge tone="info">Edited</Badge> : undefined}
-      subtitle={`Sent to: ${data.to === "You" ? "you" : data.to.toLowerCase()}`}
+      subtitle={copy.notificationsRecipient(data.to === "You" ? "you" : data.to.toLowerCase())}
       secondaryActions={
         data.edited ? [{ content: "Reset to default", onAction: () => setConfirmReset(true), disabled: busy }] : []
       }
@@ -183,6 +187,11 @@ export default function NotificationTemplate() {
       </Modal>
       <BlockStack gap="400">
         {saveError && <Banner tone="critical" title="Couldn’t save this email"><p>{saveError}</p></Banner>}
+        {!emailDelivery && (
+          <Banner tone="info" title="Not delivered yet">
+            <p>Mannon isn’t connected to a sender, so this message doesn’t go out. Your wording is saved and is used wherever Mannon prepares this message for you to copy.</p>
+          </Banner>
+        )}
         {saved && !dirty && <Banner tone="success" title={saved} onDismiss={() => undefined} />}
 
         <Card>
@@ -207,7 +216,7 @@ export default function NotificationTemplate() {
             <TextField label="Message" value={body} onChange={setBody} autoComplete="off" multiline={8} />
             {data.variables.length > 0 && (
               <Text as="p" tone="subdued" variant="bodySm">
-                {`You can use: ${data.variables.map((v) => `{{${v}}}`).join(", ")}. Mannon fills these in when the email is sent.`}
+                {`You can use: ${data.variables.map((v) => `{{${v}}}`).join(", ")}. Mannon fills these in ${emailDelivery ? "when the email is sent" : "when the message is prepared"}.`}
               </Text>
             )}
             {aiError && <Banner tone="warning">{aiError}</Banner>}

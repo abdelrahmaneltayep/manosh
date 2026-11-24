@@ -22,6 +22,7 @@ import {
   ROLE_LABELS,
   type CompanyRole,
 } from "../lib/company-accounts";
+import { emailDeliveryEnabled } from "../services/mailer.server";
 
 const ENABLED = () => process.env.MANNON_FF_COMPANY_ACCOUNTS === "true";
 
@@ -50,6 +51,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     company: me.company.name,
     isAdmin: canManageMembers(me.role),
     isGrowth: isGrowthTier(me.company.shop.plan),
+    emailDelivery: emailDeliveryEnabled(),
     myId: me.id,
     approvalThreshold: me.company.approvalThreshold ? Number(me.company.approvalThreshold) : null,
     members,
@@ -58,7 +60,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-type ActionResult = { ok: true; message: string } | { ok: false; error: string };
+type ActionResult = { ok: true; message: string; inviteUrl?: string } | { ok: false; error: string };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const me = await currentMember(request);
@@ -79,8 +81,11 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       if (!growthTier && (role === "APPROVER" || cap <= 1)) {
         return { ok: false, error: memberCapMessage(cap) };
       }
-      await inviteMember(me.companyId, { email, role, baseUrl: new URL(request.url).origin }, cap);
-      return { ok: true, message: `Invited ${email}.` };
+      const invited = await inviteMember(me.companyId, { email, role, baseUrl: new URL(request.url).origin }, cap);
+      // No sender connected: the invite can't be delivered, so hand over the link.
+      return emailDeliveryEnabled()
+        ? { ok: true, message: `Invited ${email}.` }
+        : { ok: true, message: `Added ${email}. Share this sign-in link with them. It works once and isn’t shown again.`, inviteUrl: invited.inviteUrl };
     }
     if (intent === "set-role") {
       if (!growthTier) return { ok: false, error: "Roles are a Growth feature." };
@@ -127,6 +132,7 @@ export default function Team() {
 
   const err = actionData && !actionData.ok ? actionData.error : null;
   const msg = actionData && actionData.ok ? actionData.message : null;
+  const inviteUrl = (actionData && actionData.ok ? actionData.inviteUrl : null) ?? null;
 
   return (
     <section className="portal-card">
@@ -135,6 +141,13 @@ export default function Team() {
 
       {err && <p className="error" role="alert">{err}</p>}
       {msg && <p className="muted" role="status">{msg}</p>}
+      {inviteUrl && (
+        <label className="field">
+          <span className="field-label">Sign-in link</span>
+          <input type="text" readOnly value={inviteUrl} onFocus={(e) => e.currentTarget.select()} aria-describedby="invite-link-hint" />
+          <span id="invite-link-hint" className="muted">Select the link to copy it.</span>
+        </label>
+      )}
 
       {!data.isGrowth && (
         <div className="quick-order-unresolved">
@@ -198,7 +211,7 @@ export default function Team() {
                   <option value="ADMIN">Admin (Growth)</option>
                 </select>
               </label>
-              <button type="submit" className="portal-button" disabled={busy}>Send invite</button>
+              <button type="submit" className="portal-button" disabled={busy}>{data.emailDelivery ? "Send invite" : "Create invite link"}</button>
             </Form>
           ) : (
             <div className="quick-order-unresolved">
