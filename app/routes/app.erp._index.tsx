@@ -25,8 +25,8 @@ import { ConfirmAction } from "../components/ConfirmAction";
 import { DisclosureCard } from "../components/DisclosureCard";
 import { supportEmail } from "../lib/support-email.server";
 import { authenticate } from "../shopify.server";
-import { requireBilling } from "../services/billing.server";
-import { erpSyncAllowed, GROWTH_PLAN } from "../lib/billing";
+import { getShopPlan } from "../services/billing.server";
+import { featureAvailable, lockedMessage, minimumPlan, minimumPlanName } from "../lib/plan-features";
 import { ERP_KINDS, erpKindName, syncLagExceeded, type ErpKind } from "../lib/erp";
 import {
   getConnection,
@@ -40,15 +40,20 @@ import {
 } from "../services/erp.server";
 import { upgradeUrl } from "../lib/upgrade";
 
-const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_ERP_SYNC === "true";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  const isGrowth = erpSyncAllowed(status.plan);
-  if (!isGrowth) return { isGrowth, connection: null, logs: [], lagging: false, kinds: ERP_KINDS, supportEmail: supportEmail() };
+  // ERP sync is a Scale feature (plan-features.ts), read from the stored plan.
+  const { handle } = await getShopPlan(request, session.shop, billing);
+  const isGrowth = featureAvailable("erpSync", handle);
+  if (!isGrowth) {
+    // A store that left Scale keeps its connection on file (nothing syncs) and
+    // can still disconnect it.
+    const kept = await getConnection(session.shop);
+    return { isGrowth, connection: null, logs: [], lagging: false, kinds: ERP_KINDS, supportEmail: supportEmail(), keptConnection: Boolean(kept) };
+  }
 
   const [connection, logs] = await Promise.all([getConnection(session.shop), listSyncLogs(session.shop)]);
   return {
@@ -66,11 +71,11 @@ type ActionResult = { ok: true; message: string } | { ok: false; error: string }
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) return { ok: false, error: "This feature isn’t available." };
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  if (!erpSyncAllowed(status.plan)) return { ok: false, error: "ERP sync is a Growth feature." };
-
+  const { handle } = await getShopPlan(request, session.shop, billing);
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+  // Below Scale the only thing allowed is cleaning up: disconnecting.
+  if (!featureAvailable("erpSync", handle) && intent !== "disconnect") return { ok: false, error: lockedMessage("erpSync") };
 
   if (intent === "save") {
     let config: Record<string, unknown> = {};
@@ -137,14 +142,25 @@ export default function Erp() {
       <Page>
         <TitleBar title="ERP sync" />
         <SectionTabs active="erp" />
-        <Banner tone="info" title="ERP & inventory sync — upgrade to Growth">
+        <Banner tone="info" title={`ERP & inventory sync — upgrade to ${minimumPlanName("erpSync")}`}>
           <p>
             Keep stock accurate and export orders to your ERP/WMS (webhook, SFTP,
-            NetSuite, or a custom connector). ERP sync is included on the Growth plan.
+            NetSuite, or a custom connector). {lockedMessage("erpSync")}
           </p>
           <Box paddingBlockStart="200">
-            <Button url={upgradeUrl("growth")} variant="primary">See Growth</Button>
+            <Button url={upgradeUrl(minimumPlan("erpSync"))} variant="primary">{`See ${minimumPlanName("erpSync")}`}</Button>
           </Box>
+          {"keptConnection" in data && data.keptConnection && (
+            <Box paddingBlockStart="300">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodyMd">Your ERP connection is paused: nothing syncs until you upgrade. You can disconnect it.</Text>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="disconnect" />
+                  <Button submit tone="critical">Disconnect ERP</Button>
+                </Form>
+              </BlockStack>
+            </Box>
+          )}
           <Box paddingBlockStart="200">
             <Text as="p" tone="subdued" variant="bodySm">
               Need enterprise-scale sync (bi-directional NetSuite, high volume)? Email{" "}

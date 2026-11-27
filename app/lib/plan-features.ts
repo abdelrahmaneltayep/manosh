@@ -35,6 +35,8 @@ export type PlanFeature =
   // Not on the pricing page; set by product decision.
   | "agency"
   | "catalogSharing"
+  | "erpSync"
+  | "aiOrderPad"
   | "priceRules"
   | "priceRuleTargeting";
 
@@ -65,6 +67,9 @@ export const FEATURE_PLAN: Record<PlanFeature, PlanHandle> = {
   priceRuleTargeting: "growth",
   // Not on the pricing page; on Growth since it shipped.
   catalogSharing: "growth",
+  // Owner decisions, 27 Nov 2026.
+  erpSync: "scale",
+  aiOrderPad: lowestPlanWhere((c) => c.aiCounter), // the AI purchase-order reader rides with Claude: Growth
 };
 
 export const FEATURE_LABEL: Record<PlanFeature, string> = {
@@ -80,6 +85,8 @@ export const FEATURE_LABEL: Record<PlanFeature, string> = {
   whiteLabel: "White-label",
   agency: "Agency mode",
   catalogSharing: "Catalog sharing",
+  erpSync: "ERP sync",
+  aiOrderPad: "Reading a pasted purchase order with Claude",
   priceRules: "Price rules",
   priceRuleTargeting: "Targeting by tag, product or collection",
 };

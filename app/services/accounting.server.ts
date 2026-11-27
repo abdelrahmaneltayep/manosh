@@ -18,6 +18,7 @@ import {
   providerName,
   PROVIDERS,
 } from "../lib/accounting";
+import { accountingSyncAllowed } from "../lib/billing";
 
 /**
  * F10 — Accounting Sync service (QuickBooks Online + Xero). Growth-only, dark-
@@ -337,6 +338,9 @@ export async function saveMap(shopDomain: string, map: MapView): Promise<void> {
 export async function enqueueInvoiceSync(shopId: string, invoiceId: string): Promise<void> {
   if (!ACCOUNTING_ENABLED()) return;
   try {
+    // Scale feature: below it nothing is queued, so nothing floods out on re-upgrade.
+    const shop = await prisma.shop.findUnique({ where: { id: shopId }, select: { plan: true, legacyPlan: true } });
+    if (!accountingSyncAllowed(shop?.plan ?? null, shop?.legacyPlan ?? false)) return;
     const conns = await prisma.accountingConnection.findMany({
       where: { shopId, status: { not: "ERROR" } },
       select: { provider: true },

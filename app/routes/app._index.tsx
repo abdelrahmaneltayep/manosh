@@ -80,6 +80,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     reps: flags.reps,
     catalogSharing: flags.catalogSharing,
     growthTier,
+    scaleTier: featureAvailable("salesReps", shopPlanHandle(shop)),
     planSelected,
     ...progress,
   });

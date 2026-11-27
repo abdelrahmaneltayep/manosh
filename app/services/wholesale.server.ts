@@ -10,6 +10,7 @@ import {
   type FieldSpec,
 } from "../lib/wholesale";
 import { isGrowthTier } from "../lib/billing";
+import { assertCanAddCompany, CompanyCapError } from "./plan-limits.server";
 
 /**
  * F6 — wholesale registration. Merchant builds a form; a public URL collects
@@ -240,8 +241,14 @@ export async function submitApplication(
   let status: WholesaleStatus = "PENDING";
   let magicUrl: string | null = null;
   if (isGrowthTier(shop.plan) && shouldAutoApprove(contactEmail, form.autoApproveDomains)) {
-    magicUrl = (await provisionApproval(application.id, shopDomain, "auto", payload.baseUrl))?.magicUrl ?? null;
-    status = "APPROVED";
+    try {
+      magicUrl = (await provisionApproval(application.id, shopDomain, "auto", payload.baseUrl))?.magicUrl ?? null;
+      status = "APPROVED";
+    } catch (error) {
+      // At the plan's company-account limit the application waits for the
+      // merchant instead of being auto-approved.
+      if (!(error instanceof CompanyCapError)) throw error;
+    }
   }
 
   // Buyer-facing message (best-effort). An auto-approved applicant gets the
@@ -306,6 +313,9 @@ export async function provisionApproval(
     // already provisioned
     return null;
   }
+
+  // A new company account must fit the plan's limit (CompanyCapError otherwise).
+  await assertCanAddCompany(shop.id);
 
   // Reuse F5 Company. No native Shopify company yet, so use a stable placeholder
   // GID; a later slice can reconcile to a real gid://shopify/Company on first order.

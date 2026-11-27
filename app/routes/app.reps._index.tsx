@@ -65,7 +65,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   });
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   if (!unlocked) {
-    return { unlocked, reps: [], companies: [], leaderboard: [], seatCap: 0, access };
+    // Reps stay on file below Scale (they can't sign in) and can be removed.
+    return { unlocked, reps: await listReps(session.shop), companies: [], leaderboard: [], seatCap: 0, access };
   }
   const [reps, companies, leaderboard] = await Promise.all([
     listReps(session.shop),
@@ -83,10 +84,10 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) return { ok: false, error: "This feature isn’t available." };
   const { status, handle } = await getShopPlan(request, session.shop, billing);
-  if (!featureAvailable("salesReps", handle)) return { ok: false, error: lockedMessage("salesReps") };
-
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+  // Below Scale the only thing allowed is cleaning up: removing reps.
+  if (!featureAvailable("salesReps", handle) && intent !== "remove") return { ok: false, error: lockedMessage("salesReps") };
   const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
 
   // --- F12 dual-mode: Claude drafts a personal invite note; merchant sends ----
@@ -172,6 +173,30 @@ export default function Reps() {
             <Button url={upgradeUrl(minimumPlan("salesReps"))} variant="primary">{`See ${minimumPlanName("salesReps")}`}</Button>
           </Box>
         </Banner>
+        {data.reps.length > 0 && (
+          <Box paddingBlockStart="400">
+            <Card>
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingMd">Reps on file</Text>
+                <Text as="p" variant="bodyMd">These reps can’t sign in until you upgrade. You can remove them.</Text>
+                {data.reps.map((r) => (
+                  <InlineStack key={r.id} align="space-between" blockAlign="center">
+                    <Text as="span">{r.name ?? r.email}</Text>
+                    <ConfirmAction
+                      label="Remove"
+                      size="micro"
+                      variant="plain"
+                      title={`Remove ${r.name ?? r.email}?`}
+                      message="They lose access to their assigned accounts. You can invite them again later."
+                      confirmLabel="Remove rep"
+                      fields={{ intent: "remove", repId: r.id }}
+                    />
+                  </InlineStack>
+                ))}
+              </BlockStack>
+            </Card>
+          </Box>
+        )}
       </Page>
     );
   }

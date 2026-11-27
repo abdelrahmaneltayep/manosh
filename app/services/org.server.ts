@@ -170,6 +170,15 @@ export async function unlinkStore(orgId: string, actingRole: OrgRole, shopDomain
   return { ok: true };
 }
 
+/**
+ * A store leaves the organization it belongs to (any plan, so a store that
+ * left Scale can clean up). The owning store can't leave; it deletes the org.
+ */
+export async function leaveOrganization(shopDomain: string): Promise<{ ok: boolean; error?: string }> {
+  const removed = await prisma.orgStore.deleteMany({ where: { shop: shopDomain, role: { not: "OWNER" } } });
+  return removed.count > 0 ? { ok: true } : { ok: false, error: "This store isn’t a member of an organization it can leave." };
+}
+
 // --- cross-store rollup (reuses F7/dashboard metrics, per-store isolated) -----
 
 export interface StoreRollup {

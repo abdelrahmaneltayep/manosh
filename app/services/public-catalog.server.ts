@@ -20,6 +20,7 @@ import {
   type ShowPrices,
 } from "../lib/public-catalog";
 import { lockedMessage } from "../lib/plan-features";
+import { companyAccountAllowance } from "./plan-limits.server";
 
 /**
  * F19 — Catalog Sharing & B2B Discovery. Publish a chosen F11 Catalog as a
@@ -388,6 +389,10 @@ export async function approveLead(shopDomain: string, leadId: string, reviewedBy
   });
   if (!lead) return { ok: false, error: "Lead not found." };
   if (lead.status !== "NEW") return { ok: true }; // already decided
+
+  // Approving creates a company account, which must fit the plan's limit.
+  const companies = await companyAccountAllowance(shop.id);
+  if (!companies.allowed) return { ok: false, error: companies.message };
 
   // F6 pipeline: create an application, then provision (Company + buyer + magic link).
   const application = await prisma.wholesaleApplication.create({

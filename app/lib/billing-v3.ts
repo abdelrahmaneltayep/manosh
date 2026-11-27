@@ -83,19 +83,22 @@ export interface PlanCapabilities {
 
 const I = Infinity;
 
+// Price lists follow the limits the app enforces (Free and Starter 3, Growth
+// and Scale unlimited; owner decision 27 Nov 2026 — the listing is edited to
+// match). Company accounts follow the listing: 1 / 5 / 25 / unlimited.
 export const PLAN_CAPABILITIES: Record<PlanHandle, PlanCapabilities> = {
   free: {
-    quotesCap: 10, quickOrder: true, companyAccountsCap: 1, priceListsCap: 0,
+    quotesCap: 10, quickOrder: true, companyAccountsCap: 1, priceListsCap: 3,
     aiCounter: false, makeAnOffer: "teaser", offerRuleCap: 0, netTerms: false,
     deposits: false, analytics: "basic", salesRep: false, accountingSync: false, whiteLabel: false,
   },
   starter: {
-    quotesCap: I, quickOrder: true, companyAccountsCap: 5, priceListsCap: 1,
+    quotesCap: I, quickOrder: true, companyAccountsCap: 5, priceListsCap: 3,
     aiCounter: false, makeAnOffer: "teaser", offerRuleCap: 0, netTerms: false,
     deposits: false, analytics: "basic", salesRep: false, accountingSync: false, whiteLabel: false,
   },
   growth: {
-    quotesCap: I, quickOrder: true, companyAccountsCap: 25, priceListsCap: 10,
+    quotesCap: I, quickOrder: true, companyAccountsCap: 25, priceListsCap: I,
     aiCounter: true, makeAnOffer: "manual", offerRuleCap: 3, netTerms: true,
     deposits: true, analytics: "full", salesRep: false, accountingSync: false, whiteLabel: false,
   },

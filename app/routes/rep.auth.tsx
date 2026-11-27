@@ -4,7 +4,7 @@ import { Form, useLoaderData } from "@remix-run/react";
 import { verifyRepToken, REP_PORTAL_ENABLED } from "../services/rep.server";
 import { commitRepSession } from "../services/rep-session.server";
 
-type LoaderData = { state: "valid"; email: string; token: string } | { state: "invalid" } | { state: "expired" };
+type LoaderData = { state: "valid"; email: string; token: string } | { state: "invalid" } | { state: "expired" } | { state: "plan" };
 
 // GET: peek at the token (no consumption) so email link-scanners can't burn it.
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -46,9 +46,15 @@ export default function RepAuth() {
     <section className="portal-card">
       <h1>This link can&rsquo;t be used</h1>
       <p className="error">
-        {data.state === "expired" ? "This sign-in link has expired." : "This sign-in link is invalid or has already been used."}
+        {data.state === "plan"
+          ? "The store’s current plan doesn’t include the rep portal."
+          : data.state === "expired"
+            ? "This sign-in link has expired."
+            : "This sign-in link is invalid or has already been used."}
       </p>
-      <p className="muted">Ask your manager for a new invite link.</p>
+      <p className="muted">
+        {data.state === "plan" ? "Your link still works once the store turns the rep portal back on." : "Ask your manager for a new invite link."}
+      </p>
     </section>
   );
 }

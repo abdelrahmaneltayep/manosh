@@ -18,8 +18,10 @@ import {
 // two can't drift apart unnoticed.
 const LISTING = {
   free: { priceCents: 0, quotes: 10 },
-  starter: { priceCents: 900, quotes: Infinity, companyAccounts: 5, priceLists: 1 },
-  growth: { priceCents: 2900, companyAccounts: 25, priceLists: 10 },
+  // Price lists: the owner kept the enforced limits (3 / 3 / unlimited) and is
+  // changing the listing to match (27 Nov 2026).
+  starter: { priceCents: 900, quotes: Infinity, companyAccounts: 5, priceLists: 3 },
+  growth: { priceCents: 2900, companyAccounts: 25, priceLists: Infinity },
   scale: { priceCents: 6900, companyAccounts: Infinity, priceLists: Infinity },
   // The plan each listed feature first appears on.
   features: {
@@ -33,6 +35,9 @@ const LISTING = {
     salesReps: "scale",
     accountingSync: "scale",
     whiteLabel: "scale",
+    // Owner decisions, 27 Nov 2026.
+    erpSync: "scale",
+    aiOrderPad: "growth",
   } satisfies Partial<Record<PlanFeature, string>>,
 };
 

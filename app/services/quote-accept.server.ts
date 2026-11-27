@@ -20,6 +20,7 @@ import {
 import { evaluateCredit, getCreditProfile, outstandingForCompany, type CreditDecision } from "./credit.server";
 import { isDemoEmail } from "./demo.server";
 import { createInvoiceForOrder } from "./invoice.server";
+import { featureAvailable, shopPlanHandle } from "../lib/plan-features";
 
 const CREDIT_ENABLED = () => process.env.MANNON_FF_CREDIT === "true";
 
@@ -192,13 +193,18 @@ export async function acceptAndOrder(
 
   // F2 — raise the net-terms invoice (dueDate = now + termsDays). Best-effort:
   // an invoice failure must not strand a placed order, so we swallow + report.
-  if (CREDIT_ENABLED()) {
+  // Net terms and credit are a Growth feature (owner decision, 27 Nov 2026): no
+  // invoice below it, so no store is left with invoices it can't mark paid.
+  const shopTerms = CREDIT_ENABLED()
+    ? await prisma.shop.findUnique({
+        where: { id: quote.company.shopId },
+        select: { defaultTermsDays: true, plan: true, legacyPlan: true },
+      })
+    : null;
+  if (CREDIT_ENABLED() && featureAvailable("netTerms", shopPlanHandle(shopTerms))) {
     try {
       const profile = await getCreditProfile(quote.companyId);
-      const shop = await prisma.shop.findUnique({
-        where: { id: quote.company.shopId },
-        select: { defaultTermsDays: true },
-      });
+      const shop = shopTerms;
       const termsDays = profile?.termsDays ?? shop?.defaultTermsDays ?? 30;
       await createInvoiceForOrder({
         companyId: quote.companyId,

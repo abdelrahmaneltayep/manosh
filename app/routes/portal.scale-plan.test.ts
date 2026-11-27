@@ -114,6 +114,22 @@ describe.skipIf(!hasDb)("buyer portal: Scale gets every Growth feature", () => {
     });
   });
 
+  describe("reading a pasted purchase order with Claude", () => {
+    it.each(BELOW_GROWTH)("%s: the reader is off and names Growth", async (plan) => {
+      await seed(plan);
+      const data = await quickLoader(args(new Request("https://app.example.com/portal/quick-order")));
+      expect(data.aiOrderPad).toBe(false);
+      const result = await quickAction(args(post("/portal/quick-order", { intent: "ai-parse", blob: "10 x A-1" })));
+      expect(result).toMatchObject({ kind: "error", error: expect.stringMatching(/Growth plan/) });
+    });
+
+    it.each(GROWTH_TIER)("%s: the reader is on", async (plan) => {
+      await seed(plan);
+      const data = await quickLoader(args(new Request("https://app.example.com/portal/quick-order")));
+      expect(data.aiOrderPad).toBe(true);
+    });
+  });
+
   describe("wholesale application auto-approval", () => {
     async function apply(plan: Plan) {
       const { shop } = await seed(plan);

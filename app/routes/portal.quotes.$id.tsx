@@ -26,6 +26,7 @@ import { needsApproval, canApprove, type CompanyRole } from "../lib/company-acco
 import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate, formatMoney } from "../lib/format";
 import { isGrowthTier } from "../lib/billing";
+import { featureAvailable, shopPlanHandle } from "../lib/plan-features";
 
 const ACCOUNTS_ENABLED = () => process.env.MANNON_FF_COMPANY_ACCOUNTS === "true";
 
@@ -63,8 +64,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   // Surface native payment terms on the quote (only fetch when there's an
   // action to take — the accept step).
+  // Buyer-chosen payment terms (net terms) are a Growth feature (owner decision,
+  // 27 Nov 2026): below it the buyer accepts without choosing terms.
+  const termsAllowed = featureAvailable("netTerms", shopPlanHandle(quote.company.shop));
   let paymentTerms: PaymentTerm[] = [];
-  if (quote.status === "COUNTERED") {
+  if (quote.status === "COUNTERED" && termsAllowed) {
     try {
       // FIXED-date templates need a due date the buyer can't choose here, so
       // only net / on-receipt / on-fulfillment terms are offered.
@@ -189,6 +193,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     // Shopify needs the template's schedule (issue date for net terms), so
     // look the chosen template up rather than sending the bare id.
     let paymentTerm: { paymentTermsType: string; dueInDays: number | null } | null = null;
+    if (paymentTermsTemplateId && !(await shopAllowsNetTerms(shopDomain))) {
+      return { error: "Payment terms aren’t available for this store. Accept without choosing terms." };
+    }
     if (paymentTermsTemplateId) {
       const terms = await getPaymentTerms(shopDomain);
       const chosen = terms.find((t) => t.id === paymentTermsTemplateId);
@@ -402,4 +409,10 @@ export default function BuyerQuote() {
       </p>
     </section>
   );
+}
+
+/** Whether a store's plan lets buyers choose payment terms (Growth and Scale). */
+async function shopAllowsNetTerms(shopDomain: string): Promise<boolean> {
+  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { plan: true, legacyPlan: true } });
+  return featureAvailable("netTerms", shopPlanHandle(shop));
 }

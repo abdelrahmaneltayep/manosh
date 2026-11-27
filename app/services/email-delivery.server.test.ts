@@ -75,7 +75,8 @@ describe("safePortalPath", () => {
 });
 
 async function seed() {
-  const shop = await prisma.shop.create({ data: { shopifyDomain: "honest.myshopify.com", magicLinkExpiryDays: 7 } });
+  // Starter: room for the extra company an approval adds (Free allows one).
+  const shop = await prisma.shop.create({ data: { shopifyDomain: "honest.myshopify.com", magicLinkExpiryDays: 7, plan: "STARTER" } });
   const company = await prisma.company.create({
     data: { shopId: shop.id, shopifyCompanyId: "gid://shopify/Company/honest", name: "Honest Co." },
   });

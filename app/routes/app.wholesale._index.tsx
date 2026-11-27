@@ -50,6 +50,7 @@ import { emailDeliveryEnabled } from "../services/mailer.server";
 import { emailCopy } from "../lib/email-delivery";
 import { useEmailDelivery } from "../lib/use-email-delivery";
 import { CopyPanel } from "../components/CopyPanel";
+import { CompanyCapError } from "../services/plan-limits.server";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_WHOLESALE_REG === "true";
@@ -142,6 +143,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
     return { ok: false, error: "Unknown action." };
   } catch (error) {
     if (error instanceof WholesaleFormCapError) return { ok: false, error: formCapMessage(error.cap) };
+    if (error instanceof CompanyCapError) return { ok: false, error: error.message };
     throw error;
   }
 };

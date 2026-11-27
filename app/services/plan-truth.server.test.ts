@@ -8,6 +8,13 @@ import { issueMagicLink, revokeMagicLink, verifyMagicToken } from "./magic-link.
 import { issueApplicantSignInLink, resetSubmitRate, submitApplication } from "./wholesale.server";
 import { commitRepSession, requireRepId } from "./rep-session.server";
 import type { CatalogItem } from "./catalog.server";
+import { decideApplication } from "./wholesale.server";
+import { convertToQuote } from "./quote-widget.server";
+import { companyAccountAllowance, countActiveQuotes } from "./plan-limits.server";
+import { getBrandingTokens } from "./branding.server";
+import { leaveOrganization } from "./org.server";
+import { verifyRepToken, inviteRep } from "./rep.server";
+import { hashToken } from "./magic-link.server";
 
 // Phase 1 ("make today's app truthful"): what each plan does must match what
 // the app says it does. These run against the test database.
@@ -29,6 +36,8 @@ describe.skipIf(!hasDb)("Phase 1: plan truth", () => {
   beforeEach(async () => {
     vi.stubEnv("MANNON_FF_QUOTE_CAPTURE", "true");
     vi.stubEnv("MANNON_FF_WHOLESALE", "true");
+    vi.stubEnv("MANNON_FF_WHITE_LABEL", "true");
+    vi.stubEnv("MANNON_FF_QUOTE_WIDGET", "true");
     resetSubmitRate();
     await prisma.$executeRawUnsafe('TRUNCATE TABLE "Event","Shop" RESTART IDENTITY CASCADE');
   });
@@ -225,6 +234,118 @@ describe.skipIf(!hasDb)("Phase 1: plan truth", () => {
       const error = await requireRepId(request).catch((e: unknown) => e);
       expect(error).toBeInstanceOf(Response);
       expect((error as Response).status).toBe(402);
+    });
+  });
+
+  describe("company accounts follow the listing (Free 1, Starter 5, Growth 25, Scale unlimited)", () => {
+    async function application(shopId: string, email: string) {
+      return prisma.wholesaleApplication.create({
+        data: { shopId, companyName: `Co ${email}`, contactEmail: email, answers: {}, status: "PENDING", tags: [] },
+      });
+    }
+
+    it("Free: a second company can't be added; the merchant is told to upgrade", async () => {
+      const { shop } = await shopWith("FREE"); // already has one company
+      const allowance = await companyAccountAllowance(shop.id);
+      expect(allowance).toMatchObject({ allowed: false, used: 1, cap: 1 });
+      expect(allowance.allowed ? "" : allowance.message).toBe(
+        "The Free plan includes 1 company account, and you have 1. Upgrade to Starter for 5 company accounts.",
+      );
+      const app = await application(shop.id, "new@trade.example");
+      await expect(decideApplication(shop.shopifyDomain, app.id, "APPROVED", "tester", BASE_URL)).rejects.toThrow(/Upgrade to Starter/);
+      expect((await prisma.wholesaleApplication.findUniqueOrThrow({ where: { id: app.id } })).status).toBe("PENDING");
+      expect(await prisma.company.count({ where: { shopId: shop.id } })).toBe(1);
+    });
+
+    it("Free: a storefront request from a new email can't become a quote, from a known buyer it can't either past 1 company", async () => {
+      const { shop } = await shopWith("FREE");
+      const request = await prisma.quoteRequest.create({ data: { shopId: shop.id, email: "stranger@new.example", lines: [] } });
+      expect(await convertToQuote(shop.shopifyDomain, request.id)).toEqual({
+        ok: false,
+        error: "The Free plan includes 1 company account, and you have 1. Upgrade to Starter for 5 company accounts.",
+      });
+    });
+
+    it("Starter allows 5, Scale has no limit", async () => {
+      const { shop } = await shopWith("STARTER");
+      for (let i = 0; i < 4; i++) {
+        await prisma.company.create({ data: { shopId: shop.id, shopifyCompanyId: `gid://shopify/Company/s${i}`, name: `S${i}` } });
+      }
+      expect(await companyAccountAllowance(shop.id)).toMatchObject({ allowed: false, cap: 5 });
+      await prisma.shop.update({ where: { id: shop.id }, data: { plan: "SCALE" } });
+      expect(await companyAccountAllowance(shop.id)).toEqual({ allowed: true });
+    });
+  });
+
+  describe("white-label is paused below Scale", () => {
+    it("saved branding shows on Scale and falls back to the defaults after a downgrade", async () => {
+      const { shop } = await shopWith("SCALE");
+      // Branding rows aren't tied to the Shop row, so they survive the truncate: upsert.
+      await prisma.branding.upsert({
+        where: { shop: shop.shopifyDomain },
+        create: { shop: shop.shopifyDomain, primaryColor: "#123456", portalName: "Acme Trade" },
+        update: { primaryColor: "#123456", portalName: "Acme Trade" },
+      });
+      expect((await getBrandingTokens(shop.shopifyDomain)).portalName).toBe("Acme Trade");
+      await prisma.shop.update({ where: { id: shop.id }, data: { plan: "GROWTH" } });
+      const tokens = await getBrandingTokens(shop.shopifyDomain);
+      expect(tokens.custom).toBe(false);
+      expect(tokens.portalName).not.toBe("Acme Trade");
+    });
+  });
+
+  describe("a store below Scale can leave its organization", () => {
+    it("a member leaves; the owner can't", async () => {
+      const org = await prisma.organization.create({ data: { name: "Northwind", ownerEmail: "owner@northwind.example" } });
+      await prisma.orgStore.create({ data: { orgId: org.id, shop: "owner.myshopify.com", role: "OWNER" } });
+      await prisma.orgStore.create({ data: { orgId: org.id, shop: "member.myshopify.com", role: "MANAGER" } });
+      expect(await leaveOrganization("member.myshopify.com")).toEqual({ ok: true });
+      expect((await leaveOrganization("owner.myshopify.com")).ok).toBe(false);
+      expect(await prisma.orgStore.count({ where: { orgId: org.id } })).toBe(1);
+      await prisma.organization.delete({ where: { id: org.id } });
+    });
+  });
+
+  describe("rep invite links below Scale", () => {
+    it("are refused without being used, and work again on Scale", async () => {
+      const { shop } = await shopWith("SCALE");
+      const { url } = await inviteRep(shop.shopifyDomain, { email: "rep@trade.example" }, "SCALE", BASE_URL);
+      const token = new URL(url).searchParams.get("token");
+      await prisma.shop.update({ where: { id: shop.id }, data: { plan: "GROWTH" } });
+
+      expect(await verifyRepToken(token, { consume: true })).toEqual({ ok: false, reason: "plan" });
+      const rep = await prisma.salesRep.findFirstOrThrow({ where: { shopId: shop.id } });
+      expect(rep.status).toBe("INVITED");
+      expect(rep.magicTokenHash).toBe(hashToken(token!));
+
+      await prisma.shop.update({ where: { id: shop.id }, data: { plan: "SCALE" } });
+      expect((await verifyRepToken(token, { consume: true })).ok).toBe(true);
+    });
+  });
+
+  describe("demo visitors' quotes never count toward a plan limit", () => {
+    it("only real buyers' quotes are counted", async () => {
+      const { shop, company, buyer } = await shopWith("FREE");
+      const demo = await prisma.buyer.create({ data: { companyId: company.id, email: "visitor-1@demo.mannon.invalid" } });
+      const expiresAt = new Date(Date.now() + 86_400_000);
+      for (const b of [buyer, demo, demo, demo]) {
+        await prisma.quote.create({ data: { companyId: company.id, buyerId: b.id, status: "SUBMITTED", expiresAt } });
+      }
+      expect(await countActiveQuotes(shop.id, new Date(Date.now() - 86_400_000))).toBe(1);
+    });
+  });
+
+  describe("a link sent before per-link rows existed keeps working", () => {
+    it("issuing a new link doesn't replace it", async () => {
+      const { buyer } = await shopWith("FREE");
+      const legacyRaw = "legacy-raw-token-from-before-the-change";
+      await prisma.buyer.update({
+        where: { id: buyer.id },
+        data: { magicTokenHash: hashToken(legacyRaw), magicTokenExpiresAt: new Date(Date.now() + 86_400_000) },
+      });
+      const fresh = await issueMagicLink(buyer.id, { baseUrl: BASE_URL });
+      expect((await verifyMagicToken(legacyRaw, { consume: true })).ok).toBe(true);
+      expect((await verifyMagicToken(tokenOf(fresh.url), { consume: true })).ok).toBe(true);
     });
   });
 });

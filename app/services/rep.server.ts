@@ -4,7 +4,7 @@ import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
 import { hashToken, generateMagicToken } from "./magic-link.server";
 import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
-import { getPlanLimits, evaluateRepSeatAllowance } from "../lib/billing";
+import { getPlanLimits, evaluateRepSeatAllowance, repPortalAllowed } from "../lib/billing";
 import { buildRepLeaderboard, type LeaderboardRow } from "../lib/rep";
 
 /**
@@ -169,7 +169,7 @@ export async function repLeaderboard(shopDomain: string): Promise<LeaderboardRow
 
 export type VerifyResult =
   | { ok: true; rep: SalesRep }
-  | { ok: false; reason: "invalid" | "expired" };
+  | { ok: false; reason: "invalid" | "expired" | "plan" };
 
 /** Verify a rep magic token; with consume:true it's single-use (atomic). */
 export async function verifyRepToken(
@@ -182,6 +182,11 @@ export async function verifyRepToken(
   const rep = await prisma.salesRep.findFirst({ where: { magicTokenHash: hash } });
   if (!rep || !rep.magicTokenHash || !rep.magicTokenExpiresAt) return { ok: false, reason: "invalid" };
   if (rep.magicTokenExpiresAt.getTime() <= now.getTime()) return { ok: false, reason: "expired" };
+  // The rep portal is a Scale feature. Check before the link is used, so a rep
+  // at a store below Scale isn't marked active and the link stays valid for
+  // when the store is back on Scale.
+  const shop = await prisma.shop.findUnique({ where: { id: rep.shopId }, select: { plan: true, legacyPlan: true } });
+  if (!repPortalAllowed(shop?.plan ?? null, shop?.legacyPlan ?? false)) return { ok: false, reason: "plan" };
 
   if (options.consume) {
     const consumed = await prisma.salesRep.updateMany({

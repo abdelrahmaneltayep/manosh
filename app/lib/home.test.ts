@@ -39,13 +39,18 @@ describe("setupSteps", () => {
     expect(steps.every((s) => !s.optional)).toBe(true);
   });
 
-  it("adds optional steps only for live features, and Growth-only ones only on Growth", () => {
-    const starter = setupSteps({ ...BASE, credit: true, erp: true });
-    expect(starter.map((s) => s.id)).toContain("credit");
-    expect(starter.map((s) => s.id)).not.toContain("erp");
-    const growth = setupSteps({ ...BASE, credit: true, erp: true, growthTier: true });
-    expect(growth.map((s) => s.id)).toContain("erp");
-    expect(growth.find((s) => s.id === "erp")?.optional).toBe(true);
+  it("offers optional steps only for live features the plan includes", () => {
+    const flags = { credit: true, erp: true, reps: true, accounting: true };
+    const starter = setupSteps({ ...BASE, ...flags }).map((s) => s.id);
+    expect(starter).not.toContain("credit"); // credit control is Growth
+    expect(starter).not.toContain("erp");
+    const growth = setupSteps({ ...BASE, ...flags, growthTier: true }).map((s) => s.id);
+    expect(growth).toContain("credit");
+    // Reps, ERP and accounting are Scale.
+    for (const id of ["erp", "reps", "accounting"]) expect(growth).not.toContain(id);
+    const scale = setupSteps({ ...BASE, ...flags, growthTier: true, scaleTier: true });
+    for (const id of ["erp", "reps", "accounting"]) expect(scale.map((s) => s.id)).toContain(id);
+    expect(scale.find((s) => s.id === "erp")?.optional).toBe(true);
   });
 
   it("counts progress from the done flags", () => {

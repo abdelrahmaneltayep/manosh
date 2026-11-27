@@ -64,15 +64,16 @@ export async function issueMagicLink(
 
   // Each link is its own row, so issuing one (a copied reminder, a quote link,
   // an invite) never cancels a link the buyer already has. Used and expired
-  // rows for this buyer are cleared as we go. The Buyer columns keep the newest
-  // link too: older code paths and the Home setup check read them.
+  // rows for this buyer are cleared as we go. The Buyer columns are written
+  // only when they hold no live link: a link sent before per-link rows existed
+  // lives only there and must keep working until it is used or expires.
   await prisma.$transaction([
     prisma.buyerSignInLink.deleteMany({
       where: { buyerId: buyer.id, OR: [{ usedAt: { not: null } }, { expiresAt: { lte: now } }] },
     }),
     prisma.buyerSignInLink.create({ data: { buyerId: buyer.id, tokenHash: hash, expiresAt } }),
-    prisma.buyer.update({
-      where: { id: buyer.id },
+    prisma.buyer.updateMany({
+      where: { id: buyer.id, OR: [{ magicTokenHash: null }, { magicTokenExpiresAt: null }, { magicTokenExpiresAt: { lte: now } }] },
       data: { magicTokenHash: hash, magicTokenExpiresAt: expiresAt },
     }),
   ]);

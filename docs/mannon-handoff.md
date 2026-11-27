@@ -26,7 +26,6 @@ anything here.
 
 1. `git pull origin claude/mannon-feature-slices-w3epbf`, then `fly deploy`.
 2. Turn on scheduled jobs: set `CRON_SECRET` in Fly and in GitHub (section 9.3).
-   Production still answers `503 CRON_SECRET not set`.
 3. Decide on an email provider. No email is delivered today (section 11, gap 1).
 4. Test choosing the Free plan on a clean store (section 11, gap 3).
 5. Payout and tax details in the Partner Dashboard.
@@ -223,7 +222,7 @@ Names only; values live in Fly secrets and must never be printed or committed.
 |---|---|
 | Required | `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SCOPES`, `SHOPIFY_APP_URL`, `SESSION_SECRET`, `DATABASE_URL` |
 | AI | `ANTHROPIC_API_KEY` |
-| Scheduled jobs | `CRON_SECRET` (not set in production as of 2026-11-24) |
+| Scheduled jobs | `CRON_SECRET` |
 | Email | `MANNON_MAIL_FROM` (see section 11, gap 1) |
 | Integrations | `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `MANNON_ENCRYPTION_KEY`, `MANNON_VAPID_PUBLIC_KEY`, `MANNON_VAPID_PRIVATE_KEY` |
 | Monitoring | `SENTRY_DSN`, `POSTHOG_API_KEY`, `POSTHOG_HOST` |
@@ -365,12 +364,6 @@ Lessons that still apply:
    way: dates were printed in the viewer's time zone, which failed page hydration for
    any merchant outside UTC (`app/lib/format.ts`, now fixed to UTC). Still needed: the
    browser console error and `fly logs` for a failing `GET /app`.
-4b. **Plan gates follow one map** (`app/lib/plan-features.ts`, Phase 1). Still
-   different from the 27 Nov listing, waiting for a decision: company-account and
-   price-list caps are not enforced as listed; buyers can pick Shopify payment
-   terms on every plan (listing: net terms on Growth); the AI order pad and the
-   Claude trial reach plans below Growth; ERP sync is on Growth (promotion plan
-   says Scale).
 5. **Billing reads use the Admin API.** Shopify now recommends the Partner API's active
    subscription query.
 6. **The IP allowlist uses shared networks**, not exact addresses (section 9.4).
@@ -390,17 +383,8 @@ Lessons that still apply:
 
 ## 12. Go-to-market
 
-| Document | What it is |
-|---|---|
-| https://claude.ai/artifact/PZn7AiKkkUPtjozRfm9tdn | The owner's go-to-market plan: goal, channels, week-by-week checklist |
-| `docs/promotion-plan.md` | The same plan as a brief a session can execute: allowed claims, rules, messages in English, Arabic and French, tracking |
-| `docs/b2b-store-leads.md` | 66 candidate stores with a wholesale or quote page. Shopify and the page content must be confirmed in a browser before any contact |
-
-Target customer: a Shopify store that already takes wholesale orders and answers price
-questions by email. The pitch: **Mannon turns "can you send me a price?" emails into
-Shopify draft orders.**
-
----
+Planning documents (go-to-market plan, promotion brief, lead list) are kept outside
+this public repository. Ask the owner for them.
 
 ## 13. Rules for any session working on Mannon
 
@@ -422,7 +406,7 @@ Shopify draft orders.**
   anything to Shopify, or spend money, unless the owner says so in that conversation.
 - Send outreach, publish a post or change the listing yourself. Draft; the owner sends.
 - Compute money in the app, or let AI output act without a confirm screen.
-- Make a product claim that section 3 or `docs/promotion-plan.md` section 2 does not
+- Make a product claim that section 3 or the owner's promotion brief does not
   support.
 - Put `#` comments inside commands meant for the owner's terminal (zsh).
 
@@ -445,7 +429,7 @@ Shopify draft orders.**
 | App Store listing and review | `SUBMISSION-KIT.md`, `docs/listing.md`, `docs/submission.md`, `docs/screencast-recording.md` |
 | Deploy checklists | `docs/go-live-checklist.md`, `DEPLOY-VERIFY-P0.md` |
 | Features, one file each | `docs/quote-widget.md`, `docs/quote-capture.md`, `docs/quote-ops.md`, `docs/make-an-offer.md`, `docs/order-pad.md`, `docs/price-lists.md`, `docs/custom-catalogs.md`, `docs/catalog-sharing.md`, `docs/order-rules.md`, `docs/company-accounts.md`, `docs/wholesale-registration.md`, `docs/sales-rep-portal.md`, `docs/net-terms-credit.md`, `docs/flexible-payments.md`, `docs/tax-vat.md`, `docs/followups.md`, `docs/quote-analytics.md`, `docs/accounting-sync.md`, `docs/erp-sync.md`, `docs/i18n.md`, `docs/buyer-pwa.md`, `docs/white-label.md` |
-| Promotion | `docs/promotion-plan.md`, `docs/b2b-store-leads.md` |
+| Promotion | Kept outside this repository (ask the owner) |
 | Brand | `docs/brand.md` |
 
 ---
@@ -470,7 +454,7 @@ from the conversation itself.
 | Nov 1 | Shopify suspended the submission until Nov 4 for repeated failures. Fix the two issues and test every case | Fixed 5.1.2 (theme blocks now render as soon as added) and 1.2.2 (plan page URL built from the app's real handle). QA harness with 77 HTTP cases. Live admin click-through through Remote Control into the owner's Chrome. Protected customer data declared as Level 1 plus email only. Data protection answers and an incident response policy written |
 | Nov 1 to 2 | Fix what the live run found | Added the `write_payment_terms` scope so Net 30 attaches to a draft order; drafts priced in the agreed currency; buyers linked to their Shopify company; accept refused without a company contact; demo reorder card made reliable. Reorder tolerance set to 5% on the dev store and the reorder step re-verified |
 | Nov 3 | A walkthrough video in the "Menna" voice, produced from the terminal | Narration generated with ElevenLabs in the brand's "Menna" voice, take B chosen for every scene. `npm run video` downloads the takes, records the app through the owner's signed-in Chrome, and assembles the cut with captions, pointer and transitions |
-| Nov 5 | Redesign the landing page, with options to choose from | Several options built as a preview artifact (https://claude.ai/code/artifact/c357d351-8120-4492-9686-286c92eb2857). Owner chose option B with animations, a demo store page and a pricing page. New logo, favicon and capital-M wordmark. Deployed |
+| Nov 5 | Redesign the landing page, with options to choose from | Several options built as a preview artifact. Owner chose option B with animations, a demo store page and a pricing page. New logo, favicon and capital-M wordmark. Deployed |
 | Nov 5 | Test the whole app from the terminal, including the Shopify admin | `npm run qa:all` (live) and `npm run qa:local` (mocks), with the catalogue in `docs/qa/test-catalog.md` |
 | Nov 5 | "Can I submit now?" (asked several times, with the pre-submission review skill) | Fixed 2.3.1 (no typed store domain on login; agency stores join by invite code), 5.1.3 (theme-editor deep links), 1.1.6 (cross-store discovery directory switched off). Wrote the reviewer instructions, the network access request reason for the customer account extension, and the screenshot shot list; captured the screenshots |
 | Nov 5 | "Are the Draft with Claude features linked with the Claude API?" | Yes: they call Anthropic's API with `claude-haiku-4-5` |
@@ -480,10 +464,10 @@ from the conversation itself.
 | Nov 7 | Listing screenshots and feature media | Shopify's check rejected images that showed pricing. All listing images redone in the owner's design with real captures and no pricing; screenshot 1 became a feature overview |
 | Nov 22 | Two new review issues (ref 126730) | **1.2.2:** no plan is shown as Current until Shopify holds one (`ca77c9f`). **2.1.1:** the review link that blanked the app was replaced by App Bridge's review request (`7d4e352`). Also fixed: quote count on paid plans, the "expiring soon" list, quotes past expiry counting toward the limit. Five proof recordings from the owner checked; two trimmed copies returned |
 | Nov 23 | "What should I do now?" after the approval email | Next steps given. Then: quote-expiry job wired, `docs/scheduled-jobs.md` and the scheduler workflow added (`518bb35`) |
-| Nov 23 | A go-to-market plan to reach 10 customers in a month | The plan document (section 12) |
+| Nov 23 | A go-to-market plan to reach 10 customers in a month | Kept outside the repo (section 12) |
 | Nov 23 | Shopify's email requiring an IP allowlist within 24 hours | Steps and a prompt written; the owner's local session set it up and enforced it (section 9.4) |
 | Nov 23 | How to continue this session on the owner's Mac with Remote Control | `claude --teleport`, then `/remote-control` |
-| Nov 23 | A promotion plan and a list of B2B Shopify stores, to share with another session | `docs/promotion-plan.md` and `docs/b2b-store-leads.md` |
+| Nov 23 | A promotion plan and a list of B2B Shopify stores, to share with another session | Kept outside the repo |
 | Nov 24 | Is the allowlist follow-up required? Then this document | Not required; the issue is fixed. This file |
 
 ### 15.2 Decisions the owner made
@@ -512,8 +496,6 @@ already has copies of these:
 
 | Output | Where |
 |---|---|
-| Go-to-market plan | https://claude.ai/artifact/PZn7AiKkkUPtjozRfm9tdn |
-| Landing page options | https://claude.ai/code/artifact/c357d351-8120-4492-9686-286c92eb2857 |
 | Listing feature video | https://youtu.be/y4uYnPY_Das (review-era cut; due for a promotional replacement) |
 | Review screencast, walkthrough video, narration takes | Sent to the owner as files |
 | Listing images (thumbnail and six screenshots, with alt text) | Sent to the owner as a zip |

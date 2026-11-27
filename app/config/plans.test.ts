@@ -38,41 +38,15 @@ describe("claudeAccess", () => {
     expect(a.shouldStartTrial).toBe(false);
   });
 
-  it("offers a fresh Starter the full 7-day trial and flags trial start", () => {
-    const a = claudeAccess({ plan: "STARTER", claudeTrialStartedAt: null }, NOW);
-    expect(a.state).toBe("trial");
-    expect(a.allowed).toBe(true);
-    expect(a.reason).toBe("trial-available");
-    expect(a.daysLeft).toBe(CLAUDE_TRIAL_DAYS);
-    expect(a.shouldStartTrial).toBe(true);
-  });
-
-  it("keeps a Starter in-trial mid-window (no re-start)", () => {
-    const a = claudeAccess({ plan: "STARTER", claudeTrialStartedAt: daysAgo(3) }, NOW);
-    expect(a.state).toBe("trial");
-    expect(a.allowed).toBe(true);
-    expect(a.reason).toBe("trial-active");
-    expect(a.daysLeft).toBe(4);
-    expect(a.shouldStartTrial).toBe(false);
-  });
-
-  it("locks a Starter once the 7-day window elapses", () => {
-    const a = claudeAccess({ plan: "STARTER", claudeTrialStartedAt: daysAgo(8) }, NOW);
-    expect(a.state).toBe("locked");
-    expect(a.allowed).toBe(false);
-    expect(a.reason).toBe("trial-ended");
-    expect(a.daysLeft).toBe(0);
-  });
-
-  it("locks a Starter exactly at the boundary (day 7)", () => {
-    const a = claudeAccess({ plan: "STARTER", claudeTrialStartedAt: daysAgo(CLAUDE_TRIAL_DAYS) }, NOW);
-    expect(a.state).toBe("locked");
-  });
-
-  it("accepts an ISO string for claudeTrialStartedAt (Remix serialization)", () => {
-    const a = claudeAccess({ plan: "STARTER", claudeTrialStartedAt: daysAgo(1).toISOString() }, NOW);
-    expect(a.state).toBe("trial");
-    expect(a.daysLeft).toBe(6);
+  it("locks Claude for Starter too: no trial (owner decision, 27 Nov 2026)", () => {
+    for (const startedAt of [null, daysAgo(3), daysAgo(1).toISOString()]) {
+      const a = claudeAccess({ plan: "STARTER", claudeTrialStartedAt: startedAt }, NOW);
+      expect(a.state).toBe("locked");
+      expect(a.allowed).toBe(false);
+      expect(a.reason).toBe("plan-locked");
+      expect(a.shouldStartTrial).toBe(false);
+      expect(a.daysLeft).toBeNull();
+    }
   });
 
   it("a shop with no plan selected (TRIAL) is Free-level → Claude locked, no trial started", () => {
@@ -86,18 +60,11 @@ describe("claudeAccess", () => {
     it("is true when included (Growth/Scale)", () => {
       expect(claudeAccess({ plan: "GROWTH" }, NOW).planGrantsClaude).toBe(true);
     });
-    it("is true during an active Starter trial", () => {
-      expect(
-        claudeAccess({ plan: "STARTER", claudeTrialStartedAt: daysAgo(3) }, NOW).planGrantsClaude,
-      ).toBe(true);
-    });
     it("is false for Free (nothing to toggle)", () => {
       expect(claudeAccess({ plan: "FREE" }, NOW).planGrantsClaude).toBe(false);
     });
-    it("is false once the Starter trial has ended", () => {
-      expect(
-        claudeAccess({ plan: "STARTER", claudeTrialStartedAt: daysAgo(8) }, NOW).planGrantsClaude,
-      ).toBe(false);
+    it("is false for Starter", () => {
+      expect(claudeAccess({ plan: "STARTER", claudeTrialStartedAt: daysAgo(3) }, NOW).planGrantsClaude).toBe(false);
     });
   });
 
@@ -116,39 +83,16 @@ describe("claudeAccess", () => {
       expect(a.shouldStartTrial).toBe(false);
     });
 
-    it("turns an active trial off when toggled off (without starting/altering the trial)", () => {
-      const a = claudeAccess(
-        { plan: "STARTER", claudeTrialStartedAt: daysAgo(2), claudeEnabled: false },
-        NOW,
-      );
-      expect(a.state).toBe("off");
-      expect(a.allowed).toBe(false);
-      expect(a.reason).toBe("toggled-off");
-      expect(a.shouldStartTrial).toBe(false);
-    });
-
-    it("does NOT start a fresh Starter's trial while toggled off", () => {
-      const a = claudeAccess(
-        { plan: "STARTER", claudeTrialStartedAt: null, claudeEnabled: false },
-        NOW,
-      );
-      expect(a.state).toBe("off");
-      expect(a.shouldStartTrial).toBe(false);
-    });
-
     it("ignores the toggle for a Free shop (stays locked, not off)", () => {
       const a = claudeAccess({ plan: "FREE", claudeEnabled: false }, NOW);
       expect(a.state).toBe("locked");
       expect(a.reason).toBe("plan-locked");
     });
 
-    it("ignores the toggle for a Starter whose trial has ended (stays locked)", () => {
-      const a = claudeAccess(
-        { plan: "STARTER", claudeTrialStartedAt: daysAgo(9), claudeEnabled: false },
-        NOW,
-      );
+    it("ignores the toggle for a Starter (stays locked)", () => {
+      const a = claudeAccess({ plan: "STARTER", claudeEnabled: false }, NOW);
       expect(a.state).toBe("locked");
-      expect(a.reason).toBe("trial-ended");
+      expect(a.reason).toBe("plan-locked");
     });
   });
 });

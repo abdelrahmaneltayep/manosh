@@ -89,6 +89,8 @@ export interface SetupState {
   catalogSharing: boolean;
   /** Growth or Scale — several optional steps need it. */
   growthTier: boolean;
+  /** Scale — reps, ERP and accounting steps need it (plan-features.ts). */
+  scaleTier?: boolean;
   /** A plan is selected in Shopify (Free counts). False on a fresh install. */
   planSelected: boolean;
   // progress signals from the database
@@ -155,14 +157,14 @@ export function setupSteps(s: SetupState): SetupStep[] {
   });
   // Optional — only for features that are switched on, in the order merchants need them.
   if (s.catalogs) add({ id: "catalog", title: "Build a custom catalog", description: "Show each company only the products they're allowed to see.", done: s.hasCustomCatalog, optional: true, action: { content: "Build a catalog", url: "/app/catalogs" } });
-  if (s.credit) add({ id: "credit", title: "Set a credit profile", description: "Give a company a credit limit and net terms so orders on terms raise an invoice with a due date.", done: s.hasCreditProfile, optional: true, action: { content: "Set credit", url: "/app/credit" } });
+  if (s.credit && s.growthTier) add({ id: "credit", title: "Set a credit profile", description: "Give a company a credit limit and net terms so orders on terms raise an invoice with a due date.", done: s.hasCreditProfile, optional: true, action: { content: "Set credit", url: "/app/credit" } });
   if (s.tax) add({ id: "tax", title: "Set your tax rules", description: "Collect exemption certificates and verify buyers. Shopify calculates the tax.", done: s.hasTaxRules, optional: true, action: { content: "Set tax rules", url: "/app/tax" } });
   if (s.i18n) add({ id: "i18n", title: "Add languages and currencies", description: "Let buyers use the portal in their language and see prices in their currency.", done: s.hasI18nSetup, optional: true, action: { content: "Add languages", url: "/app/i18n" } });
   if (s.payments && s.growthTier) add({ id: "deposit", title: "Set a default deposit", description: "Pre-fill a deposit percentage for large orders. Payment runs through Shopify checkout.", done: s.hasDepositPolicy, optional: true, action: { content: "Set a deposit", url: "/app/payments" } });
-  if (s.reps && s.growthTier) add({ id: "reps", title: "Invite your sales reps", description: "Give reps a login scoped to the accounts they look after.", done: s.hasRep, optional: true, action: { content: "Invite reps", url: "/app/reps" } });
+  if (s.reps && s.scaleTier) add({ id: "reps", title: "Invite your sales reps", description: "Give reps a login scoped to the accounts they look after.", done: s.hasRep, optional: true, action: { content: "Invite reps", url: "/app/reps" } });
   if (s.catalogSharing && s.growthTier) add({ id: "share", title: "Publish a shareable catalog", description: "A public page new buyers can browse and request access to. Prices stay hidden until you approve them.", done: s.hasPublicCatalog, optional: true, action: { content: "Publish a catalog", url: "/app/catalog-sharing" } });
-  if (s.erp && s.growthTier) add({ id: "erp", title: "Connect your ERP", description: "Keep stock accurate and send orders to your ERP or warehouse.", done: s.hasErpConnection, optional: true, action: { content: "Connect ERP", url: "/app/erp" } });
-  if (s.accounting && s.growthTier) add({ id: "accounting", title: "Connect your accounting", description: "Send invoices and payments to QuickBooks Online or Xero.", done: s.hasAccountingConnection, optional: true, action: { content: "Connect accounting", url: "/app/accounting" } });
+  if (s.erp && s.scaleTier) add({ id: "erp", title: "Connect your ERP", description: "Keep stock accurate and send orders to your ERP or warehouse.", done: s.hasErpConnection, optional: true, action: { content: "Connect ERP", url: "/app/erp" } });
+  if (s.accounting && s.scaleTier) add({ id: "accounting", title: "Connect your accounting", description: "Send invoices and payments to QuickBooks Online or Xero.", done: s.hasAccountingConnection, optional: true, action: { content: "Connect accounting", url: "/app/accounting" } });
   return steps;
 }
 

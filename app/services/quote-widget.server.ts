@@ -8,6 +8,7 @@ import { submitBuyerQuote } from "./portal-quote.server";
 import { quoteWidgetFeatures, type QuoteWidgetFeatures } from "../lib/billing";
 import { validateQuoteRequest, type QuoteRequestInput, type CleanLine } from "../lib/quote-widget";
 import { formBelongsToShop, QUOTE_CAPTURE_ENABLED } from "./quote-form.server";
+import { assertCanAddCompany, CompanyCapError } from "./plan-limits.server";
 
 /**
  * F17 — storefront "Request a Quote" widget service. Public submissions are
@@ -272,6 +273,8 @@ async function ensureBuyer(shopId: string, email: string, companyName: string | 
   const known = await prisma.buyer.findFirst({ where: { email, company: { shopId } }, select: { id: true, companyId: true } });
   if (known) return { buyerId: known.id, companyId: known.companyId };
 
+  // A new company account must fit the plan's limit (CompanyCapError otherwise).
+  await assertCanAddCompany(shopId);
   const company = await prisma.company.create({ data: { shopId, shopifyCompanyId: `quote-request:${requestId}`, name: companyName || email } });
   const buyer = await prisma.buyer.create({ data: { companyId: company.id, email, role: "ADMIN", status: "ACTIVE" } });
   return { buyerId: buyer.id, companyId: company.id };
@@ -287,7 +290,14 @@ export async function convertToQuote(shopDomain: string, id: string): Promise<Co
   if (!request) return { ok: false, error: "Request not found." };
   if (request.status !== "NEW") return { ok: false, error: "This request was already handled." };
 
-  const { buyerId, companyId } = await ensureBuyer(shop.id, request.email, request.companyName, request.id);
+  let ensured: { buyerId: string; companyId: string };
+  try {
+    ensured = await ensureBuyer(shop.id, request.email, request.companyName, request.id);
+  } catch (error) {
+    if (error instanceof CompanyCapError) return { ok: false, error: error.message };
+    throw error;
+  }
+  const { buyerId, companyId } = ensured;
 
   // Resolve the request's lines against the buyer's VISIBLE catalog (F11) — a
   // hidden SKU can never be quoted. Match by variantId, else by SKU.

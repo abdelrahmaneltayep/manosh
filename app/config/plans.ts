@@ -143,8 +143,10 @@ function planClaudeDecision(
     };
   }
 
-  // Free — no Claude, ever (until they upgrade).
-  if (handle === "free") {
+  // Free and Starter — no Claude until they upgrade to Growth. (Starter used to
+  // get a one-time 7-day trial; the owner removed it on 27 Nov 2026 so the app
+  // matches the listing, which puts Draft with Claude on Growth and Scale.)
+  if (handle === "free" || handle === "starter") {
     return {
       state: "locked",
       allowed: false,

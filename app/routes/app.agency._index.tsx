@@ -34,6 +34,7 @@ import {
   createOrganization,
   createStoreInvite,
   joinWithInvite,
+  leaveOrganization,
   unlinkStore,
 } from "../services/org.server";
 import { canManage, roleLabel } from "../lib/org";
@@ -56,7 +57,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { handle } = await getShopPlan(request, session.shop, billing);
   const allowed = featureAvailable("agency", handle);
   if (!allowed) {
-    return { locked: true, shop: session.shop, org: null, rollup: null, branding: null, appUrl: "", upgradeMessage: AGENCY_UPGRADE_MESSAGE };
+    // Membership is shown so a store below Scale can still leave its organization.
+    const membership = await getOrgForShop(session.shop);
+    return { locked: true, shop: session.shop, org: membership, rollup: null, branding: null, appUrl: "", upgradeMessage: AGENCY_UPGRADE_MESSAGE };
   }
 
   const org = await getOrgForShop(session.shop);
@@ -83,10 +86,14 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const { session, billing } = await authenticate.admin(request);
   if (!WHITE_LABEL_ENABLED()) throw new Response("Not found", { status: 404 });
   const shopPlan = await getShopPlan(request, session.shop, billing);
-  if (!featureAvailable("agency", shopPlan.handle)) return { ok: false, error: AGENCY_UPGRADE_MESSAGE };
-
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+  // Leaving is allowed on every plan; everything else needs Scale.
+  if (intent === "leave-org") {
+    const res = await leaveOrganization(session.shop);
+    return res.ok ? { ok: true, message: "This store left the organization." } : { ok: false, error: res.error };
+  }
+  if (!featureAvailable("agency", shopPlan.handle)) return { ok: false, error: AGENCY_UPGRADE_MESSAGE };
   const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
   const org = await getOrgForShop(session.shop);
 
@@ -167,6 +174,19 @@ export default function Agency() {
             <Button url={upgradeUrl(minimumPlan("agency"))} variant="primary">{`See ${minimumPlanName("agency")}`}</Button>
           </Box>
         </Banner>
+        {data.org && data.org.myRole !== "OWNER" && (
+          <Box paddingBlockStart="400">
+            <Card>
+              <BlockStack gap="200">
+                <Text as="p" variant="bodyMd">This store is a member of {data.org.name}. You can leave it.</Text>
+                <Form method="post">
+                  <input type="hidden" name="intent" value="leave-org" />
+                  <Button submit tone="critical">Leave organization</Button>
+                </Form>
+              </BlockStack>
+            </Card>
+          </Box>
+        )}
       </Page>
     );
   }

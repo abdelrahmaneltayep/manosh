@@ -25,6 +25,10 @@ export async function getBranding(shopDomain: string) {
  */
 export async function getBrandingTokens(shopDomain: string): Promise<BrandingTokens> {
   if (!WHITE_LABEL_ENABLED()) return resolveBrandingTokens(null);
+  // White-label is a Scale feature: after a downgrade the saved branding is
+  // kept but paused, so the portal, PDFs and messages go back to the defaults.
+  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { plan: true, legacyPlan: true } });
+  if (!whiteLabelAllowed(shop?.plan ?? null, shop?.legacyPlan ?? false)) return resolveBrandingTokens(null);
   const branding = await getBranding(shopDomain);
   return resolveBrandingTokens(branding);
 }

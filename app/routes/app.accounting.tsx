@@ -46,7 +46,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { status, handle } = await getShopPlan(request, session.shop, billing);
   const unlocked = featureAvailable("accountingSync", handle);
 
-  const connections = unlocked ? await listConnections(session.shop) : [];
+  // Below Scale the connections stay on file (nothing syncs) and can be disconnected.
+  const connections = await listConnections(session.shop);
   const map: MapView = unlocked
     ? await getMap(session.shop)
     : { taxCodeMap: {}, accountMap: {}, customerMatchStrategy: "EMAIL" };
@@ -72,12 +73,12 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) return { ok: false, error: "This feature isn’t available." };
   const { handle } = await getShopPlan(request, session.shop, billing);
-  if (!featureAvailable("accountingSync", handle)) {
-    return { ok: false, error: lockedMessage("accountingSync") };
-  }
-
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
+  // Below Scale the only thing allowed is cleaning up: disconnecting.
+  if (!featureAvailable("accountingSync", handle) && intent !== "disconnect") {
+    return { ok: false, error: lockedMessage("accountingSync") };
+  }
 
   if (intent === "save-map") {
     const parseJson = (raw: string): Record<string, string> => {
@@ -216,6 +217,23 @@ export default function Accounting() {
             </Button>
           </Box>
         </Banner>
+        {data.connections.length > 0 && (
+          <Box paddingBlockStart="400">
+            <Card>
+              <BlockStack gap="200">
+                <Text as="h2" variant="headingMd">Paused connections</Text>
+                <Text as="p" variant="bodyMd">Nothing is sent to these until you upgrade. You can disconnect them.</Text>
+                {data.connections.map((c) => (
+                  <Form method="post" key={c.provider}>
+                    <input type="hidden" name="intent" value="disconnect" />
+                    <input type="hidden" name="provider" value={c.provider} />
+                    <Button submit tone="critical" accessibilityLabel={`Disconnect ${c.provider}`}>{`Disconnect ${c.provider === "QBO" ? "QuickBooks" : c.provider === "XERO" ? "Xero" : c.provider}`}</Button>
+                  </Form>
+                ))}
+              </BlockStack>
+            </Card>
+          </Box>
+        )}
       </Page>
     );
   }

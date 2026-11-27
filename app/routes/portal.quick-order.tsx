@@ -24,6 +24,7 @@ import { getPlanLimits, isGrowthTier, savedListCapMessage } from "../lib/billing
 import { resolvePrice } from "../lib/price-resolver";
 import { orderPadSubtotal, parseOrderPadCsv, type PricedLine } from "../lib/order-pad";
 import { UNRESOLVED_MESSAGE } from "../lib/quick-order";
+import { featureAvailable, minimumPlanName, shopPlanHandle } from "../lib/plan-features";
 
 const ENABLED = () => process.env.MANNON_FF_ORDERPAD === "true";
 
@@ -81,6 +82,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     orderRules,
     companyId: buyer.companyId,
     isGrowth: isGrowthTier(plan),
+    // Reading a pasted PO with Claude is on Growth and Scale (owner decision, 27 Nov 2026).
+    aiOrderPad: featureAvailable("aiOrderPad", shopPlanHandle(buyer.company.shop)),
     savedListCap: Number.isFinite(limits.savedListCap) ? limits.savedListCap : null,
     savedUsed: savedLists.length,
     prefill,
@@ -187,6 +190,9 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
   }
 
   if (intent === "ai-parse") {
+    if (!featureAvailable("aiOrderPad", shopPlanHandle(buyer.company.shop))) {
+      return { kind: "error", error: `Reading a pasted order is on the store’s ${minimumPlanName("aiOrderPad")} plan. Search for items or use the paste box above instead.` };
+    }
     let catalog: CatalogItem[];
     try {
       catalog = await getVisibleCatalog(buyer.company.shop.shopifyDomain, { buyerId: buyer.id, companyId: buyer.companyId });
@@ -515,11 +521,13 @@ export default function OrderPad() {
       )}
       {box !== "ai" && mergeMessages}
 
-      <h2 className="portal-subhead">Paste a PO or email</h2>
+      <h2 className="portal-subhead">Paste a PO or email {data.aiOrderPad ? "" : `(${minimumPlanName("aiOrderPad")})`}</h2>
       <p className="muted" id="po-hint" style={{ marginTop: 0 }}>
-        Paste the items from a purchase order or an email, with quantities. Claude matches them
-        to the catalog; nothing is ordered until you confirm.
+        {data.aiOrderPad
+          ? "Paste the items from a purchase order or an email, with quantities. Claude matches them to the catalog; nothing is ordered until you confirm."
+          : `Reading a pasted purchase order is available on the store’s ${minimumPlanName("aiOrderPad")} plan. Search for items above instead.`}
       </p>
+      {data.aiOrderPad && (
       <merge.Form method="post" onSubmit={() => setLastBox("ai")}>
         <input type="hidden" name="intent" value="ai-parse" />
         <textarea
@@ -535,6 +543,7 @@ export default function OrderPad() {
           Read my order
         </button>
       </merge.Form>
+      )}
       {box === "ai" && mergeMessages}
 
       {/* Cart + live subtotal */}

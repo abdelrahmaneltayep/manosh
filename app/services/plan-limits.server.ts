@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { DEMO_EMAIL_DOMAIN } from "./demo.server";
 import {
   evaluateQuoteAllowance,
   ACTIVE_QUOTE_WINDOW_DAYS,
@@ -17,6 +18,13 @@ import { PLANS, PLAN_CAPABILITIES, PLAN_DISPLAY_NAME, effectivePlanHandle, getPl
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Quotes from the public demo (visitors of /demo get a throwaway buyer at the
+ * demo email domain) never count toward a plan limit (flow 7.3).
+ */
+// A function, not a constant, so a circular import can't freeze it as undefined.
+const notDemo = () => ({ NOT: { buyer: { email: { endsWith: `@${DEMO_EMAIL_DOMAIN}` } } } });
+
 /** Statuses that count as an "active" quote for the volume cap. */
 export const ACTIVE_QUOTE_STATUSES = ["SUBMITTED", "COUNTERED", "ACCEPTED"] as const;
 
@@ -34,6 +42,7 @@ export async function countActiveQuotes(shopId: string, since: Date, now: Date =
       status: { in: [...ACTIVE_QUOTE_STATUSES] },
       createdAt: { gte: since },
       expiresAt: { gt: now },
+      ...notDemo(),
     },
   });
 }
@@ -110,6 +119,7 @@ export async function canReplyToQuote(
       status: { in: [...ACTIVE_QUOTE_STATUSES] },
       createdAt: { gte: since },
       expiresAt: { gt: now },
+      ...notDemo(),
       OR: [{ createdAt: { lt: quote.createdAt } }, { createdAt: quote.createdAt, id: { lt: quote.id } }],
     },
   });
@@ -139,6 +149,47 @@ export async function replyLockFor(
   if (!quote) return null;
   const reply = await canReplyToQuote(quote.company.shopId, quote, now);
   return reply.allowed ? null : { message: reply.message, upgradeTo: reply.upgradeTo };
+}
+
+/**
+ * Company accounts per plan, as listed (owner decision, 27 Nov 2026): Free 1,
+ * Starter 5, Growth 25, Scale unlimited. Counted over every company the store
+ * has in Mannon. Companies the store already has are never removed; the limit
+ * only stops a new one being added (approving an applicant, turning a
+ * storefront request from a new email into a quote).
+ */
+export async function companyAccountAllowance(
+  shopId: string,
+): Promise<{ allowed: true } | { allowed: false; used: number; cap: number; message: string }> {
+  const shop = await prisma.shop.findUnique({ where: { id: shopId }, select: { plan: true, legacyPlan: true } });
+  const handle = effectivePlanHandle(shop?.plan ?? null, shop?.legacyPlan ?? false);
+  const cap = PLAN_CAPABILITIES[handle].companyAccountsCap;
+  if (!Number.isFinite(cap)) return { allowed: true };
+  const used = await prisma.company.count({ where: { shopId } });
+  if (used < cap) return { allowed: true };
+  const next = PLANS.slice(PLANS.indexOf(handle) + 1).find((h) => PLAN_CAPABILITIES[h].companyAccountsCap > cap) ?? "scale";
+  const nextCap = PLAN_CAPABILITIES[next].companyAccountsCap;
+  const accounts = (n: number) => (Number.isFinite(n) ? `${n} company account${n === 1 ? "" : "s"}` : "unlimited company accounts");
+  return {
+    allowed: false,
+    used,
+    cap,
+    message: `The ${PLAN_DISPLAY_NAME[handle]} plan includes ${accounts(cap)}, and you have ${used}. Upgrade to ${PLAN_DISPLAY_NAME[next]} for ${accounts(nextCap)}.`,
+  };
+}
+
+/** Thrown where a new company account would go past the plan's limit. */
+export class CompanyCapError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CompanyCapError";
+  }
+}
+
+/** Throw CompanyCapError when the store can't add another company account. */
+export async function assertCanAddCompany(shopId: string): Promise<void> {
+  const allowance = await companyAccountAllowance(shopId);
+  if (!allowance.allowed) throw new CompanyCapError(allowance.message);
 }
 
 /** Thrown by creation paths (e.g. reorder) that signal blocking via exceptions. */

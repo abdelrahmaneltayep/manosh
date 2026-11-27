@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
+import { erpSyncAllowed } from "../lib/billing";
 import { runExportForShop, sendFailureDigest, makeConnector } from "../services/erp.server";
 
 /**
@@ -20,7 +21,9 @@ async function run(request: Request): Promise<Response> {
   if (request.headers.get("x-cron-secret") !== secret) return new Response("Unauthorized", { status: 401 });
 
   const now = new Date();
-  const shops = await prisma.shop.findMany({ select: { shopifyDomain: true } });
+  const shops = (await prisma.shop.findMany({ select: { shopifyDomain: true, plan: true, legacyPlan: true } }))
+    // ERP sync is a Scale feature: a store below it keeps its connection but nothing is sent.
+    .filter((shop) => erpSyncAllowed(shop.plan, shop.legacyPlan));
   const results: Array<{ shop: string; synced: number; failed: number; digested: boolean }> = [];
   for (const shop of shops) {
     const summary = await runExportForShop(shop.shopifyDomain, makeConnector, now);

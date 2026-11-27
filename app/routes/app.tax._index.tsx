@@ -12,7 +12,6 @@ import {
   Button,
   Box,
   TextField,
-  Checkbox,
   IndexTable,
   EmptyState,
   Link as PolarisLink,
@@ -20,16 +19,12 @@ import {
 import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
 import { ConfirmAction } from "../components/ConfirmAction";
-import { DisclosureCard } from "../components/DisclosureCard";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
-import { taxRegionsAllowed, taxCertWorkflowAllowed, GROWTH_PLAN } from "../lib/billing";
+import { taxCertWorkflowAllowed, GROWTH_PLAN } from "../lib/billing";
 import { validateTaxId, type TaxIdType } from "../lib/tax";
 import {
   listProfilesForShop,
-  listRegionRules,
-  upsertRegionRule,
-  deleteRegionRule,
   verifyTaxProfile,
   rejectTaxProfile,
   setManualExempt,
@@ -57,9 +52,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
-  const [profiles, regionRules] = await Promise.all([
+  const [profiles] = await Promise.all([
     listProfilesForShop(session.shop),
-    taxRegionsAllowed(status.plan) ? listRegionRules(session.shop) : Promise.resolve([]),
   ]);
   // Validate ids for display (Growth workflow).
   const profilesWithValidation = profiles.map((p) => ({
@@ -73,10 +67,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
   return {
     isGrowth: status.plan === GROWTH_PLAN,
-    regionsAllowed: taxRegionsAllowed(status.plan),
     certWorkflow: taxCertWorkflowAllowed(status.plan),
     profiles: profilesWithValidation,
-    regionRules,
     access,
   };
 };
@@ -128,16 +120,6 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       return notice && !notice.sent
         ? { ok: true, message: "Tax profile rejected.", copy: { to: notice.to, text: notice.text } }
         : { ok: true, message: "Tax profile rejected." };
-    }
-    if (intent === "region") {
-      if (!taxRegionsAllowed(status.plan)) return { ok: false, error: "Per-region rules need Growth." };
-      const rateRaw = String(form.get("rate") ?? "").trim();
-      await upsertRegionRule(session.shop, { region: String(form.get("region") ?? ""), rate: rateRaw === "" ? null : Number(rateRaw) / 100, exemptByDefault: form.get("exemptByDefault") === "on" });
-      return { ok: true, message: "Region rule saved." };
-    }
-    if (intent === "region-delete") {
-      await deleteRegionRule(session.shop, String(form.get("id") ?? ""));
-      return { ok: true, message: "Region rule removed." };
     }
     return { ok: false, error: "Unknown action." };
   } catch (error) {
@@ -242,9 +224,6 @@ export default function TaxSettings() {
   const busyIntent = busy ? String(nav.formData?.get("intent") ?? "") : "";
   const busyCompany = busy ? String(nav.formData?.get("companyId") ?? "") : "";
 
-  const [region, setRegion] = useState("");
-  const [regionRate, setRegionRate] = useState("");
-  const [regionExempt, setRegionExempt] = useState(false);
   const unverified = data.profiles.filter((p) => p.status === "UNVERIFIED");
 
   return (
@@ -385,52 +364,8 @@ export default function TaxSettings() {
           </BlockStack>
         </Card>
 
-        {/* 3. Per-region rules (Growth) — advanced */}
-        <DisclosureCard
-          title="Per-region rules"
-          subtitle="Set a different rate, or exempt by default, for specific countries or regions."
-          badge={!data.regionsAllowed ? <Badge tone="info">Growth</Badge> : undefined}
-          defaultOpen={data.regionsAllowed && data.regionRules.length > 0}
-        >
-          {data.regionsAllowed ? (
-            <BlockStack gap="300">
-              {data.regionRules.length === 0 ? (
-                <Text as="p" tone="subdued" variant="bodySm">No region rules yet. Every region uses the default rate.</Text>
-              ) : (
-                <BlockStack gap="150">
-                  {data.regionRules.map((r) => (
-                    <InlineStack key={r.id} align="space-between" blockAlign="center">
-                      <Text as="span" variant="bodySm">{r.region} · {r.rate != null ? `${Math.round(Number(r.rate) * 10000) / 100}%` : "—"} {r.exemptByDefault ? "· exempt by default" : ""}</Text>
-                      <ConfirmAction
-                        label="Remove"
-                        size="micro"
-                        variant="tertiary"
-                        title={`Remove the ${r.region} rule?`}
-                        message={`The ${r.region} rule is removed. Shopify keeps calculating the tax.`}
-                        confirmLabel="Remove rule"
-                        fields={{ intent: "region-delete", id: r.id }}
-                      />
-                    </InlineStack>
-                  ))}
-                </BlockStack>
-              )}
-              <Form method="post">
-                <input type="hidden" name="intent" value="region" />
-                <InlineStack gap="300" blockAlign="end" wrap>
-                  <Box minWidth="140px"><TextField label="Region" name="region" value={region} onChange={setRegion} autoComplete="off" placeholder="SA, AE, EU, US-CA" /></Box>
-                  <Box minWidth="140px"><TextField label="Rate %" name="rate" type="number" value={regionRate} onChange={setRegionRate} min={0} max={100} suffix="%" autoComplete="off" /></Box>
-                  <Checkbox label="Exempt by default" name="exemptByDefault" checked={regionExempt} onChange={setRegionExempt} />
-                  <Button submit loading={busyIntent === "region"}>Save rule</Button>
-                </InlineStack>
-              </Form>
-            </BlockStack>
-          ) : (
-            <BlockStack gap="200">
-              <Text as="p" tone="subdued" variant="bodySm">Per-region VAT/GST rules are a Growth feature. Starter uses the single default rate and a manual exempt toggle per company.</Text>
-              <InlineStack><Button url={upgradeUrl("growth")}>See Growth</Button></InlineStack>
-            </BlockStack>
-          )}
-        </DisclosureCard>
+        {/* Per-region rules were removed: they never reached an order (the draft-order
+            path has no company region to apply them to), so offering them misled. */}
       </BlockStack>
     </Page>
   );

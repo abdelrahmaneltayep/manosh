@@ -288,9 +288,10 @@ export function compliantInvoiceNumbering(plan: string | null | undefined): bool
 
 // --- F15 ERP / inventory sync gating -----------------------------------------
 
-/** ERP / inventory sync (stock in, orders out) is Growth-only. Pure. */
-export function erpSyncAllowed(plan: string | null | undefined): boolean {
-  return isGrowthTier(plan);
+/** ERP / inventory sync (stock in, orders out) is Scale only. Pure. */
+export function erpSyncAllowed(plan: string | null | undefined, legacy = false): boolean {
+  // Scale only (plan-features.ts). Stored plan + legacy flag, not BillingStatus.plan.
+  return featureAvailable("erpSync", shopPlanHandle({ plan, legacyPlan: legacy }));
 }
 
 // --- F18 buyer PWA gating ----------------------------------------------------

@@ -11,9 +11,11 @@ import {
 import { erpSyncAllowed } from "./billing";
 
 describe("plan gating", () => {
-  it("ERP sync is Growth-only", () => {
-    expect(erpSyncAllowed("GROWTH")).toBe(true);
-    expect(erpSyncAllowed("Growth")).toBe(true);
+  it("ERP sync is Scale only (owner decision, 27 Nov 2026)", () => {
+    expect(erpSyncAllowed("SCALE")).toBe(true);
+    expect(erpSyncAllowed("GROWTH", true)).toBe(true); // legacy Growth maps up to Scale
+    expect(erpSyncAllowed("GROWTH")).toBe(false);
+    expect(erpSyncAllowed("Growth")).toBe(false);
     expect(erpSyncAllowed("STARTER")).toBe(false);
     expect(erpSyncAllowed(null)).toBe(false);
   });
