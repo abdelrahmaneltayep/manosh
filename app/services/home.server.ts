@@ -32,10 +32,10 @@ type Progress = Omit<SetupState,
 
 /** Which setup steps the shop has already done (the setup guide ticks them off). */
 export async function getSetupProgress(shopId: string): Promise<Progress & { dismissed: boolean }> {
-  const [shop, buyers, sent, catalogs, credit, erp, accounting, reps, publicCatalogs, dismissed] = await Promise.all([
+  const [shop, buyers, sent, catalogs, credit, erp, accounting, reps, publicCatalogs, dismissed, taxSetup] = await Promise.all([
     prisma.shop.findUnique({
       where: { id: shopId },
-      select: { quoteWidgetEnabled: true, defaultTaxRate: true, defaultDepositPct: true, supportedLocales: true, supportedCurrencies: true },
+      select: { quoteWidgetEnabled: true, defaultDepositPct: true, supportedLocales: true, supportedCurrencies: true },
     }),
     prisma.buyer.count({ where: { company: { shopId }, OR: [{ magicTokenHash: { not: null } }, { invitedAt: { not: null } }] } }),
     prisma.event.count({ where: { shopId, type: "QUOTE_COUNTERED" } }),
@@ -46,6 +46,8 @@ export async function getSetupProgress(shopId: string): Promise<Progress & { dis
     prisma.salesRep.count({ where: { shopId } }),
     prisma.publicCatalog.count({ where: { shopId } }),
     prisma.event.count({ where: { shopId, type: "SETUP_GUIDE_DISMISSED" } }),
+    // Tax step: exemption profiles or region rules exist (Shopify calculates the tax itself).
+    Promise.all([prisma.taxProfile.count({ where: { company: { shopId } } }), prisma.taxRuleOverride.count({ where: { shopId } })]),
   ]);
   const locales = (shop?.supportedLocales as string[] | null) ?? [];
   const currencies = (shop?.supportedCurrencies as string[] | null) ?? [];
@@ -55,7 +57,7 @@ export async function getSetupProgress(shopId: string): Promise<Progress & { dis
     hasSentQuote: sent > 0,
     hasCustomCatalog: catalogs > 0,
     hasCreditProfile: credit > 0,
-    hasTaxRules: shop?.defaultTaxRate != null,
+    hasTaxRules: taxSetup[0] + taxSetup[1] > 0,
     hasI18nSetup: locales.length > 1 || currencies.length > 0,
     hasDepositPolicy: shop?.defaultDepositPct != null,
     hasErpConnection: erp > 0,

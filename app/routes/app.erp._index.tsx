@@ -23,7 +23,7 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
 import { ConfirmAction } from "../components/ConfirmAction";
 import { DisclosureCard } from "../components/DisclosureCard";
-import { SUPPORT_EMAIL } from "../lib/legal";
+import { supportEmail } from "../lib/support-email.server";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
 import { erpSyncAllowed, GROWTH_PLAN } from "../lib/billing";
@@ -48,7 +48,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
   const isGrowth = erpSyncAllowed(status.plan);
-  if (!isGrowth) return { isGrowth, connection: null, logs: [], lagging: false, kinds: ERP_KINDS };
+  if (!isGrowth) return { isGrowth, connection: null, logs: [], lagging: false, kinds: ERP_KINDS, supportEmail: supportEmail() };
 
   const [connection, logs] = await Promise.all([getConnection(session.shop), listSyncLogs(session.shop)]);
   return {
@@ -57,6 +57,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     logs,
     lagging: connection ? syncLagExceeded(connection.lastSyncAt, new Date(), 120) : false,
     kinds: ERP_KINDS,
+    supportEmail: supportEmail(),
   };
 };
 
@@ -147,8 +148,8 @@ export default function Erp() {
           <Box paddingBlockStart="200">
             <Text as="p" tone="subdued" variant="bodySm">
               Need enterprise-scale sync (bi-directional NetSuite, high volume)? Email{" "}
-              <PolarisLink url={`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent("Enterprise ERP sync")}`} target="_blank">
-                {SUPPORT_EMAIL}
+              <PolarisLink url={`mailto:${data.supportEmail}?subject=${encodeURIComponent("Enterprise ERP sync")}`} target="_blank">
+                {data.supportEmail}
               </PolarisLink>{" "}
               and tell us what you need.
             </Text>

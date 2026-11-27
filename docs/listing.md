@@ -342,7 +342,7 @@ the **AI Quote Assistant** (AI counter-offers).
 
 - **App URL:** `https://mannon.app` (set to the deployed `application_url`)
 - **Privacy policy:** `https://mannon.app/privacy` (served by `app/routes/privacy.tsx`)
-- **Support / contact:** `support@mannon.app`
+- **Support / contact:** `eltayep@support-mannon.com` (the app reads `MANNON_SUPPORT_EMAIL`, with this as the default)
 
 ---
 

@@ -30,8 +30,6 @@ import {
   listRegionRules,
   upsertRegionRule,
   deleteRegionRule,
-  getDefaultTaxRate,
-  setDefaultTaxRate,
   verifyTaxProfile,
   rejectTaxProfile,
   setManualExempt,
@@ -49,6 +47,8 @@ import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
+import { CopyPanel } from "../components/CopyPanel";
+import { useEmailDelivery } from "../lib/use-email-delivery";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_TAX_VAT === "true";
@@ -57,10 +57,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
   const status = await requireBilling(billing, { isTest: IS_TEST });
-  const [profiles, regionRules, defaultRate] = await Promise.all([
+  const [profiles, regionRules] = await Promise.all([
     listProfilesForShop(session.shop),
     taxRegionsAllowed(status.plan) ? listRegionRules(session.shop) : Promise.resolve([]),
-    getDefaultTaxRate(session.shop),
   ]);
   // Validate ids for display (Growth workflow).
   const profilesWithValidation = profiles.map((p) => ({
@@ -78,13 +77,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     certWorkflow: taxCertWorkflowAllowed(status.plan),
     profiles: profilesWithValidation,
     regionRules,
-    defaultRatePct: defaultRate != null ? Math.round(defaultRate * 10000) / 100 : null,
     access,
   };
 };
 
 type ActionResult =
-  | { ok: true; message?: string; draft?: { companyId: string; reason: string } }
+  | { ok: true; message?: string; draft?: { companyId: string; reason: string }; copy?: { to: string; text: string } }
   | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
@@ -115,12 +113,6 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   }
 
   try {
-    if (intent === "default-rate") {
-      const raw = String(form.get("rate") ?? "").trim();
-      const rate = raw === "" ? null : Number(raw) / 100;
-      await setDefaultTaxRate(session.shop, rate);
-      return { ok: true, message: "Default tax rate saved." };
-    }
     if (intent === "manual-exempt") {
       await setManualExempt(session.shop, String(form.get("companyId") ?? ""), form.get("exempt") === "on");
       return { ok: true, message: "Company tax status updated." };
@@ -132,8 +124,10 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       return { ok: true, message: "Tax profile verified." };
     }
     if (intent === "reject") {
-      await rejectTaxProfile(session.shop, String(form.get("companyId") ?? ""), String(form.get("reason") ?? ""));
-      return { ok: true, message: "Tax profile rejected." };
+      const notice = await rejectTaxProfile(session.shop, String(form.get("companyId") ?? ""), String(form.get("reason") ?? ""));
+      return notice && !notice.sent
+        ? { ok: true, message: "Tax profile rejected.", copy: { to: notice.to, text: notice.text } }
+        : { ok: true, message: "Tax profile rejected." };
     }
     if (intent === "region") {
       if (!taxRegionsAllowed(status.plan)) return { ok: false, error: "Per-region rules need Growth." };
@@ -240,6 +234,7 @@ function TaxRejectRow({
 }
 
 export default function TaxSettings() {
+  const emailDelivery = useEmailDelivery();
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
@@ -247,7 +242,6 @@ export default function TaxSettings() {
   const busyIntent = busy ? String(nav.formData?.get("intent") ?? "") : "";
   const busyCompany = busy ? String(nav.formData?.get("companyId") ?? "") : "";
 
-  const [rate, setRate] = useState(data.defaultRatePct != null ? String(data.defaultRatePct) : "");
   const [region, setRegion] = useState("");
   const [regionRate, setRegionRate] = useState("");
   const [regionExempt, setRegionExempt] = useState(false);
@@ -258,7 +252,16 @@ export default function TaxSettings() {
       <TitleBar title="Tax & VAT" />
       <SectionTabs active="tax" />
       <BlockStack gap="500">
-        {actionData?.ok === true && <Banner tone="success" title={actionData.message} />}
+        {actionData?.ok === true && actionData.message && <Banner tone="success" title={actionData.message} />}
+        {actionData?.ok === true && actionData.copy && (
+          <CopyPanel
+            title="Message for the buyer"
+            description={`Mannon doesn’t deliver messages yet. Paste this into a message to ${actionData.copy.to} so they know what to re-submit.`}
+            text={actionData.copy.text}
+            toast="Message copied"
+            copyLabel="Copy message"
+          />
+        )}
         {actionData?.ok === false && <Banner tone="critical" title={actionData.error} />}
 
         {/* 1. Review queue: company tax profiles */}
@@ -357,7 +360,7 @@ export default function TaxSettings() {
                   )}
                 </InlineStack>
                 <Text as="p" tone="subdued" variant="bodySm">
-                  Tell a buyer why their exemption couldn’t be verified and what to re-submit. The buyer is emailed your reason.
+                  Tell a buyer why their exemption couldn’t be verified and what to re-submit. {emailDelivery ? "The buyer is emailed your reason." : "You get the message to send them."}
                 </Text>
               </BlockStack>
               <BlockStack gap="0">
@@ -370,21 +373,16 @@ export default function TaxSettings() {
           </Card>
         )}
 
-        {/* 2. Default rate (both plans) */}
+        {/* 2. Where tax comes from — no field here: Shopify calculates it. */}
         <Card>
-          <Form method="post">
-            <input type="hidden" name="intent" value="default-rate" />
-            <BlockStack gap="300">
-              <BlockStack gap="100">
-                <Text as="h2" variant="headingMd">Default tax rate</Text>
-                <Text as="p" tone="subdued" variant="bodySm">A reference rate shown on quotes and invoices (for example KSA 15%, UAE 5%). Shopify still calculates the actual tax.</Text>
-              </BlockStack>
-              <InlineStack gap="300" blockAlign="end" wrap>
-                <Box minWidth="180px"><TextField label="Default rate" name="rate" type="number" value={rate} onChange={setRate} min={0} max={100} suffix="%" autoComplete="off" /></Box>
-                <Button submit loading={busyIntent === "default-rate"}>Save rate</Button>
-              </InlineStack>
-            </BlockStack>
-          </Form>
+          <BlockStack gap="100">
+            <Text as="h2" variant="headingMd">How tax is calculated</Text>
+            <Text as="p" variant="bodyMd">
+              Shopify calculates tax on every quote and order, using your Shopify tax settings and each
+              company’s exemptions. Mannon never sets or adds a tax rate. Use this page to collect and verify
+              exemption certificates.
+            </Text>
+          </BlockStack>
         </Card>
 
         {/* 3. Per-region rules (Growth) — advanced */}
@@ -408,7 +406,7 @@ export default function TaxSettings() {
                         size="micro"
                         variant="tertiary"
                         title={`Remove the ${r.region} rule?`}
-                        message={`Buyers in ${r.region} will use the default tax rate instead.`}
+                        message={`The ${r.region} rule is removed. Shopify keeps calculating the tax.`}
                         confirmLabel="Remove rule"
                         fields={{ intent: "region-delete", id: r.id }}
                       />

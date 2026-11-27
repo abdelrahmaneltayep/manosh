@@ -47,6 +47,7 @@ import { DraftedByClaude } from "../components/DraftedByClaude";
 import { DisclosureCard } from "../components/DisclosureCard";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
+import { lockedMessage, minimumPlan, minimumPlanName } from "../lib/plan-features";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 const CREDIT_ENABLED = () => process.env.MANNON_FF_CREDIT === "true";
@@ -125,6 +126,9 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const growth = featureAccess(status, GROWTH_PLAN).allowed;
 
   if (intent === "mark-paid") {
+    // Credit control is a Growth feature (plan-features.ts: netTerms). Below it
+    // the invoice list is read-only, matching the lock shown on the page.
+    if (!growth) return { ok: false, error: lockedMessage("netTerms") };
     const invoiceId = String(form.get("invoiceId") ?? "");
     if (!(await invoiceBelongsToShop(invoiceId, session.shop))) {
       return { ok: false, error: "That invoice isn’t on this store." };
@@ -134,7 +138,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   }
 
   if (intent === "save-profile") {
-    if (!growth) return { ok: false, error: "Credit limits are a Growth feature." };
+    if (!growth) return { ok: false, error: lockedMessage("netTerms") };
     const companyId = String(form.get("companyId") ?? "");
     if (!(await companyBelongsToShop(companyId, session.shop))) {
       return { ok: false, error: "Choose one of your companies." };
@@ -375,7 +379,12 @@ export default function Credit() {
                     <InvoiceStatusBadge status={inv.status} />
                   </IndexTable.Cell>
                   <IndexTable.Cell>
-                    {inv.status !== "PAID" && inv.status !== "VOID" && (
+                    {inv.status !== "PAID" && inv.status !== "VOID" && !data.growth && (
+                      <Button size="slim" disabled accessibilityLabel={`Mark invoice ${inv.number} paid. ${lockedMessage("netTerms")}`}>
+                        {`Mark paid (${minimumPlanName("netTerms")})`}
+                      </Button>
+                    )}
+                    {inv.status !== "PAID" && inv.status !== "VOID" && data.growth && (
                       <Form method="post">
                         <input type="hidden" name="intent" value="mark-paid" />
                         <input type="hidden" name="invoiceId" value={inv.id} />
@@ -397,14 +406,14 @@ export default function Credit() {
         </Card>
 
         {!data.growth && (
-          <Banner tone="warning" title="Credit control is a Growth feature">
+          <Banner tone="info" title={`Credit control is on the ${minimumPlanName("netTerms")} plan`}>
             <p>
-              Starter includes net terms and due dates on invoices. Upgrade to
-              Growth for credit limits, the aging dashboard and invoice PDFs.
+              You can see your invoices here. Upgrade to {minimumPlanName("netTerms")} to mark them
+              paid and to use credit limits, the aging dashboard and invoice PDFs.
             </p>
             <Box paddingBlockStart="200">
-              <Button url={upgradeUrl("growth")} variant="primary">
-                Upgrade to Growth
+              <Button url={upgradeUrl(minimumPlan("netTerms"))} variant="primary">
+                {`Upgrade to ${minimumPlanName("netTerms")}`}
               </Button>
             </Box>
           </Banner>

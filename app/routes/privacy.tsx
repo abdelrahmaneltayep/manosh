@@ -1,9 +1,8 @@
 import type { LinksFunction, MetaFunction } from "@remix-run/node";
+import { useLoaderData } from "@remix-run/react";
 import portalStyles from "../styles/portal.css?url";
-import {
-  PRIVACY_SECTIONS,
-  PRIVACY_LAST_UPDATED,
-} from "../lib/legal";
+import { privacySections, PRIVACY_LAST_UPDATED } from "../lib/legal";
+import { supportEmail } from "../lib/support-email.server";
 import { formatDate } from "../lib/format";
 
 // Public privacy policy — the URL the App Store listing points to. No auth, no
@@ -21,14 +20,18 @@ export const meta: MetaFunction = () => [
   },
 ];
 
+// The support address comes from server config (MANNON_SUPPORT_EMAIL).
+export const loader = () => ({ supportEmail: supportEmail() });
+
 export default function Privacy() {
+  const { supportEmail: email } = useLoaderData<typeof loader>();
   return (
     <main className="portal">
       <section className="portal-card">
         <h1>Privacy Policy</h1>
         <p className="muted">Last updated {formatDate(PRIVACY_LAST_UPDATED)}</p>
 
-        {PRIVACY_SECTIONS.map((section) => (
+        {privacySections(email).map((section) => (
           <section key={section.heading}>
             <h2 className="portal-subhead">{section.heading}</h2>
             {section.body.map((paragraph, i) =>

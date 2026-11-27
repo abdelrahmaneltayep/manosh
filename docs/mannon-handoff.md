@@ -365,6 +365,12 @@ Lessons that still apply:
    way: dates were printed in the viewer's time zone, which failed page hydration for
    any merchant outside UTC (`app/lib/format.ts`, now fixed to UTC). Still needed: the
    browser console error and `fly logs` for a failing `GET /app`.
+4b. **Plan gates follow one map** (`app/lib/plan-features.ts`, Phase 1). Still
+   different from the 27 Nov listing, waiting for a decision: company-account and
+   price-list caps are not enforced as listed; buyers can pick Shopify payment
+   terms on every plan (listing: net terms on Growth); the AI order pad and the
+   Claude trial reach plans below Growth; ERP sync is on Growth (promotion plan
+   says Scale).
 5. **Billing reads use the Admin API.** Shopify now recommends the Partner API's active
    subscription query.
 6. **The IP allowlist uses shared networks**, not exact addresses (section 9.4).

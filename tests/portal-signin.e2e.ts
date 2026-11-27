@@ -28,3 +28,13 @@ describe("buyer sign-in", { tags: ["smoke", "public"] }, () => {
     expect(res.headers.get("location") ?? "").not.toContain("evil.example");
   });
 });
+
+// The sales-rep portal's sign-in page: reps get their link from the store, not
+// from an email Mannon sends.
+describe("rep sign-in", { tags: ["smoke", "public"] }, () => {
+  test("asks for the invite link and promises no email", async ({ app, screen }) => {
+    await app.open("/rep/signin");
+    await expect(screen.getByRole("heading", { level: 1 })).toHaveText("Sales-rep sign-in");
+    await expect(screen.getByText(/invite email/i)).toHaveCount(0);
+  });
+});

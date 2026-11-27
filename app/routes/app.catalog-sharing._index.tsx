@@ -51,6 +51,7 @@ import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
 import { CopyPanel } from "../components/CopyPanel";
+import { useEmailDelivery } from "../lib/use-email-delivery";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 
@@ -180,6 +181,7 @@ function focusField(id: string) {
 }
 
 export default function CatalogSharing() {
+  const emailDelivery = useEmailDelivery();
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
@@ -408,7 +410,7 @@ export default function CatalogSharing() {
             </Text>
             <Text as="p" variant="bodyMd">
               Visitors can request access. When you approve a request, the buyer gets an account and a
-              secure sign-in link by email, and their prices unlock in the portal.
+              secure sign-in link{emailDelivery ? " by email" : " (you get it to send them)"}, and their prices unlock in the portal.
             </Text>
           </BlockStack>
         </DisclosureCard>

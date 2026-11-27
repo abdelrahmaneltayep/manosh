@@ -26,6 +26,7 @@ import { getAttentionCounts, getSetupProgress, dismissSetupGuide } from "../serv
 import { syncShopPlan } from "../services/billing.server";
 import { selectedPlanHandle } from "../lib/billing-v3";
 import { isGrowthTier } from "../lib/billing";
+import { featureAvailable, shopPlanHandle } from "../lib/plan-features";
 import { requestReview } from "../lib/review-request";
 import { attentionItems, setupSteps, setupProgress, type AttentionItem, type SetupStep } from "../lib/home";
 import { navFlags } from "../lib/nav";
@@ -82,13 +83,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     planSelected,
     ...progress,
   });
+  // Only count work the shop's plan lets the merchant act on: a count that
+  // leads to an upgrade-only page ("14 offers to review" on Free) is noise.
+  const handle = shopPlanHandle(shop);
   const attention = attentionItems(counts, {
     quoteRequests: flags.quoteRequests,
-    offers: flags.offers,
+    offers: flags.offers && featureAvailable("makeAnOffer", handle),
     wholesale: flags.wholesale,
-    catalogSharing: flags.catalogSharing,
-    credit: flags.credit,
-    tax: flags.tax,
+    catalogSharing: flags.catalogSharing && featureAvailable("catalogSharing", handle),
+    credit: flags.credit && featureAvailable("netTerms", handle),
+    tax: flags.tax && growthTier, // verifying certificates is part of Growth's tax workflow
   });
   return { metrics, promptReview, attention, steps, setupDismissed: progress.dismissed, planSelected, analyticsOn: flags.analytics };
 };

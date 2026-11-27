@@ -43,7 +43,7 @@ computes money itself.
 |---|---|
 | App Store listing | https://apps.shopify.com/mannon |
 | Public demo (no install, no sign-up) | https://manosh.fly.dev/demo |
-| Support | support@mannon.app |
+| Support | eltayep@support-mannon.com |
 | Privacy policy | https://manosh.fly.dev/privacy |
 
 **What it does**

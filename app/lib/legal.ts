@@ -10,9 +10,19 @@ export interface LegalSection {
 }
 
 export const PRIVACY_LAST_UPDATED = "2026-09-19";
-export const SUPPORT_EMAIL = "support@mannon.app";
+/**
+ * The support address merchants and buyers write to. The server can override
+ * it with MANNON_SUPPORT_EMAIL (support-email.server.ts) without a code change;
+ * this is the default. (The earlier mannon.app address bounced: that domain was
+ * never registered.)
+ */
+export const DEFAULT_SUPPORT_EMAIL = "eltayep@support-mannon.com";
+/** The default address, for code that can't read the server setting. */
+export const SUPPORT_EMAIL = DEFAULT_SUPPORT_EMAIL;
 
-export const PRIVACY_SECTIONS: LegalSection[] = [
+/** The policy text with the support address filled in. Pure. */
+export function privacySections(supportEmail: string): LegalSection[] {
+  return [
   {
     heading: "Who we are",
     body: [
@@ -72,7 +82,10 @@ export const PRIVACY_SECTIONS: LegalSection[] = [
   {
     heading: "Contact & support",
     body: [
-      `Questions about this policy or your data? Email ${SUPPORT_EMAIL} and we'll help.`,
+      `Questions about this policy or your data? Email ${supportEmail} and we'll help.`,
     ],
   },
-];
+  ];
+}
+
+export const PRIVACY_SECTIONS: LegalSection[] = privacySections(DEFAULT_SUPPORT_EMAIL);

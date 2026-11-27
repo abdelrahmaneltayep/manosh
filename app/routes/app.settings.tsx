@@ -475,20 +475,26 @@ export default function Settings() {
                 <Text as="h2" variant="headingMd">Plan</Text>
                 <Text as="p" tone="subdued" variant="bodySm">{NO_PER_ORDER_FEES_COPY}</Text>
               </BlockStack>
-              {planName ? <Badge tone="success">{planName}</Badge> : <Badge tone="attention">No plan selected</Badge>}
+              {/* No plan chosen in Shopify yet: Free limits apply, but the store isn't
+                  shown as subscribed to Free (App Store review 1.2.2). */}
+              {planName ? <Badge tone="success">{planName}</Badge> : <Badge tone="info">Free limits</Badge>}
             </InlineStack>
-            {!planName && (
-              <Text as="p" variant="bodyMd">
-                Until you choose a plan, Mannon works within the Free plan’s limits.
+            {usage && (
+              <Text as="p" variant="bodyMd" fontWeight="semibold">
+                {`${planName ? `${planName} plan` : "Free limits"} · ${
+                  usage.cap === null ? `${usage.used} active quotes this month, no limit` : `${usage.used} of ${usage.cap} quotes this month`
+                }`}
               </Text>
             )}
-            {usage && (
+            {!planName && (
               <Text as="p" variant="bodyMd">
-                {usage.cap === null
-                  ? `${usage.used} active quotes this month. Your plan has no quote limit.`
-                  : usage.used > usage.cap
-                    ? `${usage.used} active quotes this month. That’s over the limit of ${usage.cap}, so buyers can’t start new quotes until you choose a plan with more.`
-                    : `${usage.used} of ${usage.cap} active quotes used this month.`}
+                You haven’t chosen a plan in Shopify yet, so Mannon works within the Free plan’s limits.
+              </Text>
+            )}
+            {usage && usage.cap !== null && usage.used >= usage.cap && (
+              <Text as="p" variant="bodyMd">
+                New requests still arrive. You can reply to them once you choose a plan with more quotes, or
+                when older quotes expire or are ordered.
               </Text>
             )}
             <InlineStack gap="200" blockAlign="center">

@@ -159,10 +159,16 @@ export async function verifyTaxProfile(shopDomain: string, companyId: string, ex
   await emailBuyer(companyId, "tax_verified", { status: exempt ? "exempt" : "taxable" });
 }
 
-export async function rejectTaxProfile(shopDomain: string, companyId: string, reason: string): Promise<void> {
+export async function rejectTaxProfile(
+  shopDomain: string,
+  companyId: string,
+  reason: string,
+): Promise<{ to: string; text: string; sent: boolean } | null> {
   await assertCompanyInShop(shopDomain, companyId);
   await prisma.taxProfile.update({ where: { companyId }, data: { status: "REJECTED", exempt: false, rejectedReason: reason || null } });
-  await emailBuyer(companyId, "tax_rejected", { reason: reason || "Please re-submit valid documents." });
+  // The buyer only learns the reason from this message; when it can't be
+  // delivered the merchant gets it to send themselves.
+  return emailBuyer(companyId, "tax_rejected", { reason: reason || "Please re-submit valid documents." });
 }
 
 /**
@@ -294,18 +300,24 @@ export async function runCertExpiryRemindersForShop(shopDomain: string, now: Dat
 
 // --- helpers -----------------------------------------------------------------
 
-async function emailBuyer(companyId: string, templateKey: string, extra: Record<string, string>): Promise<void> {
+async function emailBuyer(
+  companyId: string,
+  templateKey: string,
+  extra: Record<string, string>,
+): Promise<{ to: string; text: string; sent: boolean } | null> {
   try {
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       select: { name: true, shop: { select: { shopifyDomain: true } }, buyers: { where: { status: "ACTIVE" }, select: { email: true, name: true }, take: 1 } },
     });
     const buyer = company?.buyers[0];
-    if (!buyer) return;
+    if (!buyer) return null;
     const tpl = renderTemplate(resolveTemplate(templateKey as never, null), { buyerName: buyer.name ?? "there", companyName: company!.name, shopName: company!.shop.shopifyDomain, ...extra });
-    await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+    const result = await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+    return { to: buyer.email, text: tpl.body, sent: result.sent };
   } catch (error) {
     captureException(error);
+    return null;
   }
 }
 
