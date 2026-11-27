@@ -22,8 +22,8 @@ import { SectionTabs } from "../components/SectionTabs";
 import { ConfirmAction } from "../components/ConfirmAction";
 import { DisclosureCard } from "../components/DisclosureCard";
 import { authenticate } from "../shopify.server";
-import { requireBilling } from "../services/billing.server";
-import { accountingSyncAllowed, GROWTH_PLAN } from "../lib/billing";
+import { getShopPlan } from "../services/billing.server";
+import { featureAvailable, lockedMessage, minimumPlan, minimumPlanName } from "../lib/plan-features";
 import { PROVIDERS, providerName, connectionHealth, type Provider } from "../lib/accounting";
 import {
   listConnections,
@@ -42,18 +42,19 @@ const ENABLED = () => process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  const isGrowth = accountingSyncAllowed(status.plan);
+  // Accounting sync is a Scale feature (plan-features.ts), read from the stored plan.
+  const { status, handle } = await getShopPlan(request, session.shop, billing);
+  const unlocked = featureAvailable("accountingSync", handle);
 
-  const connections = isGrowth ? await listConnections(session.shop) : [];
-  const map: MapView = isGrowth
+  const connections = unlocked ? await listConnections(session.shop) : [];
+  const map: MapView = unlocked
     ? await getMap(session.shop)
     : { taxCodeMap: {}, accountMap: {}, customerMatchStrategy: "EMAIL" };
-  const logs = isGrowth ? await listSyncLogs(session.shop) : [];
+  const logs = unlocked ? await listSyncLogs(session.shop) : [];
 
   const now = new Date();
   return {
-    isGrowth,
+    unlocked,
     plan: status.plan,
     connections: connections.map((c) => ({
       ...c,
@@ -70,9 +71,9 @@ type ActionResult = { ok: true; message: string } | { ok: false; error: string }
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) return { ok: false, error: "This feature isn’t available." };
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  if (!accountingSyncAllowed(status.plan)) {
-    return { ok: false, error: "Accounting sync is a Growth feature." };
+  const { handle } = await getShopPlan(request, session.shop, billing);
+  if (!featureAvailable("accountingSync", handle)) {
+    return { ok: false, error: lockedMessage("accountingSync") };
   }
 
   const form = await request.formData();
@@ -199,20 +200,19 @@ export default function Accounting() {
     setSearchParams(next, { replace: true });
   };
 
-  if (!data.isGrowth) {
+  if (!data.unlocked) {
     return (
       <Page>
         <TitleBar title="Accounting" />
         <SectionTabs active="accounting" />
-        <Banner tone="info" title="Connect your accounting — upgrade to Growth">
+        <Banner tone="info" title={`Connect your accounting — upgrade to ${minimumPlanName("accountingSync")}`}>
           <p>
             Push every Mannon invoice and payment into QuickBooks Online or Xero
-            automatically — no re-keying. Accounting sync is included on the Growth
-            plan.
+            automatically — no re-keying. {lockedMessage("accountingSync")}
           </p>
           <Box paddingBlockStart="200">
-            <Button url={upgradeUrl("growth")} variant="primary">
-              See Growth
+            <Button url={upgradeUrl(minimumPlan("accountingSync"))} variant="primary">
+              {`See ${minimumPlanName("accountingSync")}`}
             </Button>
           </Box>
         </Banner>

@@ -3,10 +3,10 @@ import prisma from "../db.server";
 import { getOfferPublicConfig, submitPublicOffer } from "./offers.server";
 
 /*
- * Storefront offer config after the 5.1.2 fix: the Make an Offer block renders
- * on every plan, so the public config is `enabled` for any installed shop with
- * the flag on, regardless of tier — and `enabled: false` for a shop that is not
- * installed (found by the QA harness: an unknown shop briefly got a button).
+ * Storefront offer config. Make an Offer starts on Growth (owner decision,
+ * 27 Nov 2026): on Free and Starter shoppers get no button and the config names
+ * the plan, which the theme editor shows to the merchant (review 5.1.2: a block
+ * must never look broken to them). A shop that is not installed is always off.
  */
 const hasDb = Boolean(process.env.DATABASE_URL);
 
@@ -24,12 +24,20 @@ describe.skipIf(!hasDb)("getOfferPublicConfig (storefront rendering, 5.1.2)", ()
     expect((await getOfferPublicConfig("nobody.myshopify.com")).enabled).toBe(false);
   });
 
-  it.each(["FREE", "STARTER", "GROWTH", "SCALE"] as const)("renders the button on the %s plan", async (plan) => {
+  it.each(["GROWTH", "SCALE"] as const)("renders the button on the %s plan", async (plan) => {
     await prisma.shop.create({ data: { shopifyDomain: "oc.myshopify.com", plan } });
     const cfg = await getOfferPublicConfig("oc.myshopify.com");
     expect(cfg.enabled).toBe(true);
     expect(cfg.surfaces.button).toBe(true);
+    expect(cfg.needsPlan).toBeUndefined();
     expect(cfg.instant).toBe(plan === "SCALE"); // instant answers stay a Scale feature
+  });
+
+  it.each(["FREE", "STARTER", "TRIAL"] as const)("is off for shoppers on the %s plan and names Growth", async (plan) => {
+    await prisma.shop.create({ data: { shopifyDomain: "oc.myshopify.com", plan } });
+    const cfg = await getOfferPublicConfig("oc.myshopify.com");
+    expect(cfg.enabled).toBe(false);
+    expect(cfg.needsPlan).toBe("Growth");
   });
 
   it("is off when the feature flag is off", async () => {
@@ -38,7 +46,7 @@ describe.skipIf(!hasDb)("getOfferPublicConfig (storefront rendering, 5.1.2)", ()
     expect((await getOfferPublicConfig("oc.myshopify.com")).enabled).toBe(false);
   });
 
-  it("accepts an offer on Starter as a pending, merchant-reviewed offer", async () => {
+  it("refuses an offer on Starter, where the merchant couldn't answer it", async () => {
     await prisma.shop.create({ data: { shopifyDomain: "oc.myshopify.com", plan: "STARTER" } });
     const res = await submitPublicOffer(
       "oc.myshopify.com",
@@ -50,8 +58,7 @@ describe.skipIf(!hasDb)("getOfferPublicConfig (storefront rendering, 5.1.2)", ()
       },
       { rateKey: "qa-starter" },
     );
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.outcome).toBe("pending");
-    expect(await prisma.offer.count()).toBe(1);
+    expect(res).toEqual({ ok: false, error: "This store isn’t taking offers right now." });
+    expect(await prisma.offer.count()).toBe(0);
   });
 });

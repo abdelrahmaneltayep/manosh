@@ -25,8 +25,6 @@ export interface EmailCopy {
   /** Settings › Notifications. */
   notificationsIntro: string;
   notificationsRecipient: (to: string) => string;
-  /** After a counter is saved on a quote. */
-  counterDone: string;
 }
 
 const ON: EmailCopy = {
@@ -47,7 +45,6 @@ const ON: EmailCopy = {
   notificationsIntro:
     "The emails Mannon sends for you. Open one to change its subject and message, or draft new wording with Claude. Emails you haven’t changed use Mannon’s default wording.",
   notificationsRecipient: (to) => `Sent to: ${to}`,
-  counterDone: "Counter sent to the buyer.",
 };
 
 const OFF: EmailCopy = {
@@ -68,7 +65,6 @@ const OFF: EmailCopy = {
   notificationsIntro:
     "The wording Mannon will use once a sender is connected. You can prepare each subject and message now; nothing is delivered yet.",
   notificationsRecipient: (to) => `For: ${to}`,
-  counterDone: "Counter saved. The buyer sees it in their portal. Copy the buyer link to tell them.",
 };
 
 export function emailCopy(deliveryEnabled: boolean): EmailCopy {

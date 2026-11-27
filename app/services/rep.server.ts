@@ -67,7 +67,7 @@ export async function inviteRep(
   plan: string | null,
   baseUrl: string,
   now: Date = new Date(),
-): Promise<{ rep: SalesRep; url: string }> {
+): Promise<{ rep: SalesRep; url: string; sent: boolean }> {
   const shopId = await shopIdFor(shopDomain);
   if (!shopId) throw new NotFoundError("Unknown shop");
 
@@ -108,9 +108,11 @@ export async function inviteRep(
   // template body (with the secure sign-in link) follows.
   const note = input.note?.trim();
   const body = note ? `${note}\n\n${tpl.body}` : tpl.body;
-  await sendEmail({ to: email, subject: tpl.subject, html: body.replace(/\n/g, "<br>"), text: body });
+  const result = await sendEmail({ to: email, subject: tpl.subject, html: body.replace(/\n/g, "<br>"), text: body });
 
-  return { rep, url: url.toString() };
+  // `sent` is false whenever the invite didn't go out (no sender, or the send
+  // failed), so the page can always hand the merchant the link instead.
+  return { rep, url: url.toString(), sent: result.sent };
 }
 
 export async function assignCompany(shopDomain: string, repId: string, companyId: string): Promise<void> {

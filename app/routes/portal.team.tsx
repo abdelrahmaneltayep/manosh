@@ -83,7 +83,8 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       }
       const invited = await inviteMember(me.companyId, { email, role, baseUrl: new URL(request.url).origin }, cap);
       // No sender connected: the invite can't be delivered, so hand over the link.
-      return emailDeliveryEnabled()
+      // Hand over the link whenever the invite wasn't delivered.
+      return invited.sent
         ? { ok: true, message: `Invited ${email}.` }
         : { ok: true, message: `Added ${email}. Share this sign-in link with them. It works once and isn’t shown again.`, inviteUrl: invited.inviteUrl };
     }

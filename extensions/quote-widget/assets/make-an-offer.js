@@ -22,7 +22,7 @@
   function markOff(reason) {
     if (designMode) {
       var note = root.querySelector("[data-mannon-editor-note]");
-      if (note) note.textContent = "Mannon · Make an Offer is " + reason + ". Shoppers won't see this button until it's on. Only you see this note.";
+      if (note) note.textContent = "Mannon · Make an Offer is " + reason + ". Shoppers won't see this button until then. Only you see this note.";
       return;
     }
     if (btn) btn.hidden = true;
@@ -31,6 +31,7 @@
   fetch(appUrl + "/api/offer-config?shop=" + encodeURIComponent(shop))
     .then(function (r) { return r.json(); })
     .then(function (d) {
+      if (d && !d.enabled && d.needsPlan) { markOff("on the " + d.needsPlan + " plan and up"); return; }
       if (!d || !d.enabled) { markOff("off in Mannon"); return; }
       if (!d.surfaces || !d.surfaces.button) { markOff("off for the button surface in Mannon → Offers"); return; }
       cfg = d;

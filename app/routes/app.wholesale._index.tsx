@@ -30,6 +30,7 @@ import {
   createForm,
   listApplications,
   decideApplication,
+  issueApplicantSignInLink,
   WholesaleFormCapError,
 } from "../services/wholesale.server";
 import { formatDate } from "../lib/format";
@@ -89,7 +90,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 type ActionResult =
-  | { ok: true; message?: string; draft?: { applicationId: string; decision: string; note: string }; copy?: { to: string; text: string } }
+  | { ok: true; message?: string; draft?: { applicationId: string; decision: string; note: string }; copy?: { to: string; text: string }; link?: { to: string; url: string; expiresAt: string } }
   | { ok: false; error: string; upgrade?: boolean };
 
 export const action = async ({ request }: ActionFunctionArgs): Promise<Response | ActionResult> => {
@@ -119,6 +120,13 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<Response 
     if (intent === "create-form") {
       const created = await createForm(session.shop, String(form.get("name") ?? ""), cap);
       return redirect(`/app/wholesale/forms/${created.id}`);
+    }
+    if (intent === "applicant-link") {
+      // Approved applicants (including auto-approved ones) get their sign-in
+      // link from here while Mannon has no email sender connected.
+      const link = await issueApplicantSignInLink(session.shop, String(form.get("applicationId") ?? ""), baseUrl);
+      if (!link) return { ok: false, error: "That applicant isn’t approved yet, or their account couldn’t be found." };
+      return { ok: true, link: { to: link.to, url: link.url, expiresAt: link.expiresAt.toISOString() } };
     }
     if (intent === "decide") {
       const id = String(form.get("applicationId") ?? "");
@@ -281,6 +289,7 @@ export default function WholesaleQueue() {
   const error = actionData && !actionData.ok ? actionData.error : null;
   const message = actionData && actionData.ok ? actionData.message : null;
   const copied = (actionData && actionData.ok ? actionData.copy : null) ?? null;
+  const signInLink = (actionData && actionData.ok ? actionData.link : null) ?? null;
   const emailDelivery = useEmailDelivery();
   const copy = emailCopy(emailDelivery);
   const pending = data.applications.filter((a) => a.status === "PENDING");
@@ -322,6 +331,15 @@ export default function WholesaleQueue() {
       <BlockStack gap="500">
         {error && <Banner tone="critical" title="Couldn’t complete that"><p>{error}</p></Banner>}
         {message && <Banner tone="success" title={message} />}
+        {signInLink && (
+          <CopyPanel
+            title="Sign-in link ready"
+            description={`Send this to ${signInLink.to}. It signs them in to your wholesale portal, works once and expires ${formatDate(signInLink.expiresAt)}.`}
+            text={signInLink.url}
+            toast="Sign-in link copied"
+            copyLabel="Copy link"
+          />
+        )}
         {copied && (
           <CopyPanel
             title="Message for the applicant"
@@ -395,6 +413,12 @@ export default function WholesaleQueue() {
                           fields={{ intent: "decide", applicationId: a.id, decision: "REJECTED" }}
                         />
                       </InlineStack>
+                    ) : a.status === "APPROVED" ? (
+                      <Form method="post">
+                        <input type="hidden" name="intent" value="applicant-link" />
+                        <input type="hidden" name="applicationId" value={a.id} />
+                        <Button size="slim" variant="plain" submit accessibilityLabel={`Copy a sign-in link for ${a.companyName}`}>Copy sign-in link</Button>
+                      </Form>
                     ) : (
                       <Text as="span" tone="subdued" variant="bodySm">—</Text>
                     )}

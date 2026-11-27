@@ -143,7 +143,10 @@ export async function renderQuotePdf(
   quoteId: string,
   opts: { currencyCode: string; plan: string | null; locale?: string | null },
 ): Promise<{ filename: string; bytes: Uint8Array; buyerEmail: string; shopId: string } | null> {
-  const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { id: true } });
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: shopDomain },
+    select: { id: true, plan: true, legacyPlan: true },
+  });
   if (!shop) return null;
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, company: { shopId: shop.id } },
@@ -172,7 +175,8 @@ export async function renderQuotePdf(
     currencyCode: opts.currencyCode,
     lines: quote.lines.map((l) => ({ title: l.title, sku: l.sku, quantity: l.quantity, price: Number(l.price) })),
     brand: { name: brandName, primaryColor },
-    whiteLabel: whiteLabelAllowed(opts.plan),
+    // From the stored plan: opts.plan is BillingStatus.plan, which can't tell Scale from Growth.
+    whiteLabel: whiteLabelAllowed(shop.plan, shop.legacyPlan),
     locale: opts.locale,
   });
 

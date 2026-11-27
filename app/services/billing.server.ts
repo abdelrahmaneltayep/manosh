@@ -18,7 +18,9 @@ import {
   resolveGrandfather,
   getPlanCapabilities,
   type PlanCapabilities,
+  type PlanHandle,
 } from "../lib/billing-v3";
+import { shopPlanHandle } from "../lib/plan-features";
 
 /**
  * Billing (S3 skeleton → S17 complete). The plan constants + pure gating live
@@ -339,6 +341,24 @@ export async function syncShopPlan(
     });
   }
   return status;
+}
+
+/**
+ * The shop's billing status plus the tier it actually gets, read from the
+ * stored plan after syncing it with Shopify. Use `handle` for any feature gate
+ * (plan-features.ts): BillingStatus.plan reports a Scale shop as "Growth".
+ */
+export async function getShopPlan(
+  request: Request,
+  shopDomain: string,
+  billing: BillingLike,
+): Promise<{ status: BillingStatus; handle: PlanHandle; plan: Plan | null; legacyPlan: boolean }> {
+  const status = await syncShopPlan(request, shopDomain, billing);
+  const shop = await prisma.shop.findUnique({
+    where: { shopifyDomain: shopDomain },
+    select: { plan: true, legacyPlan: true },
+  });
+  return { status, handle: shopPlanHandle(shop), plan: shop?.plan ?? null, legacyPlan: shop?.legacyPlan ?? false };
 }
 
 /**

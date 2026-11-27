@@ -1,11 +1,12 @@
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { whiteLabelAllowed } from "../lib/billing";
+import { lockedMessage } from "../lib/plan-features";
 import { validateBranding, resolveBrandingTokens, type BrandingInput, type BrandingTokens } from "../lib/branding";
 
 /**
  * F20 — per-store white-label branding for BUYER-FACING pages only (portal +
- * emails). Never touches the embedded Shopify admin. Growth-only; colors are
+ * emails). Never touches the embedded Shopify admin. Scale only; colors are
  * AA-contrast-validated before storage. Dark-launched behind MANNON_FF_WHITE_LABEL.
  */
 
@@ -32,8 +33,9 @@ export async function saveBranding(
   shopDomain: string,
   input: BrandingInput,
   plan: string | null,
+  legacyPlan = false,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!whiteLabelAllowed(plan)) throw new NotAllowedError("White-label is a Growth (Agency) feature.");
+  if (!whiteLabelAllowed(plan, legacyPlan)) throw new NotAllowedError(lockedMessage("whiteLabel"));
   const v = validateBranding(input);
   if (!v.ok) return { ok: false, error: v.error ?? "Please check the branding." };
 

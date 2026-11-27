@@ -13,10 +13,13 @@ import {
 import { agencyAllowed, whiteLabelAllowed } from "./billing";
 
 describe("plan gating", () => {
-  it("agency + white-label are Growth-only", () => {
-    expect(agencyAllowed("GROWTH")).toBe(true);
+  it("agency + white-label are Scale-only", () => {
+    expect(agencyAllowed("SCALE")).toBe(true);
+    expect(agencyAllowed("GROWTH")).toBe(false);
     expect(agencyAllowed("STARTER")).toBe(false);
-    expect(whiteLabelAllowed("GROWTH")).toBe(true);
+    expect(whiteLabelAllowed("SCALE")).toBe(true);
+    expect(whiteLabelAllowed("GROWTH", true)).toBe(true);
+    expect(whiteLabelAllowed("GROWTH")).toBe(false);
     expect(whiteLabelAllowed(null)).toBe(false);
   });
 });

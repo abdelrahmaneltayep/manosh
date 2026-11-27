@@ -39,7 +39,7 @@ export default function OffersQueue() {
           <p>
             Accept, counter, or decline price offers from your storefront, with rules that protect your
             margin. Available on Growth (manual answers and rules) and Scale (automatic answers and
-            pay-what-you-want).
+            pay-what-you-want). Shoppers don’t see the Make an Offer button until then.
           </p>
           <Box paddingBlockStart="200">
             <Button url={upgradeUrl(GROWTH_PLAN)} variant="primary">See Growth</Button>

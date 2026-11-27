@@ -12,8 +12,8 @@ import { DisclosureCard } from "../components/DisclosureCard";
 import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
-import { GROWTH_PLAN, STARTER_PLAN } from "../lib/billing";
-import { priceRuleScopeAllowed, type PriceScope } from "../lib/price-visibility";
+import { lockedMessage, minimumPlan, minimumPlanName } from "../lib/plan-features";
+import { priceRuleFeature, priceRuleScopeAllowed, type PriceScope } from "../lib/price-visibility";
 import { QUOTE_CAPTURE_ENABLED, listPriceRules, savePriceRule, deletePriceRule, ScopeNotAllowedError, priceRulePlanFor } from "../services/price-visibility.server";
 import { upgradeUrl } from "../lib/upgrade";
 
@@ -75,7 +75,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
     });
     return "error" in res ? { ok: false, error: res.error } : { ok: true, message: "Rule saved." };
   } catch (error) {
-    if (error instanceof ScopeNotAllowedError) return { ok: false, error: "Targeting by tag, product, or collection needs the Growth plan." };
+    if (error instanceof ScopeNotAllowedError) return { ok: false, error: lockedMessage(priceRuleFeature(error.scope)) };
     throw error;
   }
 };
@@ -93,7 +93,10 @@ export default function PriceRules() {
   const [ctaLabel, setCtaLabel] = useState("Request a Quote");
   const [priority, setPriority] = useState("0");
 
-  const scopeOptions = SCOPES.map((s) => ({ label: SCOPE_LABEL[s] + (priceRuleScopeAllowed(plan, s, legacy) ? "" : s === "ALL" || s === "LOGGED_OUT" ? " (Starter)" : " (Growth)"), value: s, disabled: !priceRuleScopeAllowed(plan, s, legacy) }));
+  // Plan names come from plan-features.ts. On Free the whole form is shown
+  // disabled with the plan named; existing rules show as paused.
+  const rulesAllowed = priceRuleScopeAllowed(plan, "ALL", legacy);
+  const scopeOptions = SCOPES.map((s) => ({ label: SCOPE_LABEL[s] + (priceRuleScopeAllowed(plan, s, legacy) ? "" : ` (${minimumPlanName(priceRuleFeature(s))})`), value: s, disabled: !priceRuleScopeAllowed(plan, s, legacy) }));
   const scopeLocked = !priceRuleScopeAllowed(plan, scope, legacy);
   const refField = REF_FIELD[scope];
   const firstRun = rules.length === 0;
@@ -137,7 +140,15 @@ export default function PriceRules() {
                   <IndexTable.Cell>{[r.hidePrice ? "Price" : null, r.hideAtc ? "Add to cart" : null].filter(Boolean).join(", ") || "—"}</IndexTable.Cell>
                   <IndexTable.Cell>{r.ctaLabel}</IndexTable.Cell>
                   <IndexTable.Cell>{r.priority}</IndexTable.Cell>
-                  <IndexTable.Cell><Badge tone={r.active ? "success" : undefined}>{r.active ? "Active" : "Off"}</Badge></IndexTable.Cell>
+                  <IndexTable.Cell>
+                    {!r.active ? (
+                      <Badge>Off</Badge>
+                    ) : priceRuleScopeAllowed(plan, r.scope, legacy) ? (
+                      <Badge tone="success">Active</Badge>
+                    ) : (
+                      <Badge tone="attention">{`Paused · needs ${minimumPlanName(priceRuleFeature(r.scope))}`}</Badge>
+                    )}
+                  </IndexTable.Cell>
                   <IndexTable.Cell>
                     <ConfirmAction
                       label="Delete"
@@ -161,36 +172,40 @@ export default function PriceRules() {
           <Form method="post">
             <BlockStack gap="300">
               <Text as="h2" variant="headingMd">Add a rule</Text>
+              {!rulesAllowed && (
+                <Banner tone="info" action={{ content: `See ${minimumPlanName("priceRules")}`, url: upgradeUrl(minimumPlan("priceRules")) }}>
+                  <p>
+                    {lockedMessage("priceRules")} Until then shoppers see your prices, and any rule
+                    already saved is paused.
+                  </p>
+                </Banner>
+              )}
               <InlineStack gap="300" blockAlign="end" wrap>
                 <Box minWidth="16rem">
-                  <Select id={SCOPE_FIELD_ID} label="Applies to" name="scope" options={scopeOptions} value={scope} onChange={(v) => setScope(v as PriceScope)} />
+                  <Select id={SCOPE_FIELD_ID} label="Applies to" name="scope" options={scopeOptions} value={scope} onChange={(v) => setScope(v as PriceScope)} disabled={!rulesAllowed} />
                 </Box>
                 {needsRef(scope) && refField && (
                   <Box minWidth="16rem">
-                    <TextField label={refField.label} name="scopeRef" value={scopeRef} onChange={setScopeRef} autoComplete="off" placeholder={refField.placeholder} />
+                    <TextField label={refField.label} name="scopeRef" value={scopeRef} onChange={setScopeRef} autoComplete="off" placeholder={refField.placeholder} disabled={!rulesAllowed} />
                   </Box>
                 )}
                 <Box minWidth="10rem">
-                  <TextField label="Priority" name="priority" type="number" value={priority} onChange={setPriority} autoComplete="off" helpText="When rules overlap, the higher number wins." />
+                  <TextField label="Priority" name="priority" type="number" value={priority} onChange={setPriority} autoComplete="off" helpText="When rules overlap, the higher number wins." disabled={!rulesAllowed} />
                 </Box>
               </InlineStack>
               <InlineStack gap="400" blockAlign="center" wrap>
-                <Checkbox label="Hide price" checked={hidePrice} onChange={setHidePrice} />
+                <Checkbox label="Hide price" checked={hidePrice} onChange={setHidePrice} disabled={!rulesAllowed} />
                 <input type="hidden" name="hidePrice" value={hidePrice ? "on" : "off"} />
-                <Checkbox label="Hide Add to cart" checked={hideAtc} onChange={setHideAtc} />
+                <Checkbox label="Hide Add to cart" checked={hideAtc} onChange={setHideAtc} disabled={!rulesAllowed} />
                 <input type="hidden" name="hideAtc" value={hideAtc ? "on" : "off"} />
-                <Box minWidth="16rem"><TextField label="Button label" name="ctaLabel" value={ctaLabel} onChange={setCtaLabel} autoComplete="off" helpText="Shown where the price or Add to cart button was." /></Box>
+                <Box minWidth="16rem"><TextField label="Button label" name="ctaLabel" value={ctaLabel} onChange={setCtaLabel} autoComplete="off" helpText="Shown where the price or Add to cart button was." disabled={!rulesAllowed} /></Box>
               </InlineStack>
-              {scopeLocked ? (
-                scope === "ALL" || scope === "LOGGED_OUT" ? (
-                  <Banner tone="info" action={{ content: "See plans", url: upgradeUrl(STARTER_PLAN) }}>
-                    <p>Price rules come with the Starter plan and above.</p>
-                  </Banner>
-                ) : (
-                  <Banner tone="info" action={{ content: "Upgrade to Growth", url: upgradeUrl(GROWTH_PLAN) }}>
-                    <p>Targeting by tag, product, or collection needs the Growth plan. Pick “Everyone” or “Logged-out visitors” instead, or upgrade.</p>
-                  </Banner>
-                )
+              {!rulesAllowed ? (
+                <Box><Button disabled accessibilityLabel={lockedMessage("priceRules")}>{`Add rule (${minimumPlanName("priceRules")})`}</Button></Box>
+              ) : scopeLocked ? (
+                <Banner tone="info" action={{ content: `Upgrade to ${minimumPlanName("priceRuleTargeting")}`, url: upgradeUrl(minimumPlan("priceRuleTargeting")) }}>
+                  <p>{lockedMessage("priceRuleTargeting")} Pick “Everyone” or “Logged-out visitors” instead, or upgrade.</p>
+                </Banner>
               ) : (
                 <Box><Button submit variant="primary" disabled={busy}>Add rule</Button></Box>
               )}

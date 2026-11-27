@@ -135,7 +135,7 @@ export default function QuotesInbox() {
           >
             <p>
               {atCap
-                ? "You’ve reached the Free plan limit. Buyers can’t submit new quotes until some expire or are ordered. Starter and above have unlimited quotes."
+                ? "You’ve reached the Free plan limit. New requests still arrive, but you can reply to them only after you upgrade or older quotes expire or are ordered. Starter and above have unlimited quotes."
                 : "You’re close to the Free plan limit of active quotes. Starter and above have unlimited quotes."}
             </p>
           </Banner>

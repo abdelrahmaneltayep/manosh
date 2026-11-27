@@ -6,7 +6,8 @@
 // booleans + a CTA label, so a hidden price can't leak through our markup/JSON
 // (§5.2). Enforced by the `VisibilityDecision` type and covered by tests.
 
-import { effectivePlanHandle, meetsPlan } from "./billing-v3";
+import { effectivePlanHandle } from "./billing-v3";
+import { featureAvailable, type PlanFeature } from "./plan-features";
 export type PriceScope = "ALL" | "LOGGED_OUT" | "CUSTOMER_TAG" | "PRODUCT" | "COLLECTION";
 
 export interface PriceRuleLite {
@@ -109,6 +110,10 @@ export function evaluateVisibility(rules: PriceRuleLite[], ctx: StorefrontContex
 export function priceRuleScopeAllowed(plan: string | null | undefined, scope: PriceScope, legacy = false): boolean {
   if (!plan) return false;
   const handle = effectivePlanHandle(String(plan).toUpperCase(), legacy);
-  if (scope === "ALL" || scope === "LOGGED_OUT") return meetsPlan(handle, "starter");
-  return meetsPlan(handle, "growth"); // CUSTOMER_TAG / PRODUCT / COLLECTION
+  return featureAvailable(priceRuleFeature(scope), handle);
+}
+
+/** Which plan feature a scope needs (plan-features.ts names the plan). Pure. */
+export function priceRuleFeature(scope: PriceScope): PlanFeature {
+  return scope === "ALL" || scope === "LOGGED_OUT" ? "priceRules" : "priceRuleTargeting";
 }

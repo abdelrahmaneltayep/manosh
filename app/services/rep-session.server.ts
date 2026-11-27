@@ -1,4 +1,6 @@
 import { createCookieSessionStorage, redirect } from "@remix-run/node";
+import prisma from "../db.server";
+import { repPortalAllowed } from "../lib/billing";
 
 /**
  * F12 — sales-rep portal session. Separate from both the Shopify admin session
@@ -46,6 +48,16 @@ export async function getRepId(request: Request): Promise<string | null> {
 export async function requireRepId(request: Request, redirectTo = "/rep/signin"): Promise<string> {
   const repId = await getRepId(request);
   if (!repId) throw redirect(redirectTo);
+  // The rep portal follows the store's plan (Scale). A store that moves off
+  // Scale keeps its reps on file, but they can't work in the portal until it
+  // is back on a plan that includes it.
+  const rep = await prisma.salesRep.findUnique({
+    where: { id: repId },
+    select: { shop: { select: { plan: true, legacyPlan: true } } },
+  });
+  if (rep && !repPortalAllowed(rep.shop.plan, rep.shop.legacyPlan)) {
+    throw new Response("The sales-rep portal isn’t on this store’s plan.", { status: 402 });
+  }
   return repId;
 }
 

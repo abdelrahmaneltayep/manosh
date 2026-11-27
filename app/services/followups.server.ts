@@ -269,7 +269,7 @@ export async function sendNow(
 /**
  * The reminder as text for the merchant to copy and send themselves, used while
  * no sender is connected. The link in it is a fresh sign-in link that opens the
- * quote (the buyer has no other way in), so it replaces any earlier unused link
+ * quote (the buyer has no other way in). Earlier links the buyer has keep working.
  * for that buyer. The cadence advances exactly as a sent reminder would, so the
  * quote leaves "Needs a nudge" once the merchant has dealt with it.
  */

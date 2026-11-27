@@ -25,6 +25,7 @@ import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
 import { DisclosureCard } from "../components/DisclosureCard";
+import { lockedMessage } from "../lib/plan-features";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -56,7 +57,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const { session } = await authenticate.admin(request);
   if (!MAKE_AN_OFFER_ENABLED()) throw new Response("Not found", { status: 404 });
   const caps = await getShopCapabilities(session.shop);
-  if (caps.makeAnOffer === "teaser") return { ok: false, error: "Upgrade to Growth to configure the widget." };
+  if (caps.makeAnOffer === "teaser") return { ok: false, error: lockedMessage("makeAnOffer") };
   const scale = caps.makeAnOffer === "auto";
   const form = await request.formData();
 

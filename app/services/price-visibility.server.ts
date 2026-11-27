@@ -132,6 +132,10 @@ export async function evaluatePriceVisibility(shopDomain: string, ctx: Storefron
   if (!QUOTE_CAPTURE_ENABLED()) return { ...SHOW_ALL };
   const shopId = await shopIdFor(shopDomain);
   if (!shopId) return { ...SHOW_ALL };
-  const rules = await activeRuleLites(shopId);
+  // A rule only runs while the shop's plan includes its scope. Rules made on a
+  // higher plan stay saved but are paused after a downgrade, and the admin
+  // shows them as "Paused · needs <plan>" (owner decision, 27 Nov 2026).
+  const { plan, legacy } = await priceRulePlanFor(shopDomain);
+  const rules = (await activeRuleLites(shopId)).filter((r) => priceRuleScopeAllowed(plan, r.scope as PriceScope, legacy));
   return evaluateVisibility(rules, ctx);
 }

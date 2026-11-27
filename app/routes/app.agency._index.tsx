@@ -24,8 +24,9 @@ import { ConfirmAction } from "../components/ConfirmAction";
 import { DisclosureCard } from "../components/DisclosureCard";
 import { formatDate } from "../lib/format";
 import { authenticate } from "../shopify.server";
-import { requireBilling } from "../services/billing.server";
-import { GROWTH_PLAN, agencyAllowed, AGENCY_UPGRADE_MESSAGE } from "../lib/billing";
+import { getShopPlan } from "../services/billing.server";
+import { AGENCY_UPGRADE_MESSAGE } from "../lib/billing";
+import { featureAvailable, lockedMessage, minimumPlan, minimumPlanName } from "../lib/plan-features";
 import {
   WHITE_LABEL_ENABLED,
   getOrgForShop,
@@ -51,8 +52,9 @@ function fmtRevenue(rev: Array<{ amount: string; currencyCode: string }>): strin
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!WHITE_LABEL_ENABLED()) throw new Response("Not found", { status: 404 });
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  const allowed = agencyAllowed(status.plan);
+  // Agency mode and white-label are Scale features (plan-features.ts).
+  const { handle } = await getShopPlan(request, session.shop, billing);
+  const allowed = featureAvailable("agency", handle);
   if (!allowed) {
     return { locked: true, shop: session.shop, org: null, rollup: null, branding: null, appUrl: "", upgradeMessage: AGENCY_UPGRADE_MESSAGE };
   }
@@ -80,8 +82,8 @@ type ActionResult = { ok: boolean; error?: string; message?: string; invite?: { 
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
   if (!WHITE_LABEL_ENABLED()) throw new Response("Not found", { status: 404 });
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  if (!agencyAllowed(status.plan)) return { ok: false, error: AGENCY_UPGRADE_MESSAGE };
+  const shopPlan = await getShopPlan(request, session.shop, billing);
+  if (!featureAvailable("agency", shopPlan.handle)) return { ok: false, error: AGENCY_UPGRADE_MESSAGE };
 
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
@@ -95,7 +97,8 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
           String(form.get("name") ?? ""),
           String(form.get("ownerEmail") ?? ""),
           session.shop,
-          status.plan,
+          shopPlan.plan,
+          shopPlan.legacyPlan,
         );
         return "error" in res ? { ok: false, error: res.error } : { ok: true, message: "Agency workspace created." };
       }
@@ -128,7 +131,8 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
             portalName: form.get("portalName"),
             logoFileId: form.get("logoFileId"),
           },
-          status.plan,
+          shopPlan.plan,
+          shopPlan.legacyPlan,
         );
         return res.ok ? { ok: true, message: "Buyer-portal branding saved." } : { ok: false, error: res.error };
       }
@@ -160,7 +164,7 @@ export default function Agency() {
         <Banner tone="info" title="Manage & white-label multiple stores">
           <p>{data.upgradeMessage}</p>
           <Box paddingBlockStart="200">
-            <Button url={upgradeUrl(GROWTH_PLAN)} variant="primary">See Growth</Button>
+            <Button url={upgradeUrl(minimumPlan("agency"))} variant="primary">{`See ${minimumPlanName("agency")}`}</Button>
           </Box>
         </Banner>
       </Page>
@@ -289,7 +293,7 @@ function CreateOrg({ shop, busy }: { shop: string; busy: boolean }) {
         <Text as="p" tone="subdued" variant="bodyMd">
           Manage every client store from one place — cross-store rollups, quick switching, and
           per-store white-label branding. This store ({shop}) becomes the owner. Each managed store
-          keeps its own Growth subscription.
+          keeps its own {minimumPlanName("agency")} subscription.
         </Text>
         <Form method="post">
           <input type="hidden" name="intent" value="create-org" />
@@ -314,7 +318,7 @@ function InviteStoreForm({ busy, invite }: { busy: boolean; invite: { code: stri
       <Text as="p" tone="subdued" variant="bodySm">
         Create an invite code and send it to the store’s owner. They join from inside their own
         Mannon, so a store is only added with its owner’s consent. The store needs Mannon installed
-        from the Shopify App Store and its own Growth plan.
+        from the Shopify App Store and its own {minimumPlanName("agency")} plan.
       </Text>
       <Form method="post">
         <input type="hidden" name="intent" value="create-invite" />

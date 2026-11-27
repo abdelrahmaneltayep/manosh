@@ -19,6 +19,7 @@ import {
   isHoneypotTripped,
   type ShowPrices,
 } from "../lib/public-catalog";
+import { lockedMessage } from "../lib/plan-features";
 
 /**
  * F19 — Catalog Sharing & B2B Discovery. Publish a chosen F11 Catalog as a
@@ -104,7 +105,7 @@ export async function createPublicCatalog(
   input: { catalogId: string; title: string },
   plan: string | null,
 ): Promise<string> {
-  if (!catalogSharingAllowed(plan)) throw new NotAllowedError("Catalog sharing is a Growth feature.");
+  if (!catalogSharingAllowed(plan)) throw new NotAllowedError(lockedMessage("catalogSharing"));
   const shop = await shopFor(shopDomain);
   if (!shop) throw new NotFoundError("Unknown shop");
 

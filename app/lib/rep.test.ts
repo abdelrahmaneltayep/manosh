@@ -3,9 +3,12 @@ import { repCanAccessCompany, buildRepLeaderboard, impersonationBannerText } fro
 import { repPortalAllowed, evaluateRepSeatAllowance, PLAN_LIMITS } from "./billing";
 
 describe("plan gating", () => {
-  it("rep portal is Growth-only; Starter has 0 seats", () => {
-    expect(repPortalAllowed("GROWTH")).toBe(true);
-    expect(repPortalAllowed("Growth")).toBe(true);
+  it("rep portal is Scale-only (legacy Growth maps up to Scale); Starter has 0 seats", () => {
+    expect(repPortalAllowed("SCALE")).toBe(true);
+    expect(repPortalAllowed("GROWTH", true)).toBe(true);
+    expect(repPortalAllowed("GROWTH")).toBe(false);
+    // BillingStatus names are not stored plans and never unlock it.
+    expect(repPortalAllowed("Growth")).toBe(false);
     expect(repPortalAllowed("STARTER")).toBe(false);
     expect(repPortalAllowed(null)).toBe(false);
     expect(PLAN_LIMITS.starter.repSeatCap).toBe(0);

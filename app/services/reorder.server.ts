@@ -1,6 +1,6 @@
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
-import { canCreateQuote, QuoteCapReachedError } from "./plan-limits.server";
+import { canCreateQuote } from "./plan-limits.server";
 import { acceptAndOrder } from "./quote-accept.server";
 import { counterQuote, submitQuote, type QuoteWithLines } from "./quote.server";
 import type { AdminGraphqlClient } from "./draft-order.server";
@@ -206,13 +206,11 @@ export async function createReorder(params: {
   });
   if (!company) throw new Error(`Company ${params.companyId} not found`);
 
-  // A reorder is a new quote — enforce the shop's quote-volume cap.
+  // A reorder is a new quote. Past the plan's quote cap it is still saved, but
+  // it isn't auto-approved into an order: the merchant replies once they
+  // upgrade (or older quotes clear), like any other quote past the cap.
   const allowance = await canCreateQuote(company.shopId, params.now);
-  if (!allowance.allowed) {
-    throw new QuoteCapReachedError(allowance.used, allowance.cap);
-  }
-
-  const needsApproval = reorderNeedsApproval(params.lines, params.tolerance);
+  const needsApproval = !allowance.allowed || reorderNeedsApproval(params.lines, params.tolerance);
 
   const quote = await submitQuote({
     companyId: params.companyId,

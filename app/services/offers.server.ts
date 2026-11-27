@@ -22,6 +22,7 @@ import {
   type DraftOrderTotals,
   type PurchasingEntityRef,
 } from "./draft-order.server";
+import { minimumPlanName } from "../lib/plan-features";
 
 /**
  * F21 — Make an Offer service. Orchestrates offers, the negotiation thread, and
@@ -453,6 +454,8 @@ const DEFAULT_SURFACES: OfferSurfaces = { button: true, banner: false, inlineFor
 
 export interface OfferPublicConfig {
   enabled: boolean;
+  /** Set when the store's plan doesn't include Make an Offer: the plan that does. */
+  needsPlan?: string;
   label: string;
   surfaces: OfferSurfaces;
   hideAtcUntilOffer: boolean;
@@ -469,9 +472,12 @@ export async function getOfferPublicConfig(shopDomain: string): Promise<OfferPub
   const off: OfferPublicConfig = { enabled: false, label: "Make an offer", surfaces: { ...DEFAULT_SURFACES }, hideAtcUntilOffer: false, instant: false };
   if (!MAKE_AN_OFFER_ENABLED()) return off;
   const caps = await getShopCapabilities(shopDomain);
-  // Every plan renders the button (review 5.1.2: a block that shows nothing on
-  // Free/Starter reads as broken). Plan tiers change what happens AFTER the
-  // offer: rules and auto-answers are Growth/Scale, instant answers Scale only.
+  // Make an Offer starts on Growth (owner decision, 27 Nov 2026): on Free and
+  // Starter a buyer could send an offer the merchant has no way to answer, so
+  // shoppers don't get the button. The theme editor still shows the block with
+  // a note naming the plan (review 5.1.2: a block must never look broken to
+  // the merchant). Instant answers are Scale only.
+  if (caps.makeAnOffer === "teaser") return { ...off, needsPlan: minimumPlanName("makeAnOffer") };
   const isScale = caps.makeAnOffer === "auto";
   if (!(await shopIdFor(shopDomain))) return off; // unknown shop (not installed): never render a button for it
   const cfg = await getWidgetConfig(shopDomain); // null = installed shop with no saved widget config → defaults
@@ -538,9 +544,10 @@ export async function submitPublicOffer(
   if (!submitRateOk(`offer:${ctx.rateKey}`, now)) return { ok: true, outcome: "pending", silent: true };
 
   if (!MAKE_AN_OFFER_ENABLED()) return { ok: false, error: "Offers aren’t available right now." };
-  // Accepted on every plan. On Free/Starter ("teaser") there are no offer rules
-  // and no auto-answer, so the offer simply lands in the merchant's inbox as
-  // pending — the same path Growth takes when a rule doesn't match.
+  // Not on Free or Starter: the merchant couldn't answer it (see getOfferPublicConfig).
+  if ((await getShopCapabilities(shopDomain)).makeAnOffer === "teaser") {
+    return { ok: false, error: "This store isn’t taking offers right now." };
+  }
 
   const email = (input.buyerEmail ?? "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: "Enter a valid email." };

@@ -1052,12 +1052,29 @@ model Buyer {
   localePreference         LocalePreference?
   pushSubscriptions        PushSubscription[]
   reorderShortcuts         ReorderShortcut[]
+  signInLinks              BuyerSignInLink[]
   createdAt                DateTime        @default(now())
   updatedAt                DateTime        @updatedAt
 
   @@unique([companyId, email])
   @@index([magicTokenHash])
   @@index([companyId, status])
+}
+
+// Every outstanding sign-in link for a buyer, so creating a new link (a copied
+// reminder, a quote link, an invite) never cancels one already sent. Only the
+// SHA-256 hash of the token is stored; the raw token exists only in the URL.
+// Each link works once (usedAt) and expires on its own.
+model BuyerSignInLink {
+  id        String    @id @default(cuid())
+  buyerId   String
+  buyer     Buyer     @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([buyerId])
 }
 
 enum CompanyRole {

@@ -156,7 +156,7 @@ export default function Followups() {
         {copied && (
           <CopyPanel
             title="Reminder ready"
-            description={`Paste this into a message to ${copied.to}. The link signs them in and opens the quote; it works once and replaces any earlier link you made for this buyer.`}
+            description={`Paste this into a message to ${copied.to}. The link signs them in and opens the quote and works once. Links you made earlier keep working.`}
             text={copied.text}
             toast="Reminder copied"
             copyLabel="Copy reminder"

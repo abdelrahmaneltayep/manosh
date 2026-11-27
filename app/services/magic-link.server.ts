@@ -62,10 +62,20 @@ export async function issueMagicLink(
   const expiresAt = new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000);
   const { raw, hash } = generateMagicToken();
 
-  await prisma.buyer.update({
-    where: { id: buyer.id },
-    data: { magicTokenHash: hash, magicTokenExpiresAt: expiresAt },
-  });
+  // Each link is its own row, so issuing one (a copied reminder, a quote link,
+  // an invite) never cancels a link the buyer already has. Used and expired
+  // rows for this buyer are cleared as we go. The Buyer columns keep the newest
+  // link too: older code paths and the Home setup check read them.
+  await prisma.$transaction([
+    prisma.buyerSignInLink.deleteMany({
+      where: { buyerId: buyer.id, OR: [{ usedAt: { not: null } }, { expiresAt: { lte: now } }] },
+    }),
+    prisma.buyerSignInLink.create({ data: { buyerId: buyer.id, tokenHash: hash, expiresAt } }),
+    prisma.buyer.update({
+      where: { id: buyer.id },
+      data: { magicTokenHash: hash, magicTokenExpiresAt: expiresAt },
+    }),
+  ]);
 
   const url = new URL("/portal/auth", options.baseUrl);
   url.searchParams.set("token", raw);
@@ -94,6 +104,29 @@ export async function verifyMagicToken(
   const now = options.now ?? new Date();
   const hash = hashToken(rawToken);
 
+  const link = await prisma.buyerSignInLink.findUnique({
+    where: { tokenHash: hash },
+    include: { buyer: { include: { company: true } } },
+  });
+  if (link) {
+    if (link.usedAt) return { ok: false, reason: "invalid" };
+    if (link.expiresAt.getTime() <= now.getTime()) return { ok: false, reason: "expired" };
+    if (options.consume) {
+      // Single use, race-safe: only one concurrent consume can flip usedAt.
+      const consumed = await prisma.buyerSignInLink.updateMany({
+        where: { id: link.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+      if (consumed.count !== 1) return { ok: false, reason: "invalid" };
+      await prisma.buyer.updateMany({
+        where: { id: link.buyerId, magicTokenHash: hash },
+        data: { magicTokenHash: null, magicTokenExpiresAt: null },
+      });
+    }
+    return { ok: true, buyer: link.buyer };
+  }
+
+  // Links issued before per-link rows existed live only on the Buyer row.
   const buyer = await prisma.buyer.findFirst({
     where: { magicTokenHash: hash },
     include: { company: true },
@@ -128,12 +161,15 @@ export async function verifyMagicToken(
   return { ok: true, buyer };
 }
 
-/** Revoke any outstanding magic link for a buyer. */
+/** Revoke every outstanding sign-in link for a buyer. */
 export async function revokeMagicLink(buyerId: string): Promise<void> {
-  await prisma.buyer.update({
-    where: { id: buyerId },
-    data: { magicTokenHash: null, magicTokenExpiresAt: null },
-  });
+  await prisma.$transaction([
+    prisma.buyerSignInLink.deleteMany({ where: { buyerId } }),
+    prisma.buyer.update({
+      where: { id: buyerId },
+      data: { magicTokenHash: null, magicTokenExpiresAt: null },
+    }),
+  ]);
 }
 
 function safeEqualHex(a: string, b: string): boolean {

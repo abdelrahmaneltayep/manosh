@@ -238,15 +238,23 @@ export async function submitApplication(
 
   // Auto-approve (Growth and Scale) when the domain is allowlisted.
   let status: WholesaleStatus = "PENDING";
+  let magicUrl: string | null = null;
   if (isGrowthTier(shop.plan) && shouldAutoApprove(contactEmail, form.autoApproveDomains)) {
-    await provisionApproval(application.id, shopDomain, "auto", payload.baseUrl);
+    magicUrl = (await provisionApproval(application.id, shopDomain, "auto", payload.baseUrl))?.magicUrl ?? null;
     status = "APPROVED";
   }
 
-  // Buyer-facing "application received" (best-effort).
-  const received = resolveTemplate("application_received", shop.emailTemplates);
-  const { subject, body } = renderTemplate(received, {
+  // Buyer-facing message (best-effort). An auto-approved applicant gets the
+  // approval with their sign-in link; it used to be "received" with no link,
+  // so they had no way in. With no sender connected nothing goes out, and the
+  // merchant copies a sign-in link from Applications instead.
+  const template = status === "APPROVED"
+    ? resolveTemplate("application_decision", shop.emailTemplates)
+    : resolveTemplate("application_received", shop.emailTemplates);
+  const { subject, body } = renderTemplate(template, {
     companyName,
+    decision: "approved",
+    portalUrl: magicUrl ?? `${payload.baseUrl.replace(/\/$/, "")}/portal`,
     shopName: shopDomain,
   });
   await sendEmail({ to: contactEmail, subject, html: body, text: body });
@@ -416,6 +424,32 @@ export interface DecisionMessage {
   subject: string;
   body: string;
   sent: boolean;
+}
+
+/**
+ * A fresh sign-in link for an approved applicant's buyer account, for the
+ * merchant to copy and send. Scoped to the shop; null when the application
+ * isn't approved or its buyer can't be found.
+ */
+export async function issueApplicantSignInLink(
+  shopDomain: string,
+  applicationId: string,
+  baseUrl: string,
+): Promise<{ to: string; url: string; expiresAt: Date } | null> {
+  const shop = await shopFor(shopDomain);
+  if (!shop) return null;
+  const app = await prisma.wholesaleApplication.findFirst({
+    where: { id: applicationId, shopId: shop.id, status: "APPROVED", companyId: { not: null } },
+    select: { companyId: true, contactEmail: true },
+  });
+  if (!app?.companyId) return null;
+  const buyer = await prisma.buyer.findFirst({
+    where: { companyId: app.companyId, email: app.contactEmail },
+    select: { id: true, email: true },
+  });
+  if (!buyer) return null;
+  const { url, expiresAt } = await issueMagicLink(buyer.id, { baseUrl });
+  return { to: buyer.email, url, expiresAt };
 }
 
 /** Bulk approve a set of applications. */

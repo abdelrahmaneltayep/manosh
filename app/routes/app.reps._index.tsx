@@ -21,8 +21,9 @@ import { TitleBar } from "@shopify/app-bridge-react";
 import { SectionTabs } from "../components/SectionTabs";
 import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
-import { requireBilling } from "../services/billing.server";
-import { repPortalAllowed, getPlanLimits, repSeatCapMessage, GROWTH_PLAN } from "../lib/billing";
+import { getShopPlan } from "../services/billing.server";
+import { getPlanLimits, repSeatCapMessage } from "../lib/billing";
+import { featureAvailable, lockedMessage, minimumPlan, minimumPlanName } from "../lib/plan-features";
 import {
   listReps,
   inviteRep,
@@ -45,7 +46,6 @@ import { requireClaudeAccess } from "../services/claude-access.server";
 import { draft } from "../services/claude.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
-import { emailDeliveryEnabled } from "../services/mailer.server";
 import { emailCopy } from "../lib/email-delivery";
 import { useEmailDelivery } from "../lib/use-email-delivery";
 import { CopyPanel } from "../components/CopyPanel";
@@ -56,22 +56,23 @@ const ENABLED = () => process.env.MANNON_FF_REP_PORTAL === "true";
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  const isGrowth = repPortalAllowed(status.plan);
+  const { status, handle } = await getShopPlan(request, session.shop, billing);
+  // Reps are a Scale feature (plan-features.ts), read from the stored plan.
+  const unlocked = featureAvailable("salesReps", handle);
   const shopRow = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
     select: { plan: true, legacyPlan: true, claudeTrialStartedAt: true, claudeEnabled: true },
   });
   const access = claudeAccess(shopRow ?? { plan: "FREE" }, new Date());
-  if (!isGrowth) {
-    return { isGrowth, reps: [], companies: [], leaderboard: [], seatCap: 0, access };
+  if (!unlocked) {
+    return { unlocked, reps: [], companies: [], leaderboard: [], seatCap: 0, access };
   }
   const [reps, companies, leaderboard] = await Promise.all([
     listReps(session.shop),
     listCompaniesForShop(session.shop),
     repLeaderboard(session.shop),
   ]);
-  return { isGrowth, reps, companies, leaderboard, seatCap: getPlanLimits(status.plan).repSeatCap, access };
+  return { unlocked, reps, companies, leaderboard, seatCap: getPlanLimits(status.plan).repSeatCap, access };
 };
 
 type ActionResult =
@@ -81,8 +82,8 @@ type ActionResult =
 export const action = async ({ request }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) return { ok: false, error: "This feature isn’t available." };
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  if (!repPortalAllowed(status.plan)) return { ok: false, error: "The sales-rep portal is a Growth feature." };
+  const { status, handle } = await getShopPlan(request, session.shop, billing);
+  if (!featureAvailable("salesReps", handle)) return { ok: false, error: lockedMessage("salesReps") };
 
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
@@ -107,8 +108,12 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       const email = String(form.get("email") ?? "").trim();
       if (!email) return { ok: false, error: "Enter an email." };
       const note = String(form.get("note") ?? "").trim() || undefined;
-      const { url } = await inviteRep(session.shop, { email, name: String(form.get("name") ?? ""), note }, status.plan, baseUrl);
-      return { ok: true, message: emailCopy(emailDeliveryEnabled()).repInviteDone, inviteUrl: url };
+      const { url, sent } = await inviteRep(session.shop, { email, name: String(form.get("name") ?? ""), note }, status.plan, baseUrl);
+      // Hand over the link whenever the invite wasn't delivered, even with a
+      // sender connected (a failed send must not leave the rep with no way in).
+      return sent
+        ? { ok: true, message: emailCopy(true).repInviteDone }
+        : { ok: true, message: emailCopy(false).repInviteDone, inviteUrl: url };
     }
     if (intent === "assign") {
       await assignCompany(session.shop, String(form.get("repId") ?? ""), String(form.get("companyId") ?? ""));
@@ -153,19 +158,18 @@ export default function Reps() {
   const noteErr = noteData && !noteData.ok ? noteData.error : null;
   const access = data.access as ClaudeAccess;
 
-  if (!data.isGrowth) {
+  if (!data.unlocked) {
     return (
       <Page>
         <TitleBar title="Reps" />
         <SectionTabs active="reps" />
-        <Banner tone="info" title="Add your sales team — upgrade to Growth">
+        <Banner tone="info" title={`Add your sales team — upgrade to ${minimumPlanName("salesReps")}`}>
           <p>
             Give your reps a scoped login to see only their assigned accounts and
-            place or negotiate orders on behalf of buyers. The sales-rep portal is
-            included on the Growth plan.
+            place or negotiate orders on behalf of buyers. {lockedMessage("salesReps")}
           </p>
           <Box paddingBlockStart="200">
-            <Button url={upgradeUrl("growth")} variant="primary">See Growth</Button>
+            <Button url={upgradeUrl(minimumPlan("salesReps"))} variant="primary">{`See ${minimumPlanName("salesReps")}`}</Button>
           </Box>
         </Banner>
       </Page>
@@ -184,7 +188,7 @@ export default function Reps() {
       <SectionTabs active="reps" />
       <BlockStack gap="500">
         {actionData?.ok === true && actionData.message && <Banner tone="success" title={actionData.message} />}
-        {actionData?.ok === true && actionData.inviteUrl && !emailDelivery && (
+        {actionData?.ok === true && actionData.inviteUrl && (
           <CopyPanel
             title="Rep sign-in link ready"
             description="Share this link with the rep. It signs them in and shows only the accounts you assign. It isn’t shown again."

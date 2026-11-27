@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
+import { accountingSyncAllowed } from "../lib/billing";
 import {
   runSyncForShop,
   sendFailureDigest,
@@ -27,10 +28,13 @@ async function run(request: Request): Promise<Response> {
 
   const now = new Date();
   const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
-  const shops = await prisma.shop.findMany({ select: { shopifyDomain: true } });
+  const shops = await prisma.shop.findMany({ select: { shopifyDomain: true, plan: true, legacyPlan: true } });
 
   const results: Array<{ shop: string; synced: number; failed: number; digested: boolean }> = [];
   for (const shop of shops) {
+    // Accounting sync is a Scale feature: a store that left Scale keeps its
+    // connection on file, but nothing is pushed until it is back on Scale.
+    if (!accountingSyncAllowed(shop.plan, shop.legacyPlan)) continue;
     const summary = await runSyncForShop(shop.shopifyDomain, makeProviderClient, now);
     const digested = await sendFailureDigest(shop.shopifyDomain, baseUrl);
     results.push({ shop: shop.shopifyDomain, synced: summary.synced, failed: summary.failed, digested });

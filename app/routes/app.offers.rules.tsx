@@ -12,6 +12,7 @@ import { upgradeUrl } from "../lib/upgrade";
 import { authenticate } from "../shopify.server";
 import { getShopCapabilities } from "../services/billing.server";
 import { MAKE_AN_OFFER_ENABLED, listRules, createRule, deleteRule, OfferRuleCapError } from "../services/offers.server";
+import { lockedMessage } from "../lib/plan-features";
 
 const NAME_FIELD_ID = "offer-rule-name";
 
@@ -37,7 +38,7 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
   const { session } = await authenticate.admin(request);
   if (!MAKE_AN_OFFER_ENABLED()) throw new Response("Not found", { status: 404 });
   const caps = await getShopCapabilities(session.shop);
-  if (caps.makeAnOffer === "teaser") return { ok: false, error: "Upgrade to Growth for offer rules." };
+  if (caps.makeAnOffer === "teaser") return { ok: false, error: lockedMessage("makeAnOffer") };
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   if (intent === "delete") {

@@ -19,6 +19,12 @@ export function portalErrorContent(status: number | null): PortalErrorContent {
       body: "This link may be out of date, or the item is no longer available. Head back to your portal and try again.",
     };
   }
+  if (status === 402) {
+    return {
+      title: "This portal is switched off",
+      body: "The store’s current plan doesn’t include this portal. Contact the store if you need access.",
+    };
+  }
   if (status === 401 || status === 403) {
     return {
       title: "Please sign in again",

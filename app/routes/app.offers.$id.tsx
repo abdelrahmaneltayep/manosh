@@ -25,6 +25,7 @@ import { requireClaudeAccess } from "../services/claude-access.server";
 import { draftOfferCounter } from "../services/offers-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { upgradeUrl } from "../lib/upgrade";
+import { lockedMessage } from "../lib/plan-features";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -75,7 +76,7 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
   const { admin, session } = await authenticate.admin(request);
   if (!MAKE_AN_OFFER_ENABLED()) throw new Response("Not found", { status: 404 });
   const caps = await getShopCapabilities(session.shop);
-  if (caps.makeAnOffer === "teaser") return { ok: false, error: "Upgrade to Growth to handle offers." };
+  if (caps.makeAnOffer === "teaser") return { ok: false, error: lockedMessage("makeAnOffer") };
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
   const id = params.id!;
@@ -114,7 +115,7 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
     return res.ok ? { ok: true, message: "Offer declined." } : { ok: false, error: res.error };
   }
   if (intent === "convert") {
-    if (caps.makeAnOffer !== "auto") return { ok: false, error: "Upgrade to Scale to turn offers into orders automatically." };
+    if (caps.makeAnOffer !== "auto") return { ok: false, error: lockedMessage("offerAutomation") };
     const catalog = await getCatalog(session.shop);
     const currencyCode = catalog[0]?.currencyCode ?? "USD";
     const res = await convertOffer(session.shop, id, admin, { currencyCode });

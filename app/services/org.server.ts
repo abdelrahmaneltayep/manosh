@@ -6,6 +6,7 @@ import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
 import { getBrandingTokens } from "./branding.server";
 import { getDashboardMetrics, addDecimal, type RevenueTotal } from "./dashboard.server";
 import { agencyAllowed } from "../lib/billing";
+import { lockedMessage, minimumPlanName } from "../lib/plan-features";
 import { canManage, storeHandle, storeAdminUrl } from "../lib/org";
 
 // Re-exported for existing server-side callers; the pure defs live in lib/org.
@@ -16,7 +17,7 @@ export { canManage, storeHandle, storeAdminUrl };
  * stores for cross-store rollups (reusing F7/dashboard metrics) and role-based
  * navigation. Strict per-store isolation: every metric query is keyed by that
  * store's shopId — data never crosses stores. Management-only: each store still
- * bills separately through Shopify. Growth-only (Agency add-on).
+ * bills separately through Shopify. Scale only (plan-features.ts).
  */
 
 export const WHITE_LABEL_ENABLED = () => process.env.MANNON_FF_WHITE_LABEL === "true";
@@ -25,7 +26,7 @@ export class NotAllowedError extends Error {}
 export class NotFoundError extends Error {}
 
 async function shopBy(shopDomain: string) {
-  return prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { id: true, plan: true } });
+  return prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { id: true, plan: true, legacyPlan: true } });
 }
 
 // --- org lifecycle -----------------------------------------------------------
@@ -44,8 +45,9 @@ export async function createOrganization(
   ownerEmail: string,
   firstShopDomain: string,
   plan: string | null,
+  legacyPlan = false,
 ): Promise<{ orgId: string } | { error: string }> {
-  if (!agencyAllowed(plan)) throw new NotAllowedError("Agency mode is a Growth feature.");
+  if (!agencyAllowed(plan, legacyPlan)) throw new NotAllowedError(lockedMessage("agency"));
   const shop = await shopBy(firstShopDomain);
   if (!shop) return { error: "Unknown shop." };
 
@@ -132,7 +134,9 @@ export async function joinWithInvite(
 
   const shop = await shopBy(shopDomain);
   if (!shop) return { ok: false, error: "Unknown shop." };
-  if (!agencyAllowed(shop.plan)) return { ok: false, error: "This store needs its own Growth plan before it can join an organization." };
+  if (!agencyAllowed(shop.plan, shop.legacyPlan)) {
+    return { ok: false, error: `This store needs its own ${minimumPlanName("agency")} plan before it can join an organization.` };
+  }
   if (await prisma.orgStore.findUnique({ where: { shop: shopDomain } })) return { ok: false, error: "This store is already part of an organization." };
 
   const invite = await prisma.orgInvite.findUnique({ where: { codeHash: hashInviteCode(code) }, include: { org: { select: { id: true, name: true, ownerEmail: true } } } });

@@ -17,9 +17,11 @@ import {
 import { accountingSyncAllowed } from "./billing";
 
 describe("plan gating", () => {
-  it("accounting sync is Growth-only", () => {
-    expect(accountingSyncAllowed("GROWTH")).toBe(true);
-    expect(accountingSyncAllowed("Growth")).toBe(true);
+  it("accounting sync is Scale-only", () => {
+    expect(accountingSyncAllowed("SCALE")).toBe(true);
+    expect(accountingSyncAllowed("GROWTH", true)).toBe(true);
+    expect(accountingSyncAllowed("GROWTH")).toBe(false);
+    expect(accountingSyncAllowed("Growth")).toBe(false);
     expect(accountingSyncAllowed("STARTER")).toBe(false);
     expect(accountingSyncAllowed(null)).toBe(false);
   });

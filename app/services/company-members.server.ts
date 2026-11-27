@@ -62,6 +62,8 @@ export async function getMember(companyId: string, buyerId: string): Promise<Mem
 export interface InviteResult {
   member: { id: string; email: string };
   inviteUrl: string;
+  /** Whether the invite email was delivered. */
+  sent: boolean;
 }
 
 /**
@@ -110,9 +112,10 @@ export async function inviteMember(
     role: input.role,
     shopName: company.shop.shopifyDomain,
   });
-  await sendEmail({ to: email, subject, html: body, text: body });
+  const result = await sendEmail({ to: email, subject, html: body, text: body });
 
-  return { member, inviteUrl: url };
+  // `sent` is false whenever the invite didn't go out, so the caller can show the link.
+  return { member, inviteUrl: url, sent: result.sent };
 }
 
 export async function setMemberRole(companyId: string, buyerId: string, role: CompanyRole): Promise<void> {

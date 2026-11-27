@@ -1,8 +1,6 @@
 import prisma from "../db.server";
 import type { CatalogItem } from "./catalog.server";
 import { submitQuote, type QuoteLineInput, type QuoteWithLines } from "./quote.server";
-import { canCreateQuote } from "./plan-limits.server";
-import { QUOTE_CAP_BUYER_MESSAGE } from "../lib/billing";
 
 /**
  * Buyer-portal quote submission (F1). Turns a buyer's basket of catalog
@@ -80,17 +78,13 @@ export async function submitBuyerQuote(
   const built = buildQuoteLinesFromSelections(catalog, selections);
   if (!built.ok) return built;
 
-  // Plan quote-volume cap (per shop). Check before persisting.
+  // The plan's quote cap never turns a buyer away: the request is always saved.
+  // On a capped plan the merchant is asked to upgrade before replying to quotes
+  // past the cap (plan-limits.server.ts canReplyToQuote).
   const company = await prisma.company.findUnique({
     where: { id: buyer.companyId },
     select: { shopId: true, shop: { select: { shopifyDomain: true } } },
   });
-  if (company) {
-    const allowance = await canCreateQuote(company.shopId);
-    if (!allowance.allowed) {
-      return { ok: false, error: QUOTE_CAP_BUYER_MESSAGE, capReached: true };
-    }
-  }
 
   // F9 — order rules (MOQ / pack size / min order value). Round line quantities
   // up (never dropped) and block a cart under the store minimum with a shortfall.

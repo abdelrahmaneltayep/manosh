@@ -33,9 +33,9 @@ describe.skipIf(!hasDb)("agency store linking by invite (DB)", () => {
   });
 
   async function setup() {
-    await prisma.shop.create({ data: { shopifyDomain: "agency.myshopify.com", plan: "GROWTH" } });
+    await prisma.shop.create({ data: { shopifyDomain: "agency.myshopify.com", plan: "SCALE" } });
     await prisma.shop.create({ data: { shopifyDomain: "client.myshopify.com", plan: "SCALE" } });
-    const org = await createOrganization("Northwind", "owner@northwind.example", "agency.myshopify.com", "GROWTH");
+    const org = await createOrganization("Northwind", "owner@northwind.example", "agency.myshopify.com", "SCALE");
     if ("error" in org) throw new Error(org.error);
     return org.orgId;
   }
@@ -56,7 +56,7 @@ describe.skipIf(!hasDb)("agency store linking by invite (DB)", () => {
 
   it("is single use", async () => {
     const orgId = await setup();
-    await prisma.shop.create({ data: { shopifyDomain: "other.myshopify.com", plan: "GROWTH" } });
+    await prisma.shop.create({ data: { shopifyDomain: "other.myshopify.com", plan: "SCALE" } });
     const invite = await createStoreInvite(orgId, "OWNER", "VIEWER");
     if (!invite.ok) throw new Error(invite.error);
     expect((await joinWithInvite("client.myshopify.com", invite.code, "https://app.example")).ok).toBe(true);
@@ -82,12 +82,14 @@ describe.skipIf(!hasDb)("agency store linking by invite (DB)", () => {
     expect((await getOrgForShop("client.myshopify.com"))?.myRole).toBe("MANAGER");
   });
 
-  it("refuses a store below Growth, or one already in an organization", async () => {
+  it("refuses a store below Scale, or one already in an organization", async () => {
     const orgId = await setup();
     await prisma.shop.create({ data: { shopifyDomain: "small.myshopify.com", plan: "STARTER" } });
+    await prisma.shop.create({ data: { shopifyDomain: "mid.myshopify.com", plan: "GROWTH" } });
     const invite = await createStoreInvite(orgId, "OWNER", "MANAGER");
     if (!invite.ok) throw new Error(invite.error);
-    expect(await joinWithInvite("small.myshopify.com", invite.code, "https://app.example")).toMatchObject({ ok: false, error: expect.stringMatching(/Growth/) });
+    expect(await joinWithInvite("small.myshopify.com", invite.code, "https://app.example")).toMatchObject({ ok: false, error: expect.stringMatching(/Scale/) });
+    expect(await joinWithInvite("mid.myshopify.com", invite.code, "https://app.example")).toMatchObject({ ok: false, error: expect.stringMatching(/Scale/) });
     expect(await joinWithInvite("agency.myshopify.com", invite.code, "https://app.example")).toMatchObject({ ok: false, error: expect.stringMatching(/already part/) });
     // The code was not consumed by the refused attempts.
     expect((await joinWithInvite("client.myshopify.com", invite.code, "https://app.example")).ok).toBe(true);

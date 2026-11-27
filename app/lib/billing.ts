@@ -2,6 +2,7 @@
 // billing.server.ts so route components can reference plan names, pricing, and
 // gating (planMeets/featureAccess) in render without pulling server-only code
 // (Prisma, the Shopify SDK) into the client bundle.
+import { featureAvailable, lockedMessage, shopPlanHandle } from "./plan-features";
 
 // Plan names are the keys Shopify stores against the subscription; keep them
 // stable — changing a key orphans existing subscriptions.
@@ -212,9 +213,13 @@ export function packRulesAllowed(plan: string | null | undefined): boolean {
 
 // --- F10 accounting sync gating ----------------------------------------------
 
-/** Accounting sync (QuickBooks Online / Xero) is Growth-only. Pure. */
-export function accountingSyncAllowed(plan: string | null | undefined): boolean {
-  return isGrowthTier(plan);
+/**
+ * Accounting sync (QuickBooks Online / Xero) is on Scale (plan-features.ts).
+ * Pass the shop's STORED plan ("SCALE", "GROWTH"…) and its legacy flag, never
+ * BillingStatus.plan, which reports a Scale shop as "Growth". Pure.
+ */
+export function accountingSyncAllowed(plan: string | null | undefined, legacy = false): boolean {
+  return featureAvailable("accountingSync", shopPlanHandle({ plan, legacyPlan: legacy }));
 }
 
 // --- F11 custom catalog gating -----------------------------------------------
@@ -248,9 +253,12 @@ export function catalogCapMessage(cap: number): string {
 
 // --- F12 sales-rep portal gating ---------------------------------------------
 
-/** The sales-rep portal (order-on-behalf + assigned accounts) is Growth-only. */
-export function repPortalAllowed(plan: string | null | undefined): boolean {
-  return isGrowthTier(plan);
+/**
+ * The sales-rep portal (order-on-behalf + assigned accounts) is on Scale.
+ * Takes the shop's stored plan and legacy flag (see accountingSyncAllowed). Pure.
+ */
+export function repPortalAllowed(plan: string | null | undefined, legacy = false): boolean {
+  return featureAvailable("salesReps", shopPlanHandle({ plan, legacyPlan: legacy }));
 }
 
 /** Flexible payments (deposits / installments / pay-by-link) are Growth-only. */
@@ -310,30 +318,33 @@ export function shortcutCapMessage(cap: number): string {
 // billing bypass. `agencyAllowed` gates org creation + store linking;
 // `whiteLabelAllowed` gates buyer-portal branding.
 
-/** Agency org management (create org, link stores) is Growth-only. Pure. */
-export function agencyAllowed(plan: string | null | undefined): boolean {
-  return isGrowthTier(plan);
+/**
+ * Agency org management (create org, link stores) follows white-label: Scale.
+ * Takes the shop's stored plan and legacy flag (see accountingSyncAllowed). Pure.
+ */
+export function agencyAllowed(plan: string | null | undefined, legacy = false): boolean {
+  return featureAvailable("agency", shopPlanHandle({ plan, legacyPlan: legacy }));
 }
 
-/** White-label buyer-portal branding is Growth-only. Pure. */
-export function whiteLabelAllowed(plan: string | null | undefined): boolean {
-  return isGrowthTier(plan);
+/** White-label buyer-portal branding is on Scale. Stored plan + legacy flag. Pure. */
+export function whiteLabelAllowed(plan: string | null | undefined, legacy = false): boolean {
+  return featureAvailable("whiteLabel", shopPlanHandle({ plan, legacyPlan: legacy }));
 }
 
-/** Merchant-facing copy when the agency add-on is hit on Starter. */
-export const AGENCY_UPGRADE_MESSAGE =
-  "Agency mode manages and white-labels multiple stores from one place — upgrade to Growth to turn it on. Each managed store keeps its own Growth subscription.";
+/** Merchant-facing copy when agency mode is locked. Plan name from plan-features. */
+export const AGENCY_UPGRADE_MESSAGE = `${lockedMessage("agency")} It manages and white-labels several stores from one place, and each managed store keeps its own subscription.`;
 
 // --- F19 catalog sharing / B2B discovery gating ------------------------------
 
 /** Publishing a shareable public catalog + the discovery listing is Growth-only. Pure. */
 export function catalogSharingAllowed(plan: string | null | undefined): boolean {
+  // Growth and Scale (plan-features.ts: catalogSharing). Accepts the stored plan
+  // or BillingStatus.plan; both name Scale shops in a way isGrowthTier accepts.
   return isGrowthTier(plan);
 }
 
 /** Merchant-facing copy when catalog sharing is hit on Starter. */
-export const CATALOG_SHARE_UPGRADE_MESSAGE =
-  "Publish a shareable wholesale catalog — upgrade to Growth to share it with new buyers.";
+export const CATALOG_SHARE_UPGRADE_MESSAGE = `Publish a shareable wholesale catalog for new buyers. ${lockedMessage("catalogSharing")}`;
 
 // --- F17 storefront quote-widget gating --------------------------------------
 

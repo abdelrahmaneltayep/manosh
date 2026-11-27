@@ -59,6 +59,7 @@ import { DraftedByClaude } from "../components/DraftedByClaude";
 import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
 import { DraftOrderError } from "../services/draft-order.server";
 import { issueBuyerQuoteLink } from "../services/buyer-sign-in-link.server";
+import { replyLockFor } from "../services/plan-limits.server";
 import { emailCopy } from "../lib/email-delivery";
 import { useEmailDelivery } from "../lib/use-email-delivery";
 import { CopyPanel } from "../components/CopyPanel";
@@ -93,6 +94,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
 
   const aiEnabled = AI_QUOTE_ENABLED();
+  // Past a capped plan's quote limit the request is saved but can't be answered
+  // until the merchant upgrades (plan-limits.server.ts canReplyToQuote).
+  const replyLock = await replyLockFor(session.shop, quote.id);
   // Dual-mode gating: Growth/Scale included, Starter on a one-time 7-day trial,
   // Free/expired locked. Read-only here — the trial is only *started* in the
   // action, on first real use (never on a page view).
@@ -116,6 +120,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     aiEnabled,
     access,
     quoteOpsEnabled: QUOTE_OPS_ENABLED(),
+    replyLock,
     suggestions,
     quote: {
       id: quote.id,
@@ -176,13 +181,17 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const currencyCode = catalog[0]?.currencyCode ?? "USD";
     const pdf = await renderQuotePdf(session.shop, quoteId, { currencyCode, plan: status.plan });
     if (!pdf) return { ok: false as const, kind: "quote" as const, error: "Quote not found." };
-    await sendEmail({
+    const sent = await sendEmail({
       to: pdf.buyerEmail,
       subject: "Your quote",
       html: "<p>Your quote is attached as a PDF.</p>",
       text: "Your quote is attached as a PDF.",
       attachments: [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }],
     });
+    // Only claim a send that happened.
+    if (!sent.sent) {
+      return { ok: false as const, kind: "quote" as const, error: "The quote PDF couldn’t be emailed. Use Copy buyer link or Download PDF and send it yourself." };
+    }
     await appendEvent({ shopId: pdf.shopId, type: "QUOTE_PDF_GENERATED", entityType: "Quote", entityId: quoteId, payload: { via: "email" } });
     return { ok: true as const, kind: "quote" as const, message: "Quote PDF emailed to the buyer." };
   }
@@ -203,6 +212,11 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
   }
 
   // --- F25.2 convert quote → draft order → invoice (paid) -------------------
+  if (intent === "counter" || intent === "convert") {
+    const lock = await replyLockFor(session.shop, quoteId);
+    if (lock) return { ok: false as const, kind: "quote" as const, error: lock.message, upgrade: true as const };
+  }
+
   if (intent === "convert") {
     const status = await requireBilling(billing, { isTest: IS_TEST });
     if (!featureAccess(status, STARTER_PLAN).allowed) {
@@ -299,7 +313,16 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         return { ok: false as const, kind: "quote" as const, error: parsed.error };
       }
       await counterQuoteForShop(session.shop, quoteId, parsed.lines);
-      return { ok: true as const, kind: "quote" as const, message: emailCopy(emailDeliveryEnabled()).counterDone };
+      // Mannon sends no email for a counter, so hand the merchant the buyer's
+      // sign-in link (it opens this quote) to send themselves.
+      const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
+      const link = await issueBuyerQuoteLink(session.shop, quoteId, baseUrl);
+      return {
+        ok: true as const,
+        kind: "quote" as const,
+        message: "Counter saved. No email was sent: copy the buyer’s link below and send it to them.",
+        buyerLink: link ? { url: link.url, email: link.buyerEmail, expiresAt: link.expiresAt.toISOString() } : undefined,
+      };
     }
 
     return { ok: false as const, kind: "quote" as const, error: "Unknown action." };
@@ -376,7 +399,7 @@ function UpsellBundle({ quoteId }: { quoteId: string }) {
 }
 
 export default function QuoteDetail() {
-  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions } = useLoaderData<typeof loader>();
+  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions, replyLock } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const aiFetcher = useFetcher<typeof action>();
@@ -506,10 +529,15 @@ export default function QuoteDetail() {
           </Banner>
         )}
         {quoteAction && quoteAction.ok && quoteAction.message && <Banner tone="success" title={quoteAction.message} />}
+        {replyLock && (
+          <Banner tone="warning" title="Upgrade to reply to this quote" action={{ content: "See plans", url: upgradeUrl(replyLock.upgradeTo) }}>
+            <p>{replyLock.message}</p>
+          </Banner>
+        )}
         {buyerLink && (
           <CopyPanel
             title="Buyer link ready"
-            description={`Share this with ${buyerLink.email}. It signs them in and opens this quote. It works once, expires ${formatDate(buyerLink.expiresAt)}, and replaces any earlier link you made for this buyer.`}
+            description={`Share this with ${buyerLink.email}. It signs them in and opens this quote. It works once, expires ${formatDate(buyerLink.expiresAt)}. Links you made earlier keep working.`}
             text={buyerLink.url}
             toast="Buyer link copied"
             copyLabel="Copy link"
@@ -632,7 +660,7 @@ export default function QuoteDetail() {
                         })}
 
                         <InlineStack gap="200">
-                          <Button variant="primary" submit loading={submitting}>
+                          <Button variant="primary" submit loading={submitting} disabled={Boolean(replyLock)}>
                             Send counter
                           </Button>
                           {showAi && access.allowed && (

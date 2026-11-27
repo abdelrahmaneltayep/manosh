@@ -23,7 +23,8 @@ import { DisclosureCard } from "../components/DisclosureCard";
 import { ConfirmAction } from "../components/ConfirmAction";
 import { authenticate } from "../shopify.server";
 import { requireBilling } from "../services/billing.server";
-import { GROWTH_PLAN, catalogSharingAllowed, CATALOG_SHARE_UPGRADE_MESSAGE } from "../lib/billing";
+import { catalogSharingAllowed, CATALOG_SHARE_UPGRADE_MESSAGE } from "../lib/billing";
+import { minimumPlan, minimumPlanName } from "../lib/plan-features";
 import { listCatalogs } from "../services/catalogs.server";
 import {
   CATALOG_SHARE_ENABLED,
@@ -202,7 +203,7 @@ export default function CatalogSharing() {
         <Banner tone="info" title="Publish a shareable wholesale catalog">
           <p>{data.upgradeMessage}</p>
           <Box paddingBlockStart="200">
-            <Button url={upgradeUrl(GROWTH_PLAN)} variant="primary">See Growth</Button>
+            <Button url={upgradeUrl(minimumPlan("catalogSharing"))} variant="primary">{`See ${minimumPlanName("catalogSharing")}`}</Button>
           </Box>
         </Banner>
       </Page>

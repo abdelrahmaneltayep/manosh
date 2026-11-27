@@ -1,8 +1,8 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { requireBilling } from "../services/billing.server";
-import { accountingSyncAllowed } from "../lib/billing";
+import { getShopPlan } from "../services/billing.server";
+import { featureAvailable, minimumPlan } from "../lib/plan-features";
 import { buildAuthorizeUrl, signState, oauthConfig } from "../services/accounting.server";
 import type { Provider } from "../lib/accounting";
 import { upgradeUrl } from "../lib/upgrade";
@@ -11,7 +11,7 @@ const IS_TEST = process.env.NODE_ENV !== "production";
 const ENABLED = () => process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
 
 /**
- * F10 — OAuth start. Growth-gated. Builds the provider authorize URL with a
+ * F10 — OAuth start. Scale-gated (plan-features.ts). Builds the provider authorize URL with a
  * signed `state` (carries the shop, verified by the public callback) and
  * top-level redirects the browser to the provider. Rendered with target="_top"
  * from the settings page so it breaks out of the embedded iframe.
@@ -19,9 +19,9 @@ const ENABLED = () => process.env.MANNON_FF_ACCOUNTING_SYNC === "true";
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session, billing } = await authenticate.admin(request);
   if (!ENABLED()) throw new Response("Not found", { status: 404 });
-  const status = await requireBilling(billing, { isTest: IS_TEST });
-  if (!accountingSyncAllowed(status.plan)) {
-    throw redirect(upgradeUrl("growth"));
+  const { handle } = await getShopPlan(request, session.shop, billing);
+  if (!featureAvailable("accountingSync", handle)) {
+    throw redirect(upgradeUrl(minimumPlan("accountingSync")));
   }
 
   const raw = (params.provider ?? "").toUpperCase();
