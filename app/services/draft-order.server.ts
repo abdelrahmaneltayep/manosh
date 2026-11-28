@@ -73,6 +73,8 @@ export interface DraftOrderInput {
   };
   /** F14: when true, Shopify zeroes tax on the draft order (verified-exempt buyer). */
   taxExempt?: boolean;
+  /** Tags on the draft order; a quote's draft carries mannon-quote:<quote id>. */
+  tags?: string[];
   /**
    * The currency the draft is priced and charged in. Set to the agreed
    * (priceOverride) currency: otherwise a company location in another market
@@ -408,4 +410,57 @@ export async function getDraftOrderStatus(admin: AdminGraphqlClient, draftOrderI
     invoiceSentAt: d.invoiceSentAt,
     order: d.order ? { id: d.order.id, name: d.order.name, financialStatus: d.order.displayFinancialStatus } : null,
   };
+}
+
+// --- one draft order per quote ------------------------------------------------
+
+/** The tag that ties a Shopify draft order to its quote. */
+export function quoteDraftTag(quoteId: string): string {
+  return `mannon-quote:${quoteId}`;
+}
+
+const DRAFT_ORDER_BY_TAG = `#graphql
+  query MannonDraftOrderByTag($query: String!) {
+    draftOrders(first: 1, query: $query) {
+      nodes {
+        id
+        subtotalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalTaxSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalDiscountsSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalShippingPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+      }
+    }
+  }
+`;
+
+/** The draft order Shopify already holds for this quote, if any. */
+export async function findDraftOrderForQuote(
+  admin: AdminGraphqlClient,
+  quoteId: string,
+): Promise<{ id: string; totals: DraftOrderTotals } | null> {
+  const response = await admin.graphql(DRAFT_ORDER_BY_TAG, { variables: { query: `tag:'${quoteDraftTag(quoteId)}'` } });
+  const body = (await response.json()) as { data?: { draftOrders?: { nodes?: Array<CalculatedShape & { id: string }> } } };
+  const node = body.data?.draftOrders?.nodes?.[0];
+  return node?.id ? { id: node.id, totals: readTotals(node) } : null;
+}
+
+/**
+ * Create the quote's draft order, or reuse the one Shopify already has. If an
+ * earlier attempt got as far as Shopify creating the draft but Mannon never
+ * saved its id (a crash, a timeout), the retry finds it by tag instead of
+ * creating a second one. The search runs after the quote's order claim, and
+ * a claim only goes stale after minutes, longer than Shopify takes to index a
+ * new draft.
+ */
+export async function createDraftOrderForQuote(
+  admin: AdminGraphqlClient,
+  quoteId: string,
+  input: DraftOrderInput,
+): Promise<{ id: string; totals: DraftOrderTotals; reused: boolean }> {
+  const existing = await findDraftOrderForQuote(admin, quoteId);
+  if (existing) return { ...existing, reused: true };
+  const tag = quoteDraftTag(quoteId);
+  const created = await createDraftOrder(admin, { ...input, tags: [...(input.tags ?? []).filter((t) => t !== tag), tag] });
+  return { ...created, reused: false };
 }

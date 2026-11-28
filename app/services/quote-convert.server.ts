@@ -6,7 +6,7 @@ import { appendEvent } from "./events.server";
 import { acceptQuote, markOrdered } from "./quote.server";
 import {
   buildDraftOrderInput,
-  createDraftOrder,
+  createDraftOrderForQuote,
   sendDraftOrderInvoice,
   DraftOrderError,
   type AdminGraphqlClient,
@@ -103,7 +103,7 @@ async function convertClaimed(
   });
 
   // Shopify FIRST (source of truth for money) — then mutate quote state.
-  const created = await createDraftOrder(admin, input);
+  const created = await createDraftOrderForQuote(admin, quoteId, input);
 
   // Best-effort invoice email (the order stands even if the send hiccups).
   let invoiceSent = false;

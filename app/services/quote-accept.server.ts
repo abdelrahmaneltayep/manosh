@@ -13,7 +13,7 @@ import {
 import {
   buildDraftOrderInput,
   calculateDraftOrder,
-  createDraftOrder,
+  createDraftOrderForQuote,
   DraftOrderError,
   type AdminGraphqlClient,
   type DraftOrderTotals,
@@ -89,15 +89,18 @@ export async function acceptAndOrder(
   });
   if (!quote) throw new QuoteNotFoundError(quoteId);
 
-  // Only a countered quote can be accepted.
-  if (quote.status !== "COUNTERED") {
-    if (quote.status === "ORDERED") throw new QuoteAlreadyOrderedError();
+  // Only a countered quote can be accepted. An ACCEPTED quote without a draft
+  // order is an earlier attempt that stopped after Shopify (a failed save):
+  // it resumes, and the draft order is found by its tag instead of recreated.
+  const resuming = quote.status === "ACCEPTED" && !quote.draftOrderId;
+  if (quote.status !== "COUNTERED" && !resuming) {
+    if (quote.status === "ORDERED" || quote.draftOrderId) throw new QuoteAlreadyOrderedError();
     throw new IllegalQuoteTransitionError(quote.status, "ACCEPTED");
   }
 
   // One order per quote: claim it before calling Shopify (a second accept
   // stops here). Released below if anything before the order fails.
-  const claim = await claimForOrder(quoteId, ["COUNTERED"]);
+  const claim = await claimForOrder(quoteId, ["COUNTERED", "ACCEPTED"]);
   let totals: DraftOrderTotals;
   let ordered: QuoteWithLines;
   let draftOrderId: string;
@@ -206,11 +209,11 @@ export async function acceptAndOrder(
       }
     }
 
-    const created = await createDraftOrder(admin, input);
+    const created = await createDraftOrderForQuote(admin, quoteId, input);
     totals = created.totals ?? previewed;
 
     // Only now mutate quote state: COUNTERED → ACCEPTED → ORDERED.
-    await acceptQuote(quoteId, { now: options.now });
+    if (!resuming) await acceptQuote(quoteId, { now: options.now });
     ordered = await markOrdered(quoteId, {
       draftOrderId: created.id,
       totalsSnapshot: { ...totals, calculatedAt: new Date().toISOString() } as unknown as Prisma.InputJsonValue,

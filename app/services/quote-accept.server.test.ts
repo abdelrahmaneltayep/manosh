@@ -42,6 +42,11 @@ function mockAdmin(options: {
         calls.push("lookup");
         return { json: async () => ({ data: options.lookup ?? { customers: { nodes: [] } } }) };
       }
+      if (query.includes("MannonDraftOrderByTag")) {
+        // Shopify has no draft order for this quote yet.
+        calls.push("search");
+        return { json: async () => ({ data: { draftOrders: { nodes: [] } } }) };
+      }
       if (opts?.variables?.input) inputs.push(opts.variables.input);
       if (query.includes("draftOrderCalculate")) {
         calls.push("calculate");
@@ -109,7 +114,7 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     const result = await acceptAndOrder(quote.id, admin, { currencyCode: "USD" });
 
     // Shopify was asked to price then create, in that order.
-    expect(admin.calls).toEqual(["calculate", "create"]);
+    expect(admin.calls).toEqual(["calculate", "search", "create"]);
 
     expect(result.quote.status).toBe("ORDERED");
     expect(result.quote.draftOrderId).toBe("gid://shopify/DraftOrder/500");
@@ -218,7 +223,7 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
 
     const result = await acceptAndOrder(quote.id, admin, { currencyCode: "USD" });
 
-    expect(admin.calls).toEqual(["lookup", "calculate", "create"]);
+    expect(admin.calls).toEqual(["lookup", "calculate", "search", "create"]);
     expect(result.quote.status).toBe("ORDERED");
     expect((admin.inputs[1] as { purchasingEntity: unknown }).purchasingEntity).toEqual({
       purchasingCompany: { companyId: "gid://shopify/Company/8", companyLocationId: "gid://shopify/CompanyLocation/80", companyContactId: "gid://shopify/CompanyContact/80" },

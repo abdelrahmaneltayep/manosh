@@ -13,12 +13,21 @@ const hasDb = Boolean(process.env.DATABASE_URL);
 const money = (amount: string) => ({ shopMoney: { amount, currencyCode: "USD" } });
 const totals = (total: string) => ({ subtotalPriceSet: money("90.00"), totalTaxSet: money("9.00"), totalPriceSet: money(total) });
 
-function shopify(opts: { total?: string; down?: boolean; slowCreateMs?: number } = {}) {
+/** Shopify's draft orders, by tag, shared across calls (like the real store). */
+type Store = Map<string, string>;
+
+function shopify(opts: { total?: string; down?: boolean; slowCreateMs?: number; store?: Store } = {}) {
   const created: string[] = [];
+  const store: Store = opts.store ?? new Map();
   let n = 0;
   const admin: AdminGraphqlClient = {
-    graphql: async (query) => {
+    graphql: async (query, options) => {
       if (opts.down) throw new Error("getaddrinfo ENOTFOUND shop.myshopify.com");
+      if (query.includes("MannonDraftOrderByTag")) {
+        const tag = /tag:'([^']+)'/.exec(String(options?.variables?.query))?.[1] ?? "";
+        const id = store.get(tag);
+        return { json: async () => ({ data: { draftOrders: { nodes: id ? [{ id, ...totals(opts.total ?? "99.00") }] : [] } } }) };
+      }
       if (query.includes("draftOrderCalculate")) {
         return { json: async () => ({ data: { draftOrderCalculate: { calculatedDraftOrder: totals(opts.total ?? "99.00"), userErrors: [] } } }) };
       }
@@ -29,6 +38,7 @@ function shopify(opts: { total?: string; down?: boolean; slowCreateMs?: number }
       if (opts.slowCreateMs) await new Promise((r) => setTimeout(r, opts.slowCreateMs));
       const id = `gid://shopify/DraftOrder/${700 + n++}`;
       created.push(id);
+      for (const tag of ((options?.variables?.input as { tags?: string[] })?.tags ?? [])) store.set(tag, id);
       return { json: async () => ({ data: { draftOrderCreate: { draftOrder: { id, ...totals(opts.total ?? "99.00") }, userErrors: [] } } }) };
     },
   };
@@ -120,6 +130,33 @@ describe.skipIf(!hasDb)("accept to order", () => {
     const { admin, created } = shopify();
     await acceptAndOrder(quote.id, admin, { currencyCode: "USD" });
     expect(created).toHaveLength(1);
+  });
+
+  it("Shopify created the draft, our save failed, then the retry reuses it", async () => {
+    const { quote } = await sentQuote();
+    const store: Store = new Map();
+    // First attempt: Shopify creates the draft order, then Mannon dies before saving its id.
+    const first = shopify({ store });
+    const draft = await first.admin.graphql("mutation MannonDraftOrderCreate", {
+      variables: { input: { tags: [`mannon-quote:${quote.id}`] } },
+    });
+    await draft.json();
+    expect(first.created).toHaveLength(1);
+    await prisma.quote.update({ where: { id: quote.id }, data: { orderingSince: new Date(Date.now() - CLAIM_STALE_MS - 1000) } });
+
+    // Retry after the claim went stale: the draft is found by its tag, not created again.
+    const retry = shopify({ store });
+    const done = await acceptAndOrder(quote.id, retry.admin, { currencyCode: "USD" });
+    expect(retry.created).toHaveLength(0);
+    expect(done.quote.draftOrderId).toBe(first.created[0]);
+    expect((await prisma.quote.findUniqueOrThrow({ where: { id: quote.id } })).status).toBe("ORDERED");
+  });
+
+  it("tags every quote's draft order so it can be found again", async () => {
+    const { quote } = await sentQuote();
+    const store: Store = new Map();
+    await acceptAndOrder(quote.id, shopify({ store }).admin, { currencyCode: "USD" });
+    expect(store.has(`mannon-quote:${quote.id}`)).toBe(true);
   });
 
   it("a claim left by a crash expires", async () => {

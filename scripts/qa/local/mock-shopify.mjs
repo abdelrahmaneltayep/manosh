@@ -106,6 +106,11 @@ export function createMockShopify() {
       drafts.set(id, d);
       return { draftOrderCreate: { draftOrder: { id, subtotalPriceSet: d.subtotalPriceSet, totalTaxSet: d.totalTaxSet, totalPriceSet: d.totalPriceSet, totalDiscountsSet: d.totalDiscountsSet, totalShippingPriceSet: d.totalShippingPriceSet }, userErrors: [] } };
     },
+    MannonDraftOrderByTag: (v) => {
+      const tag = /tag:'([^']+)'/.exec(v.query || "")?.[1];
+      const d = [...drafts.values()].find((x) => (x.input?.tags || []).includes(tag));
+      return { draftOrders: { nodes: d ? [{ id: d.id, subtotalPriceSet: d.subtotalPriceSet, totalTaxSet: d.totalTaxSet, totalPriceSet: d.totalPriceSet, totalDiscountsSet: d.totalDiscountsSet, totalShippingPriceSet: d.totalShippingPriceSet }] : [] } };
+    },
     MannonDraftOrderStatus: (v) => {
       const d = drafts.get(v.id);
       return { draftOrder: d ? { id: d.id, name: d.name, status: d.status, invoiceSentAt: d.invoiceSentAt ?? null, order: d.order ?? null } : null };
