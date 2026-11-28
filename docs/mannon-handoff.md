@@ -166,7 +166,7 @@ e2e check, not only a unit test.
 |---|---|
 | Framework | Remix 2 (Shopify Remix template), TypeScript, Vite |
 | Admin UI | Polaris React 12, App Bridge React 4, React 18 |
-| Database | Postgres (Neon) via Prisma 6. 40 migrations |
+| Database | Postgres (Neon) via Prisma 6. 46 migrations |
 | Sessions | Prisma session storage |
 | Auth | Shopify's new embedded auth strategy (token exchange), expiring offline tokens |
 | Shopify API | Admin GraphQL, version 2026-04 |
@@ -270,6 +270,32 @@ fly deploy
 `fly deploy` runs `prisma migrate deploy` first. Changes to the extensions or
 `shopify.app.toml` also need `shopify app deploy`. After every deploy: open the app in
 the dev store and load Pricing plans (section 9.4 explains why).
+
+### 9.1.1 Migrations and steps added since the November 27 build
+
+`fly deploy` applies any of these the database doesn't have yet, in this order
+(`prisma migrate deploy` skips ones already applied). Each is additive or, for
+the one data step, safe to run twice.
+
+| # | Migration | Phase | What it does |
+|---|---|---|---|
+| 1 | `20261127120000_buyer_sign_in_links` | 1 | New table for buyer sign-in links (hash only) |
+| 2 | `20261128120000_email_delivery` | 2 | New email delivery log table and status enum; `Shop.alertEmails` |
+| 3 | `20261128130000_expiry_warning_days` | 2 | New follow-up setting column (default 1) |
+| 4 | `20261128140000_shop_name` | 2 | New nullable `Shop.name` (store name in emails) |
+| 5 | `20261128150000_storefront_quote_source` | 3 | Data only: quotes made from a storefront request get source WIDGET; only touches quotes still on PORTAL |
+| 6 | `20261128160000_quote_draft_layout` | 3 | New nullable `Quote.adjustments`, `buyerMessage`, `internalNote` |
+| 7 | `20261128170000_quote_ordering_claim` | 3 | New nullable `Quote.orderingSince` |
+
+Then, once, after the deploy (safe to repeat): turn open storefront requests from
+known buyers into quotes.
+
+```
+fly ssh console -C "npx tsx scripts/backfill-requests-to-quotes.mts"
+```
+
+Email needs `MANNON_MAIL_FROM` and the `POSTMARK_SERVER_TOKEN` secret (section 7);
+scheduled jobs need `CRON_SECRET` (section 9.3).
 
 ### 9.2 Billing
 
