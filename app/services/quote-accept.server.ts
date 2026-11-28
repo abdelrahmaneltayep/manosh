@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { readAdjustments } from "../lib/quote-adjustments";
 import prisma from "../db.server";
 import { ensureBuyerCompanyLink } from "./buyer-link.server";
 import { appendEvent } from "./events.server";
@@ -137,6 +138,8 @@ export async function acceptAndOrder(
       quantity: line.quantity,
       price: line.price.toString(),
     })),
+    // The discount, shipping and custom items the buyer was sent.
+    adjustments: readAdjustments(quote.adjustments),
   });
 
   // Shopify is the source of truth for money — preview first (we need the total

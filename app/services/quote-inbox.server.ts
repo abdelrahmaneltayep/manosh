@@ -154,6 +154,9 @@ export function parseCounterForm(form: FormData): ParseCounterResult {
       if (!MONEY.test(price)) {
         return { ok: false, error: "Enter a valid price for each line (e.g. 9.50)." };
       }
+      if (Number(price) <= 0) {
+        return { ok: false, error: "Enter a price above 0 for each line. To leave an item out, remove it from the quote." };
+      }
       line.price = price;
     }
 

@@ -257,10 +257,11 @@ export interface CounterLineInput {
 /** SUBMITTED → COUNTERED. Optionally revise line prices/quantities. */
 export async function counterQuote(
   quoteId: string,
-  options: { lines?: CounterLineInput[]; now?: Date } = {},
+  options: { lines?: CounterLineInput[]; now?: Date; data?: Prisma.QuoteUpdateInput } = {},
 ): Promise<QuoteWithLines> {
   return runTransition(quoteId, "COUNTERED", {
     now: options.now,
+    data: options.data,
     apply: async (tx, quote) => {
       for (const line of options.lines ?? []) {
         // Only touch lines that belong to this quote.

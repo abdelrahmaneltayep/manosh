@@ -32,17 +32,32 @@ export const MOCK_COMPANY = {
 const money = (n) => (Math.round(n * 100) / 100).toFixed(2);
 const set = (n) => ({ shopMoney: { amount: money(n), currencyCode: CURRENCY }, presentmentMoney: { amount: money(n), currencyCode: CURRENCY } });
 
+// Plays Shopify's draftOrderCalculate: line prices (override, custom item or
+// catalog), the order discount, the shipping line, then tax. Test fixture only;
+// the app itself never adds anything up.
 function totalsFor(input) {
-  const subtotal = (input?.lineItems || []).reduce((s, l) => {
-    const unit = Number(l.priceOverride?.amount ?? l.originalUnitPrice ?? variants.get(l.variantId)?.price ?? 0);
+  const lines = (input?.lineItems || []).reduce((s, l) => {
+    const unit = Number(l.priceOverride?.amount ?? l.originalUnitPriceWithCurrency?.amount ?? l.originalUnitPrice ?? variants.get(l.variantId)?.price ?? 0);
     return s + unit * Number(l.quantity || 0);
   }, 0);
+  const d = input?.appliedDiscount;
+  const discount = d ? Math.min(lines, d.valueType === "PERCENTAGE" ? (lines * Number(d.value)) / 100 : Number(d.value)) : 0;
+  const subtotal = lines - discount;
+  const shipping = Number(input?.shippingLine?.priceWithCurrency?.amount ?? 0);
   const tax = input?.taxExempt ? 0 : subtotal * TAX_RATE;
-  return { subtotalPriceSet: set(subtotal), totalTaxSet: set(tax), totalPriceSet: set(subtotal + tax) };
+  return {
+    subtotalPriceSet: set(subtotal),
+    totalTaxSet: set(tax),
+    totalPriceSet: set(subtotal + shipping + tax),
+    totalDiscountsSet: set(discount),
+    totalShippingPriceSet: set(shipping),
+  };
 }
 
 function lineErrors(input) {
-  return (input?.lineItems || []).filter((l) => !variants.has(l.variantId)).map((l) => ({ field: ["lineItems", "variantId"], message: `Variant ${l.variantId} does not exist` }));
+  return (input?.lineItems || [])
+    .filter((l) => (l.variantId ? !variants.has(l.variantId) : !l.title))
+    .map((l) => ({ field: ["lineItems", l.variantId ? "variantId" : "title"], message: l.variantId ? `Variant ${l.variantId} does not exist` : "Custom items need a title" }));
 }
 
 export function createMockShopify() {
@@ -89,7 +104,7 @@ export function createMockShopify() {
       const id = `gid://shopify/DraftOrder/${nextDraft++}`;
       const d = { id, name: `#D${nextDraft - 5001}`, input: v.input, ...totalsFor(v.input), status: "OPEN", createdAt: new Date().toISOString() };
       drafts.set(id, d);
-      return { draftOrderCreate: { draftOrder: { id, subtotalPriceSet: d.subtotalPriceSet, totalTaxSet: d.totalTaxSet, totalPriceSet: d.totalPriceSet }, userErrors: [] } };
+      return { draftOrderCreate: { draftOrder: { id, subtotalPriceSet: d.subtotalPriceSet, totalTaxSet: d.totalTaxSet, totalPriceSet: d.totalPriceSet, totalDiscountsSet: d.totalDiscountsSet, totalShippingPriceSet: d.totalShippingPriceSet }, userErrors: [] } };
     },
     MannonDraftOrderInvoiceSend: (v) => ({ draftOrderInvoiceSend: drafts.has(v.id) ? { draftOrder: { id: v.id }, userErrors: [] } : { draftOrder: null, userErrors: [{ field: ["id"], message: "Draft order not found" }] } }),
     MannonDemoCompany: () => ({ companies: { nodes: [{ id: MOCK_COMPANY.id, name: MOCK_COMPANY.name, locations: { nodes: [{ id: MOCK_COMPANY.locationId }] }, contacts: { nodes: [{ id: MOCK_COMPANY.contactId }] } }] } }),

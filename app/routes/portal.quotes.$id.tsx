@@ -1,4 +1,5 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { readAdjustments } from "../lib/quote-adjustments";
 import { redirect } from "@remix-run/node";
 import { Form, Link, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
 import { useState } from "react";
@@ -35,6 +36,8 @@ interface TotalsSnapshot {
   totalTax: string;
   total: string;
   currencyCode: string;
+  totalDiscounts?: string;
+  totalShipping?: string;
 }
 
 /** The current member's quote scoped to their COMPANY (any member can view). */
@@ -111,6 +114,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       expiresAt: quote.expiresAt,
       poReference: quote.poReference,
       totals: quote.totalsSnapshot as TotalsSnapshot | null,
+      // What the store added (Shopify calculated the amounts in the totals).
+      adjustments: readAdjustments(quote.adjustments),
+      // Shown once the quote is sent; before that it's the merchant's draft.
+      message: quote.status === "SUBMITTED" ? null : quote.buyerMessage,
       lines: quote.lines.map((line) => ({
         id: line.id,
         title: line.title,
@@ -325,7 +332,24 @@ export default function BuyerQuote() {
             </span>
           </li>
         ))}
+        {quote.adjustments.customItems.map((item, i) => (
+          <li key={`custom-${i}`} className="catalog-row">
+            <div className="catalog-info">
+              <span className="catalog-title">{item.title}</span>
+            </div>
+            <span className="muted">
+              {item.quantity} × {item.price}
+            </span>
+          </li>
+        ))}
       </ul>
+
+      {quote.message && (
+        <div className="portal-note" role="note">
+          <p className="field-label">Message from your supplier</p>
+          <p style={{ whiteSpace: "pre-wrap" }}>{quote.message}</p>
+        </div>
+      )}
 
       {quote.status === "COUNTERED" && (
         <Form method="post" className="accept-form">
@@ -391,6 +415,18 @@ export default function BuyerQuote() {
             <span>Subtotal</span>
             <span>{formatMoney(quote.totals.subtotal, quote.totals.currencyCode)}</span>
           </div>
+          {quote.totals.totalDiscounts && (
+            <div className="totals-row">
+              <span>{quote.adjustments.discount?.title || "Discount"}</span>
+              <span>−{formatMoney(quote.totals.totalDiscounts, quote.totals.currencyCode)}</span>
+            </div>
+          )}
+          {quote.totals.totalShipping && (
+            <div className="totals-row">
+              <span>{quote.adjustments.shipping?.title || "Shipping"}</span>
+              <span>{formatMoney(quote.totals.totalShipping, quote.totals.currencyCode)}</span>
+            </div>
+          )}
           <div className="totals-row">
             <span>Tax</span>
             <span>{formatMoney(quote.totals.totalTax, quote.totals.currencyCode)}</span>
@@ -399,6 +435,9 @@ export default function BuyerQuote() {
             <span>Total</span>
             <span>{formatMoney(quote.totals.total, quote.totals.currencyCode)}</span>
           </div>
+          {quote.status === "COUNTERED" && (
+            <p className="muted">Calculated by Shopify when this quote was sent. Shopify confirms the final total when you accept.</p>
+          )}
         </div>
       )}
 

@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { readAdjustments } from "../lib/quote-adjustments";
 import prisma from "../db.server";
 import { ensureBuyerCompanyLink } from "./buyer-link.server";
 import { appendEvent } from "./events.server";
@@ -74,6 +75,8 @@ export async function convertQuoteToOrder(
       quantity: line.quantity,
       price: line.price.toString(),
     })),
+    // The discount, shipping and custom items the buyer was sent.
+    adjustments: readAdjustments(quote.adjustments),
   });
 
   // Shopify FIRST (source of truth for money) — then mutate quote state.

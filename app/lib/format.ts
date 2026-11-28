@@ -17,6 +17,21 @@ export function formatDate(value: Date | string): string {
   return DATE_FMT.format(new Date(value));
 }
 
+const DATE_TIME_FMT = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  timeZone: DISPLAY_TIME_ZONE,
+  timeZoneName: "short",
+});
+
+/** Date and time for timelines, e.g. "Nov 28, 2026, 3:04 PM UTC". */
+export function formatDateTime(value: Date | string): string {
+  return DATE_TIME_FMT.format(new Date(value));
+}
+
 // Money is formatted for DISPLAY only here (Number() is fine for rendering; it
 // is never used to compute or sum totals — see dashboard.server.ts for exact
 // decimal addition). Fixed locale keeps server/client output identical.

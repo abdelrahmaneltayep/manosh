@@ -172,6 +172,13 @@ describe.skipIf(!hasDb)("Phase 2 email", () => {
     for (const m of reminders) expect(m.replyTo).toBe("owner@store.example");
   });
 
+  it("the merchant's message goes with the quote", async () => {
+    const { quote } = await seed();
+    await prisma.quote.update({ where: { id: quote.id }, data: { buyerMessage: "Prices hold until Friday." } });
+    await emailQuoteSent(quote.id, BASE_URL);
+    expect(outbox[0].text).toContain("Message from Mail Supply Co.:\nPrices hold until Friday.");
+  });
+
   it("tells the buyer when the order is placed", async () => {
     const { quote } = await seed();
     await emailQuoteOrdered(quote.id, BASE_URL);

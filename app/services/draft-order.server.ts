@@ -10,6 +10,8 @@
  * calculated-order price fields against the current API via the Shopify Dev MCP.
  */
 
+import { adjustmentDraftFields, type QuoteAdjustments } from "../lib/quote-adjustments";
+
 export interface AdminGraphqlClient {
   graphql: (
     query: string,
@@ -22,6 +24,9 @@ export interface DraftOrderTotals {
   totalTax: string;
   total: string;
   currencyCode: string;
+  /** Shopify's total discounts and shipping, when the quote has them. */
+  totalDiscounts?: string;
+  totalShipping?: string;
 }
 
 export interface PurchasingEntityRef {
@@ -45,11 +50,15 @@ export interface DraftOrderInput {
       companyContactId?: string;
     };
   };
-  lineItems: Array<{
-    variantId: string;
-    quantity: number;
-    priceOverride: { amount: string; currencyCode: string };
-  }>;
+  lineItems: Array<
+    | { variantId: string; quantity: number; priceOverride: { amount: string; currencyCode: string } }
+    // A custom item (no product): Shopify takes a title and an original unit price.
+    | { title: string; quantity: number; originalUnitPriceWithCurrency: { amount: string; currencyCode: string } }
+  >;
+  /** An order discount; Shopify calculates the amount. */
+  appliedDiscount?: { valueType: "PERCENTAGE" | "FIXED_AMOUNT"; value: number; title?: string };
+  /** A shipping line at the price the merchant set. */
+  shippingLine?: { title: string; priceWithCurrency: { amount: string; currencyCode: string } };
   poNumber?: string;
   /**
    * Native payment terms. Shopify needs a schedule with the template: NET
@@ -100,6 +109,8 @@ export function buildDraftOrderInput(params: {
   now?: Date;
   /** F14: pass true for a verified-exempt buyer — Shopify removes tax (we never compute it). */
   taxExempt?: boolean;
+  /** Discount, shipping and custom items from the quote (Shopify calculates them). */
+  adjustments?: QuoteAdjustments | null;
 }): DraftOrderInput {
   const input: DraftOrderInput = {
     purchasingEntity: {
@@ -118,6 +129,12 @@ export function buildDraftOrderInput(params: {
     })),
     presentmentCurrencyCode: params.currencyCode,
   };
+  if (params.adjustments) {
+    const extra = adjustmentDraftFields(params.adjustments, params.currencyCode);
+    input.lineItems.push(...extra.customLineItems);
+    if (extra.appliedDiscount) input.appliedDiscount = extra.appliedDiscount;
+    if (extra.shippingLine) input.shippingLine = extra.shippingLine;
+  }
   if (params.poReference) {
     input.poNumber = params.poReference;
   }
@@ -166,6 +183,8 @@ interface CalculatedShape {
   subtotalPriceSet?: MoneySet;
   totalTaxSet?: MoneySet;
   totalPriceSet?: MoneySet;
+  totalDiscountsSet?: MoneySet;
+  totalShippingPriceSet?: MoneySet;
 }
 
 /**
@@ -178,11 +197,15 @@ function readTotals(node: CalculatedShape): DraftOrderTotals {
   const subtotal = pick(node.subtotalPriceSet);
   const tax = pick(node.totalTaxSet);
   const total = pick(node.totalPriceSet);
+  const discounts = pick(node.totalDiscountsSet)?.amount;
+  const shipping = pick(node.totalShippingPriceSet)?.amount;
   return {
     subtotal: subtotal?.amount ?? "0.00",
     totalTax: tax?.amount ?? "0.00",
     total: total?.amount ?? "0.00",
     currencyCode: total?.currencyCode ?? subtotal?.currencyCode ?? "USD",
+    ...(discounts && Number(discounts) !== 0 ? { totalDiscounts: discounts } : {}),
+    ...(shipping && Number(shipping) !== 0 ? { totalShipping: shipping } : {}),
   };
 }
 
@@ -230,6 +253,8 @@ const DRAFT_ORDER_CALCULATE = `#graphql
         subtotalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
         totalTaxSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
         totalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalDiscountsSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalShippingPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
       }
       userErrors { field message }
     }
@@ -244,6 +269,8 @@ const DRAFT_ORDER_CREATE = `#graphql
         subtotalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
         totalTaxSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
         totalPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalDiscountsSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
+        totalShippingPriceSet { shopMoney { amount currencyCode } presentmentMoney { amount currencyCode } }
       }
       userErrors { field message }
     }

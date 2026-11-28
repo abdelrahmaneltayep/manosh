@@ -8,6 +8,7 @@ import {
   type DraftOrderTotals,
 } from "./draft-order.server";
 import type { CounterLineInput } from "./quote.server";
+import { readAdjustments, type QuoteAdjustments } from "../lib/quote-adjustments";
 
 /**
  * Shopify's subtotal, tax and total for a quote, for the merchant's quote page
@@ -27,6 +28,8 @@ export async function previewQuoteTotals(params: {
   currencyCode: string;
   /** Unsaved counter edits (from the counter form) to price instead of the stored lines. */
   edits?: CounterLineInput[];
+  /** Unsaved discount / shipping / custom items to price instead of the stored ones. */
+  adjustments?: QuoteAdjustments;
 }): Promise<QuoteTotalsPreview> {
   const quote = await prisma.quote.findFirst({
     where: { id: params.quoteId, company: { shop: { shopifyDomain: params.shopDomain } } },
@@ -35,7 +38,7 @@ export async function previewQuoteTotals(params: {
   if (!quote) return { ok: false, message: "This quote couldn’t be found." };
 
   const snapshot = readSnapshot(quote.totalsSnapshot);
-  if (snapshot && !params.edits) return { ok: true, totals: snapshot, source: "snapshot" };
+  if (snapshot && !params.edits && !params.adjustments) return { ok: true, totals: snapshot, source: "snapshot" };
 
   if (quote.lines.length === 0) return { ok: false, message: "This quote has no line items." };
   // The native purchasing entity, read from Shopify when the buyer isn't linked yet.
@@ -52,6 +55,7 @@ export async function previewQuoteTotals(params: {
       quantity: edits.get(line.id)?.quantity ?? line.quantity,
       price: edits.get(line.id)?.price ?? line.price.toString(),
     })),
+    adjustments: params.adjustments ?? readAdjustments(quote.adjustments),
   });
 
   try {
@@ -72,5 +76,12 @@ export function readSnapshot(value: unknown): DraftOrderTotals | null {
   const s = value as Partial<DraftOrderTotals> | null | undefined;
   if (!s || typeof s !== "object") return null;
   if (typeof s.subtotal !== "string" || typeof s.totalTax !== "string" || typeof s.total !== "string") return null;
-  return { subtotal: s.subtotal, totalTax: s.totalTax, total: s.total, currencyCode: s.currencyCode || "USD" };
+  return {
+    subtotal: s.subtotal,
+    totalTax: s.totalTax,
+    total: s.total,
+    currencyCode: s.currencyCode || "USD",
+    ...(typeof s.totalDiscounts === "string" ? { totalDiscounts: s.totalDiscounts } : {}),
+    ...(typeof s.totalShipping === "string" ? { totalShipping: s.totalShipping } : {}),
+  };
 }

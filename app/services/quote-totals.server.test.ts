@@ -7,6 +7,12 @@ import { submitQuote } from "./quote.server";
 const hasDb = Boolean(process.env.DATABASE_URL);
 
 describe("readSnapshot (pure)", () => {
+  it("keeps Shopify's discount and shipping totals", () => {
+    expect(readSnapshot({ subtotal: "250.20", totalTax: "25.02", total: "290.22", currencyCode: "USD", totalDiscounts: "27.80", totalShipping: "15.00" })).toEqual({
+      subtotal: "250.20", totalTax: "25.02", total: "290.22", currencyCode: "USD", totalDiscounts: "27.80", totalShipping: "15.00",
+    });
+  });
+
   it("reads a complete Shopify snapshot", () => {
     expect(readSnapshot({ subtotal: "190.00", totalTax: "15.20", total: "205.20", currencyCode: "CAD" })).toEqual({
       subtotal: "190.00",

@@ -4,7 +4,6 @@ import { shopNameFor } from "../services/shop-name.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import {
-  Form,
   useActionData,
   useFetcher,
   useLoaderData,
@@ -19,6 +18,7 @@ import {
   Text,
   Badge,
   TextField,
+  Select,
   Button,
   Banner,
   Box,
@@ -33,7 +33,6 @@ import { DisclosureCard } from "../components/DisclosureCard";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
-  counterQuoteForShop,
   declineQuoteForShop,
   getQuoteDetailForShop,
   parseCounterForm,
@@ -71,6 +70,9 @@ import { duplicateQuote, QuoteNotFoundForShopError } from "../services/quote-dup
 import { emailDeliveryEnabled, lastDeliveryFor, sendEmail } from "../services/mailer.server";
 import { appendEvent } from "../services/events.server";
 import { getCatalog } from "../services/catalog.server";
+import { quoteTimelineSources, saveInternalNote, sendQuoteForShop } from "../services/quote-send.server";
+import { buildTimeline } from "../lib/quote-timeline";
+import { parseAdjustments, readAdjustments, sendBlockedReason, sendLabel, type QuoteAdjustments } from "../lib/quote-adjustments";
 import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
 import {
   generateSuggestionForLine,
@@ -81,7 +83,7 @@ import {
   type SuggestionView,
 } from "../services/quote-ai.server";
 import { quoteStatusBadge } from "../lib/quote-status";
-import { formatDate, formatMoney } from "../lib/format";
+import { formatDate, formatDateTime, formatMoney } from "../lib/format";
 import type { loader as totalsLoader } from "./app.quote-totals.$id";
 import { upgradeUrl } from "../lib/upgrade";
 import { TEMPLATE_INFO } from "../lib/notification-templates";
@@ -104,6 +106,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   // The last email Mannon tried to send about this quote, so a failure shows here.
   const shopRow = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { id: true } });
   const lastEmail = shopRow ? await lastDeliveryFor(shopRow.id, "Quote", quote.id) : null;
+  const timelineSources = shopRow ? await quoteTimelineSources(shopRow.id, quote.id) : { events: [], emails: [] };
+  const timeline = buildTimeline(timelineSources.events, timelineSources.emails);
   // Dual-mode gating: Growth/Scale included, Starter on a one-time 7-day trial,
   // Free/expired locked. Read-only here — the trial is only *started* in the
   // action, on first real use (never on a page view).
@@ -132,8 +136,15 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       ? { ...lastEmail, label: TEMPLATE_INFO[lastEmail.template ?? ""]?.label ?? "Email", createdAt: lastEmail.createdAt.toISOString() }
       : null,
     suggestions,
+    timeline,
+    // Buyers can't make their own offer on a quote yet, so the reply is "Send quote".
+    sendLabel: sendLabel({ buyerOffered: false }),
+    sendBlocked: sendBlockedReason({ status: quote.status, expiresAt: quote.expiresAt }),
     quote: {
       id: quote.id,
+      adjustments: readAdjustments(quote.adjustments),
+      buyerMessage: quote.buyerMessage,
+      internalNote: quote.internalNote,
       status: quote.status,
       companyName: quote.company.name,
       buyerEmail: quote.buyer.email,
@@ -312,6 +323,13 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
   }
 
+  if (intent === "note") {
+    const saved = await saveInternalNote(session.shop, quoteId, String(form.get("internalNote") ?? ""));
+    return saved
+      ? { ok: true as const, kind: "note" as const, message: "Note saved." }
+      : { ok: false as const, kind: "note" as const, error: "This quote couldn’t be found." };
+  }
+
   try {
     if (intent === "decline") {
       await declineQuoteForShop(session.shop, quoteId);
@@ -323,7 +341,26 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       if (!parsed.ok) {
         return { ok: false as const, kind: "quote" as const, error: parsed.error };
       }
-      await counterQuoteForShop(session.shop, quoteId, parsed.lines);
+      const adjusted = parseAdjustments(form);
+      if (!adjusted.ok) {
+        return { ok: false as const, kind: "quote" as const, error: adjusted.error };
+      }
+      // Shopify recalculates the totals for exactly what's being sent; if it
+      // can't, nothing is saved or sent.
+      const catalog = await getCatalog(session.shop);
+      const sent = await sendQuoteForShop({
+        shopDomain: session.shop,
+        quoteId,
+        admin,
+        currencyCode: catalog[0]?.currencyCode ?? "USD",
+        lines: parsed.lines,
+        adjustments: adjusted.adjustments,
+        buyerMessage: String(form.get("buyerMessage") ?? "").trim().slice(0, 2000) || null,
+      });
+      if (!sent.ok) {
+        if (sent.reason === "not-found") throw new Response("Quote not found", { status: 404 });
+        return { ok: false as const, kind: "quote" as const, error: sent.error };
+      }
       // Email the buyer the quote with a sign-in link. When it doesn't go out
       // (no sender connected, or the send failed) the merchant gets the link
       // to copy, and a failure is said plainly.
@@ -418,7 +455,7 @@ function UpsellBundle({ quoteId }: { quoteId: string }) {
 }
 
 export default function QuoteDetail() {
-  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions, replyLock, lastEmail } = useLoaderData<typeof loader>();
+  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions, replyLock, lastEmail, timeline, sendLabel: sendText, sendBlocked } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const aiFetcher = useFetcher<typeof action>();
@@ -440,6 +477,50 @@ export default function QuoteDetail() {
 
   const setLine = (id: string, field: "priceInput" | "quantityInput", value: string) =>
     setLines((prev) => prev.map((l) => (l.id === id ? { ...l, [field]: value } : l)));
+
+  // Draft-order layout: discount, shipping, custom items and the buyer message,
+  // typed here and sent with the quote. Shopify calculates every amount.
+  const stored = quote.adjustments as QuoteAdjustments;
+  const [discount, setDiscount] = useState(() => ({
+    open: Boolean(stored.discount),
+    type: stored.discount?.valueType ?? "PERCENTAGE",
+    value: stored.discount?.value ?? "",
+    title: stored.discount?.title ?? "",
+  }));
+  const [shipping, setShipping] = useState(() => ({
+    open: Boolean(stored.shipping),
+    title: stored.shipping?.title ?? "Shipping",
+    price: stored.shipping?.price ?? "",
+  }));
+  const [customItems, setCustomItems] = useState(() =>
+    stored.customItems.map((c, i) => ({ key: i, title: c.title, quantity: String(c.quantity), price: c.price })),
+  );
+  const [buyerMessage, setBuyerMessage] = useState(quote.buyerMessage ?? "");
+  const nextKey = () => customItems.reduce((m, c) => Math.max(m, c.key), -1) + 1;
+  const setCustom = (key: number, field: "title" | "quantity" | "price", value: string) =>
+    setCustomItems((prev) => prev.map((c) => (c.key === key ? { ...c, [field]: value } : c)));
+  /** The form fields Shopify prices and Send submits (same names as the parsers). */
+  const quoteFields = (): Array<[string, string]> => {
+    const f: Array<[string, string]> = [];
+    for (const l of lines) {
+      f.push(["lineId", l.id], [`price_${l.id}`, l.priceInput], [`quantity_${l.id}`, l.quantityInput]);
+    }
+    if (discount.open && discount.value.trim()) {
+      f.push(["discountType", discount.type], ["discountValue", discount.value], ["discountTitle", discount.title]);
+    }
+    if (shipping.open) f.push(["shippingTitle", shipping.title], ["shippingPrice", shipping.price]);
+    customItems.forEach((c, i) => f.push([`customTitle_${i}`, c.title], [`customQuantity_${i}`, c.quantity], [`customPrice_${i}`, c.price]));
+    return f;
+  };
+  const sendQuote = () => {
+    const fd = new FormData();
+    fd.set("intent", "counter");
+    for (const [k, v] of quoteFields()) fd.append(k, v);
+    fd.set("buyerMessage", buyerMessage);
+    submit(fd, { method: "post" });
+  };
+  const noteFetcher = useFetcher<typeof action>();
+  const [note, setNote] = useState(quote.internalNote ?? "");
 
   const quoteAction = actionData?.kind === "quote" ? actionData : null;
   const aiActionError =
@@ -605,13 +686,12 @@ export default function QuoteDetail() {
                   {showAi && access.allowed && !hasAnySuggestion && (
                     <Text as="p" tone="subdued" variant="bodySm">
                       Change any price or quantity, or use ✦ Draft with Claude on a line for a
-                      suggested price and message. Nothing is sent until you click Send counter.
+                      suggested price. Nothing is sent until you click {sendText}.
                     </Text>
                   )}
 
                   {isSubmitted ? (
-                    <Form method="post">
-                      <input type="hidden" name="intent" value="counter" />
+                    <div>
                       <BlockStack gap="400">
                         {lines.map((line) => {
                           const suggestion = suggestions[line.id];
@@ -687,9 +767,43 @@ export default function QuoteDetail() {
                           );
                         })}
 
+                        {customItems.map((c) => (
+                          <BlockStack key={`custom-${c.key}`} gap="200">
+                            <InlineStack gap="300" align="space-between" blockAlign="end" wrap>
+                              <Box minWidth="14rem">
+                                <TextField
+                                  label="Custom item"
+                                  value={c.title}
+                                  onChange={(v) => setCustom(c.key, "title", v)}
+                                  placeholder="e.g. Setup fee"
+                                  autoComplete="off"
+                                />
+                              </Box>
+                              <Box minWidth="7rem">
+                                <TextField label="Quantity" type="number" value={c.quantity} onChange={(v) => setCustom(c.key, "quantity", v)} min={1} autoComplete="off" />
+                              </Box>
+                              <Box minWidth="9rem">
+                                <TextField label="Unit price" type="number" value={c.price} onChange={(v) => setCustom(c.key, "price", v)} min={0.01} step={0.01} autoComplete="off" />
+                              </Box>
+                              <Button
+                                variant="plain"
+                                tone="critical"
+                                accessibilityLabel={`Remove custom item ${c.title || ""}`.trim()}
+                                onClick={() => setCustomItems((prev) => prev.filter((x) => x.key !== c.key))}
+                              >
+                                Remove
+                              </Button>
+                            </InlineStack>
+                            <Divider />
+                          </BlockStack>
+                        ))}
+
                         <InlineStack gap="200">
-                          <Button variant="primary" submit loading={submitting} disabled={Boolean(replyLock)}>
-                            Send counter
+                          <Button
+                            onClick={() => setCustomItems((prev) => [...prev, { key: nextKey(), title: "", quantity: "1", price: "" }])}
+                            disabled={customItems.length >= 20}
+                          >
+                            Add custom item
                           </Button>
                           {showAi && access.allowed && (
                             <Button
@@ -702,7 +816,7 @@ export default function QuoteDetail() {
                           )}
                         </InlineStack>
                       </BlockStack>
-                    </Form>
+                    </div>
                   ) : (
                     <BlockStack gap="300">
                       {lines.map((line) => (
@@ -722,10 +836,33 @@ export default function QuoteDetail() {
                           </Text>
                         </InlineStack>
                       ))}
+                      {stored.customItems.map((c, i) => (
+                        <InlineStack key={`custom-${i}`} align="space-between" wrap>
+                          <Box minWidth="14rem">
+                            <Text as="p" fontWeight="semibold">
+                              {c.title}
+                            </Text>
+                            <Text as="p" tone="subdued" variant="bodySm">
+                              Custom item
+                            </Text>
+                          </Box>
+                          <Text as="span" numeric>
+                            {c.quantity} × {money(c.price)}
+                          </Text>
+                        </InlineStack>
+                      ))}
                       {countered && (
                         <Text as="p" tone="subdued">
-                          You’ve countered this quote. It’s now with the buyer to accept.
+                          You’ve sent this quote. It’s now with the buyer to accept.
                         </Text>
+                      )}
+                      {quote.buyerMessage && (
+                        <Box paddingBlockStart="100">
+                          <Text as="p" tone="subdued" variant="bodySm">
+                            Message sent to the buyer
+                          </Text>
+                          <Text as="p">{quote.buyerMessage}</Text>
+                        </Box>
                       )}
                     </BlockStack>
                   )}
@@ -735,8 +872,112 @@ export default function QuoteDetail() {
               <ShopifyTotals
                 quoteId={quote.id}
                 ordered={quote.status === "ORDERED"}
-                editable={!isTerminal && !countered}
-                lines={lines.map((l) => ({ id: l.id, price: l.priceInput, quantity: l.quantityInput }))}
+                editable={isSubmitted}
+                fields={quoteFields}
+                editor={
+                  isSubmitted ? (
+                    <BlockStack gap="300">
+                      {discount.open ? (
+                        <InlineStack gap="300" blockAlign="end" wrap>
+                          <Box minWidth="9rem">
+                            <Select
+                              label="Discount type"
+                              options={[
+                                { label: "Percentage", value: "PERCENTAGE" },
+                                { label: "Amount", value: "FIXED_AMOUNT" },
+                              ]}
+                              value={discount.type}
+                              onChange={(v) => setDiscount((d) => ({ ...d, type: v as "PERCENTAGE" | "FIXED_AMOUNT" }))}
+                            />
+                          </Box>
+                          <Box minWidth="7rem">
+                            <TextField
+                              label={discount.type === "PERCENTAGE" ? "Discount (%)" : "Discount amount"}
+                              type="number"
+                              value={discount.value}
+                              onChange={(v) => setDiscount((d) => ({ ...d, value: v }))}
+                              min={0.01}
+                              step={0.01}
+                              autoComplete="off"
+                            />
+                          </Box>
+                          <Box minWidth="12rem">
+                            <TextField
+                              label="Reason (shown to the buyer)"
+                              value={discount.title}
+                              onChange={(v) => setDiscount((d) => ({ ...d, title: v }))}
+                              placeholder="e.g. Volume discount"
+                              autoComplete="off"
+                            />
+                          </Box>
+                          <Button variant="plain" tone="critical" onClick={() => setDiscount({ open: false, type: "PERCENTAGE", value: "", title: "" })}>
+                            Remove discount
+                          </Button>
+                        </InlineStack>
+                      ) : null}
+                      {shipping.open ? (
+                        <InlineStack gap="300" blockAlign="end" wrap>
+                          <Box minWidth="12rem">
+                            <TextField label="Shipping name" value={shipping.title} onChange={(v) => setShipping((x) => ({ ...x, title: v }))} autoComplete="off" />
+                          </Box>
+                          <Box minWidth="7rem">
+                            <TextField
+                              label="Shipping price"
+                              type="number"
+                              value={shipping.price}
+                              onChange={(v) => setShipping((x) => ({ ...x, price: v }))}
+                              min={0}
+                              step={0.01}
+                              helpText="0 for free shipping"
+                              autoComplete="off"
+                            />
+                          </Box>
+                          <Button variant="plain" tone="critical" onClick={() => setShipping({ open: false, title: "Shipping", price: "" })}>
+                            Remove shipping
+                          </Button>
+                        </InlineStack>
+                      ) : null}
+                      <InlineStack gap="200">
+                        {!discount.open && <Button onClick={() => setDiscount((d) => ({ ...d, open: true }))}>Add discount</Button>}
+                        {!shipping.open && <Button onClick={() => setShipping((x) => ({ ...x, open: true }))}>Add shipping</Button>}
+                      </InlineStack>
+                    </BlockStack>
+                  ) : null
+                }
+                footer={
+                  isSubmitted ? (
+                    <BlockStack gap="300">
+                      <Divider />
+                      <TextField
+                        label="Message to buyer"
+                        value={buyerMessage}
+                        onChange={setBuyerMessage}
+                        multiline={3}
+                        maxLength={2000}
+                        helpText="Sent with the quote. Optional."
+                        autoComplete="off"
+                      />
+                      {sendBlocked && (
+                        <Text as="p" tone="critical">
+                          {sendBlocked}
+                        </Text>
+                      )}
+                      <InlineStack align="end">
+                        <Button
+                          variant="primary"
+                          onClick={sendQuote}
+                          loading={submitting && navigation.formData?.get("intent") === "counter"}
+                          disabled={Boolean(replyLock) || Boolean(sendBlocked) || submitting}
+                        >
+                          {sendText}
+                        </Button>
+                      </InlineStack>
+                      <Text as="p" tone="subdued" variant="bodySm">
+                        Shopify recalculates the totals when you send. If it can’t, nothing is sent.
+                      </Text>
+                    </BlockStack>
+                  ) : null
+                }
               />
 
               {canConvert && (
@@ -756,6 +997,26 @@ export default function QuoteDetail() {
                   </BlockStack>
                 </Card>
               )}
+
+              <Card>
+                <BlockStack gap="300">
+                  <Text as="h2" variant="headingMd">Timeline</Text>
+                  {timeline.length === 0 ? (
+                    <Text as="p" tone="subdued">Nothing has happened on this quote yet.</Text>
+                  ) : (
+                    <BlockStack as="ul" gap="200">
+                      {timeline.map((t, i) => (
+                        <Box as="li" key={`${t.at}-${i}`}>
+                          <InlineStack align="space-between" gap="300" wrap={false}>
+                            <Text as="span" tone={t.tone}>{t.text}</Text>
+                            <Text as="span" tone="subdued" variant="bodySm">{formatDateTime(t.at)}</Text>
+                          </InlineStack>
+                        </Box>
+                      ))}
+                    </BlockStack>
+                  )}
+                </BlockStack>
+              </Card>
 
               {/* AI-14 add-ons: useful, not the job — one click away. */}
               {showAi && access.allowed && (
@@ -809,6 +1070,38 @@ export default function QuoteDetail() {
                       Internal note: a Claude draft was used on this quote. Buyers never see this.
                     </Text>
                   )}
+                </BlockStack>
+              </Card>
+              <Card>
+                <BlockStack gap="200">
+                  <Text as="h2" variant="headingMd">Notes</Text>
+                  <TextField
+                    label="Internal note"
+                    labelHidden
+                    value={note}
+                    onChange={setNote}
+                    multiline={3}
+                    maxLength={5000}
+                    placeholder="Only your team sees this."
+                    autoComplete="off"
+                  />
+                  <InlineStack align="space-between" blockAlign="center">
+                    <Text as="span" tone="subdued" variant="bodySm">
+                      {noteFetcher.data && noteFetcher.data.kind === "note"
+                        ? noteFetcher.data.ok
+                          ? "Saved."
+                          : noteFetcher.data.error
+                        : "Never shown to the buyer."}
+                    </Text>
+                    <Button
+                      size="slim"
+                      onClick={() => noteFetcher.submit({ intent: "note", internalNote: note }, { method: "post" })}
+                      loading={noteFetcher.state !== "idle"}
+                      disabled={note === (quote.internalNote ?? "") && !noteFetcher.data}
+                    >
+                      Save note
+                    </Button>
+                  </InlineStack>
                 </BlockStack>
               </Card>
               {quoteOpsEnabled && (
@@ -915,12 +1208,17 @@ function ShopifyTotals({
   quoteId,
   ordered,
   editable,
-  lines,
+  fields,
+  editor,
+  footer,
 }: {
   quoteId: string;
   ordered: boolean;
   editable: boolean;
-  lines: Array<{ id: string; price: string; quantity: string }>;
+  /** The form's current lines and adjustments, priced by Shopify on Recalculate. */
+  fields: () => Array<[string, string]>;
+  editor?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   const fetcher = useFetcher<typeof totalsLoader>();
   const [previewingEdits, setPreviewingEdits] = useState(false);
@@ -933,11 +1231,7 @@ function ShopifyTotals({
 
   const recalculate = () => {
     const qs = new URLSearchParams({ edits: "1" });
-    for (const line of lines) {
-      qs.append("lineId", line.id);
-      qs.set(`price_${line.id}`, line.price);
-      qs.set(`quantity_${line.id}`, line.quantity);
-    }
+    for (const [k, v] of fields()) qs.append(k, v);
     setPreviewingEdits(true);
     fetcher.load(`/app/quote-totals/${quoteId}?${qs.toString()}`);
   };
@@ -950,11 +1244,11 @@ function ShopifyTotals({
       <BlockStack gap="300">
         <InlineStack align="space-between" blockAlign="center">
           <Text as="h2" variant="headingMd">
-            Totals from Shopify
+            Payment
           </Text>
           {editable && (
             <Button size="slim" onClick={recalculate} loading={fetcher.state !== "idle" && previewingEdits}>
-              Recalculate with these prices
+              Recalculate
             </Button>
           )}
         </InlineStack>
@@ -971,6 +1265,18 @@ function ShopifyTotals({
                 <Text as="span">Subtotal</Text>
                 <Text as="span" numeric>{formatMoney(data.totals.subtotal, data.totals.currencyCode)}</Text>
               </InlineStack>
+              {data.totals.totalDiscounts && (
+                <InlineStack align="space-between">
+                  <Text as="span">Discount</Text>
+                  <Text as="span" numeric>{`−${formatMoney(data.totals.totalDiscounts, data.totals.currencyCode)}`}</Text>
+                </InlineStack>
+              )}
+              {data.totals.totalShipping && (
+                <InlineStack align="space-between">
+                  <Text as="span">Shipping</Text>
+                  <Text as="span" numeric>{formatMoney(data.totals.totalShipping, data.totals.currencyCode)}</Text>
+                </InlineStack>
+              )}
               <InlineStack align="space-between">
                 <Text as="span">Tax</Text>
                 <Text as="span" numeric>{formatMoney(data.totals.totalTax, data.totals.currencyCode)}</Text>
@@ -984,16 +1290,20 @@ function ShopifyTotals({
               </InlineStack>
               <Text as="p" tone="subdued" variant="bodySm">
                 {data.source === "snapshot"
-                  ? "Snapshot from Shopify when the order was created."
+                  ? ordered
+                    ? "Calculated by Shopify when the order was created."
+                    : "Calculated by Shopify when this quote was sent."
                   : previewingEdits
-                    ? "Calculated by Shopify for the prices above. Not saved until you send the counter."
+                    ? "Calculated by Shopify for what’s on this page. Not saved until you send."
                     : ordered
                       ? "Calculated by Shopify."
-                      : "Calculated by Shopify for this buyer’s company location. Shipping isn’t included."}
+                      : "Calculated by Shopify for this buyer’s company location."}
               </Text>
             </BlockStack>
           )}
         </div>
+        {editor}
+        {footer}
       </BlockStack>
     </Card>
   );

@@ -33,6 +33,7 @@ async function quoteContext(quoteId: string) {
     select: {
       id: true,
       expiresAt: true,
+      buyerMessage: true,
       buyer: { select: { id: true, email: true, name: true, localePreference: { select: { locale: true } } } },
       company: { select: { name: true, shop: { select: { id: true, shopifyDomain: true, emailTemplates: true } } } },
     },
@@ -51,13 +52,19 @@ async function sendToBuyer(
   const link = await issueBuyerQuoteLink(shop.shopifyDomain, quoteId, appUrl(baseUrl));
   const quoteUrl = link?.url ?? `${appUrl(baseUrl)}/portal/quotes/${quoteId}`;
   const locale = q.buyer.localePreference?.locale ?? "en";
-  const { subject, body } = renderTemplate(resolveTemplate(template, shop.emailTemplates, locale), {
+  const rendered = renderTemplate(resolveTemplate(template, shop.emailTemplates, locale), {
     buyerName: q.buyer.name ?? "there",
     shopName: await shopNameFor(shop.shopifyDomain),
     companyName: q.company.name,
     quoteUrl,
     expiresAt: q.expiresAt.toISOString().slice(0, 10),
   });
+  const subject = rendered.subject;
+  // The merchant's own message goes with the quote, as plain text (escaped when sent).
+  const body =
+    template === "quote_sent" && q.buyerMessage?.trim()
+      ? `${rendered.body}\n\nMessage from ${await shopNameFor(shop.shopifyDomain)}:\n${q.buyerMessage.trim()}`
+      : rendered.body;
   const result = await sendEmail(
     { ...(await storeSender(shop.shopifyDomain)), to: q.buyer.email, subject, html: body.replace(/\n/g, "<br>"), text: body, tag: template },
     { shopId: shop.id, template, entityType: "Quote", entityId: quoteId },

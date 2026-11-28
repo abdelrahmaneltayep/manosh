@@ -1159,6 +1159,9 @@ model Quote {
   draftOrderId   String? // gid://shopify/DraftOrder/... (set on accept)
   convertedOrderId String? // F25.2: gid set by the merchant one-click convert (mirrors Offer.convertedOrderId)
   totalsSnapshot Json? // exact draftOrderCalculate output
+  adjustments    Json? // Phase 3: order discount, shipping line, custom items as typed (Shopify calculates them)
+  buyerMessage   String? // Phase 3: message to the buyer, sent with the quote
+  internalNote   String? // Phase 3: merchant-only note, never shown to the buyer
   reminderState  Json? // F8: per-quote follow-up state ({ unsubscribed, nudgesSent, overrideCadence })
   placedByRepId  String? // F12: the sales rep who placed/negotiated this on behalf of the buyer
   placedByRep    SalesRep?           @relation("QuotePlacedByRep", fields: [placedByRepId], references: [id], onDelete: SetNull)

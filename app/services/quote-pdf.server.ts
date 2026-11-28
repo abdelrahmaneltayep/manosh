@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { readAdjustments } from "../lib/quote-adjustments";
 import { PdfBuilder, A4 } from "../lib/pdf";
 import { getBrandingTokens } from "./branding.server";
 import { whiteLabelAllowed } from "../lib/billing";
@@ -173,7 +174,11 @@ export async function renderQuotePdf(
     buyerEmail: quote.buyer.email,
     poReference: quote.poReference,
     currencyCode: opts.currencyCode,
-    lines: quote.lines.map((l) => ({ title: l.title, sku: l.sku, quantity: l.quantity, price: Number(l.price) })),
+    lines: [
+      ...quote.lines.map((l) => ({ title: l.title, sku: l.sku, quantity: l.quantity, price: Number(l.price) })),
+      // Custom items the store added (no product, so no SKU).
+      ...readAdjustments(quote.adjustments).customItems.map((c) => ({ title: c.title, sku: null, quantity: c.quantity, price: Number(c.price) })),
+    ],
     brand: { name: brandName, primaryColor },
     // From the stored plan: opts.plan is BillingStatus.plan, which can't tell Scale from Growth.
     whiteLabel: whiteLabelAllowed(shop.plan, shop.legacyPlan),
