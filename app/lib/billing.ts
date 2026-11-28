@@ -115,7 +115,8 @@ export interface PlanLimits {
   followupCadenceMax: number;
   /** F11: maximum CUSTOM catalogs (the default catalog is not counted). */
   customCatalogCap: number;
-  /** F12: maximum sales-rep seats. Starter = 0 (feature hidden). */
+  /** F12: maximum sales-rep seats. Reps are a Scale feature (plan-features.ts); Scale
+   *  (which uses these Growth-row limits) has unlimited seats (owner decision, 28 Nov 2026). */
   repSeatCap: number;
   /** F16: additional currencies beyond the store default. Starter = 1. */
   extraCurrencyCap: number;
@@ -130,7 +131,7 @@ export const ACTIVE_QUOTE_WINDOW_DAYS = 30;
 
 export const PLAN_LIMITS = {
   starter: { activeQuoteCap: 50, seatCap: 1, priceListCap: 3, savedListCap: 3, memberCap: 1, wholesaleFormCap: 1, followupCadenceMax: 1, customCatalogCap: 1, repSeatCap: 0, extraCurrencyCap: 1, localeCap: 2, reorderShortcutCap: 1 },
-  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity, repSeatCap: 3, extraCurrencyCap: Infinity, localeCap: 3, reorderShortcutCap: Infinity },
+  growth: { activeQuoteCap: Infinity, seatCap: 5, priceListCap: Infinity, savedListCap: Infinity, memberCap: 5, wholesaleFormCap: Infinity, followupCadenceMax: 6, customCatalogCap: Infinity, repSeatCap: Infinity, extraCurrencyCap: Infinity, localeCap: 3, reorderShortcutCap: Infinity },
 } as const satisfies Record<"starter" | "growth", PlanLimits>;
 
 /**

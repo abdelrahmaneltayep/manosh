@@ -73,7 +73,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     listCompaniesForShop(session.shop),
     repLeaderboard(session.shop),
   ]);
-  return { unlocked, reps, companies, leaderboard, seatCap: getPlanLimits(status.plan).repSeatCap, access };
+  // Infinity doesn't survive JSON, so an unlimited seat count travels as null.
+  const seatCap = getPlanLimits(status.plan).repSeatCap;
+  return { unlocked, reps, companies, leaderboard, seatCap: Number.isFinite(seatCap) ? seatCap : null, access };
 };
 
 type ActionResult =
@@ -230,7 +232,7 @@ export default function Reps() {
             <BlockStack gap="100">
               <InlineStack align="space-between" blockAlign="center">
                 <Text as="h2" variant="headingMd">Reps</Text>
-                <Badge>{`${data.reps.length} of ${data.seatCap} seats used`}</Badge>
+                <Badge>{data.seatCap === null ? `${data.reps.length} ${data.reps.length === 1 ? "rep" : "reps"} · unlimited seats` : `${data.reps.length} of ${data.seatCap} seats used`}</Badge>
               </InlineStack>
               <Text as="p" tone="subdued" variant="bodySm">
                 Reps sign in to a scoped portal, see only their assigned companies, and place or negotiate

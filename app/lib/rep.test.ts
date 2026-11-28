@@ -12,7 +12,9 @@ describe("plan gating", () => {
     expect(repPortalAllowed("STARTER")).toBe(false);
     expect(repPortalAllowed(null)).toBe(false);
     expect(PLAN_LIMITS.starter.repSeatCap).toBe(0);
-    expect(PLAN_LIMITS.growth.repSeatCap).toBe(3);
+    // Reps are Scale only; Scale (which uses the Growth-row limits) has unlimited seats (28 Nov 2026).
+    expect(PLAN_LIMITS.growth.repSeatCap).toBe(Infinity);
+    expect(evaluateRepSeatAllowance(500, PLAN_LIMITS.growth.repSeatCap).allowed).toBe(true);
   });
 
   it("evaluateRepSeatAllowance allows while used < cap", () => {
