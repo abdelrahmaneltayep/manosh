@@ -91,7 +91,7 @@ export async function sendQuoteForShop(params: {
     data: {
       adjustments: params.adjustments as object,
       buyerMessage: params.buyerMessage,
-      totalsSnapshot: totals as object,
+      totalsSnapshot: { ...totals, calculatedAt: new Date().toISOString() } as object,
     },
   });
   return { ok: true, totals };

@@ -27,6 +27,8 @@ export interface DraftOrderTotals {
   /** Shopify's total discounts and shipping, when the quote has them. */
   totalDiscounts?: string;
   totalShipping?: string;
+  /** When Shopify calculated these (ISO), set where a snapshot is saved. */
+  calculatedAt?: string;
 }
 
 export interface PurchasingEntityRef {

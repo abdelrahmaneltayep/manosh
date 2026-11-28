@@ -83,5 +83,6 @@ export function readSnapshot(value: unknown): DraftOrderTotals | null {
     currencyCode: s.currencyCode || "USD",
     ...(typeof s.totalDiscounts === "string" ? { totalDiscounts: s.totalDiscounts } : {}),
     ...(typeof s.totalShipping === "string" ? { totalShipping: s.totalShipping } : {}),
+    ...(typeof s.calculatedAt === "string" ? { calculatedAt: s.calculatedAt } : {}),
   };
 }

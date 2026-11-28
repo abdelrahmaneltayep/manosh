@@ -213,7 +213,7 @@ export async function acceptAndOrder(
     await acceptQuote(quoteId, { now: options.now });
     ordered = await markOrdered(quoteId, {
       draftOrderId: created.id,
-      totalsSnapshot: totals as unknown as Prisma.InputJsonValue,
+      totalsSnapshot: { ...totals, calculatedAt: new Date().toISOString() } as unknown as Prisma.InputJsonValue,
       now: options.now,
     });
     draftOrderId = created.id;

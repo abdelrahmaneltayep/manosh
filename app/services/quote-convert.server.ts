@@ -123,7 +123,7 @@ async function convertClaimed(
   if (quote.status === "COUNTERED") await acceptQuote(quoteId, { now: opts.now });
   await markOrdered(quoteId, {
     draftOrderId: created.id,
-    totalsSnapshot: created.totals as unknown as Prisma.InputJsonValue,
+    totalsSnapshot: { ...created.totals, calculatedAt: new Date().toISOString() } as unknown as Prisma.InputJsonValue,
     now: opts.now,
   });
   await prisma.quote.update({ where: { id: quoteId }, data: { convertedOrderId: created.id } });
