@@ -23,8 +23,25 @@ import { isDemoEmail } from "./demo.server";
 import { createInvoiceForOrder } from "./invoice.server";
 import { featureAvailable, shopPlanHandle } from "../lib/plan-features";
 import { emailQuoteOrdered } from "./quote-emails.server";
+import { claimForOrder, releaseOrderClaim, QuoteAlreadyOrderedError } from "./order-claim.server";
+import { readSnapshot } from "./quote-totals.server";
 
 const CREDIT_ENABLED = () => process.env.MANNON_FF_CREDIT === "true";
+
+/** Shopify's total changed since the quote was sent; the buyer confirms the new one. */
+export class TotalsChangedError extends Error {
+  constructor(
+    public was: DraftOrderTotals,
+    public now: DraftOrderTotals,
+  ) {
+    super("Shopify’s total for this order changed since the quote was sent.");
+    this.name = "TotalsChangedError";
+  }
+}
+
+// Equality only (no arithmetic): two amounts as Shopify wrote them.
+const sameAmount = (a: string | null | undefined, b: string) => a != null && a.trim() !== "" && Number(a) === Number(b);
+const totalsDiffer = (a: DraftOrderTotals, b: DraftOrderTotals) => a.currencyCode !== b.currencyCode || !sameAmount(a.total, b.total);
 
 /**
  * Thrown when a net-terms order would breach the company's credit limit or the
@@ -58,6 +75,12 @@ export async function acceptAndOrder(
     /** The chosen template's type + net days, so Shopify gets the schedule it requires. */
     paymentTerm?: { paymentTermsType: string; dueInDays: number | null } | null;
     now?: Date;
+    /**
+     * The total the buyer confirmed after being told Shopify's total changed
+     * since the quote was sent (TotalsChangedError). Shopify's new total must
+     * match it, or the buyer is asked again.
+     */
+    confirmedTotal?: string | null;
   },
 ): Promise<{ quote: QuoteWithLines; totals: DraftOrderTotals }> {
   const quote = await prisma.quote.findUnique({
@@ -68,114 +91,139 @@ export async function acceptAndOrder(
 
   // Only a countered quote can be accepted.
   if (quote.status !== "COUNTERED") {
+    if (quote.status === "ORDERED") throw new QuoteAlreadyOrderedError();
     throw new IllegalQuoteTransitionError(quote.status, "ACCEPTED");
   }
 
-  // The native purchasing entity, read from Shopify when the buyer isn't
-  // linked yet (Customers → Companies owns it). Nothing is written to Shopify.
-  const linked = await ensureBuyerCompanyLink(admin, quote.buyerId);
-  if (!linked.ok) throw new DraftOrderError(linked.buyerMessage);
+  // One order per quote: claim it before calling Shopify (a second accept
+  // stops here). Released below if anything before the order fails.
+  const claim = await claimForOrder(quoteId, ["COUNTERED"]);
+  let totals: DraftOrderTotals;
+  let ordered: QuoteWithLines;
+  let draftOrderId: string;
+  try {
 
-  // F9 — enforce order rules at conversion too, so a countered quote that no
-  // longer meets MOQ/pack/min-value can't slip through. Round line quantities up
-  // (persisted) and block a total under the store minimum.
-  if (process.env.MANNON_FF_MOQ === "true") {
-    const shop = await prisma.shop.findUnique({
-      where: { id: quote.company.shopId },
-      select: { shopifyDomain: true },
-    });
-    if (shop) {
-      const { evaluateForCompany, logRuleApplied } = await import("./order-rules.server");
-      const evalResult = await evaluateForCompany(
-        shop.shopifyDomain,
-        quote.lines.map((l) => ({ variantId: l.variantId, qty: l.quantity, price: Number(l.price) })),
-        quote.companyId,
-      );
-      let changed = 0;
-      for (const adj of evalResult.lines) {
-        if (!adj.changed) continue;
-        const line = quote.lines.find((l) => l.variantId === adj.variantId);
-        if (line) {
-          await prisma.quoteLine.update({ where: { id: line.id }, data: { quantity: adj.finalQty } });
-          line.quantity = adj.finalQty;
-          changed++;
-        }
-      }
-      if (!evalResult.ok && evalResult.minOrderValue != null) {
-        await logRuleApplied(quote.company.shopId, quoteId, { changed, blocked: true });
-        throw new DraftOrderError(
-          `This order is under the ${options.currencyCode} ${evalResult.minOrderValue.toFixed(2)} minimum. Add more before placing it.`,
-        );
-      }
-      if (changed > 0) await logRuleApplied(quote.company.shopId, quoteId, { changed, blocked: false });
-    }
-  }
+    // The native purchasing entity, read from Shopify when the buyer isn't
+    // linked yet (Customers → Companies owns it). Nothing is written to Shopify.
+    const linked = await ensureBuyerCompanyLink(admin, quote.buyerId);
+    if (!linked.ok) throw new DraftOrderError(linked.buyerMessage);
 
-  // F14 — a verified-exempt buyer gets tax removed at checkout. We only set the
-  // flag; Shopify zeroes the tax (we never compute it). Best-effort: a lookup
-  // hiccup must never block the order, so it falls back to taxed.
-  let taxExempt = false;
-  if (process.env.MANNON_FF_TAX_VAT === "true") {
-    try {
-      const { isCompanyTaxExempt } = await import("./tax.server");
-      taxExempt = await isCompanyTaxExempt(quote.companyId);
-    } catch (error) {
-      const { captureException } = await import("../lib/sentry.server");
-      captureException(error);
-    }
-  }
-
-  const input = buildDraftOrderInput({
-    currencyCode: options.currencyCode,
-    poReference: quote.poReference,
-    paymentTermsTemplateId: options.paymentTermsTemplateId,
-    paymentTerm: options.paymentTerm ?? null,
-    now: options.now,
-    taxExempt,
-    purchasingEntity: linked.link,
-    lines: quote.lines.map((line) => ({
-      variantId: line.variantId,
-      quantity: line.quantity,
-      price: line.price.toString(),
-    })),
-    // The discount, shipping and custom items the buyer was sent.
-    adjustments: readAdjustments(quote.adjustments),
-  });
-
-  // Shopify is the source of truth for money — preview first (we need the total
-  // for the credit check before we create anything).
-  const previewed = await calculateDraftOrder(admin, input);
-
-  // F2 — credit check (Growth-gated at the route; feature-flagged here). Block a
-  // net-terms order that would breach the limit or a company on hold, BEFORE we
-  // create the draft order, so nothing is stranded.
-  if (CREDIT_ENABLED()) {
-    const profile = await getCreditProfile(quote.companyId);
-    if (profile) {
-      const outstanding = await outstandingForCompany(
-        quote.companyId,
-        isDemoEmail(quote.buyer.email) ? { onlyBuyerId: quote.buyerId } : {},
-      );
-      const decision = evaluateCredit({
-        status: profile.status,
-        creditLimit: Number(profile.creditLimit),
-        outstanding,
-        newOrderAmount: Number(previewed.total),
+    // F9 — enforce order rules at conversion too, so a countered quote that no
+    // longer meets MOQ/pack/min-value can't slip through. Round line quantities up
+    // (persisted) and block a total under the store minimum.
+    if (process.env.MANNON_FF_MOQ === "true") {
+      const shop = await prisma.shop.findUnique({
+        where: { id: quote.company.shopId },
+        select: { shopifyDomain: true },
       });
-      if (!decision.allowed) throw new CreditBlockedError(decision);
+      if (shop) {
+        const { evaluateForCompany, logRuleApplied } = await import("./order-rules.server");
+        const evalResult = await evaluateForCompany(
+          shop.shopifyDomain,
+          quote.lines.map((l) => ({ variantId: l.variantId, qty: l.quantity, price: Number(l.price) })),
+          quote.companyId,
+        );
+        let changed = 0;
+        for (const adj of evalResult.lines) {
+          if (!adj.changed) continue;
+          const line = quote.lines.find((l) => l.variantId === adj.variantId);
+          if (line) {
+            await prisma.quoteLine.update({ where: { id: line.id }, data: { quantity: adj.finalQty } });
+            line.quantity = adj.finalQty;
+            changed++;
+          }
+        }
+        if (!evalResult.ok && evalResult.minOrderValue != null) {
+          await logRuleApplied(quote.company.shopId, quoteId, { changed, blocked: true });
+          throw new DraftOrderError(
+            `This order is under the ${options.currencyCode} ${evalResult.minOrderValue.toFixed(2)} minimum. Add more before placing it.`,
+          );
+        }
+        if (changed > 0) await logRuleApplied(quote.company.shopId, quoteId, { changed, blocked: false });
+      }
     }
+
+    // F14 — a verified-exempt buyer gets tax removed at checkout. We only set the
+    // flag; Shopify zeroes the tax (we never compute it). Best-effort: a lookup
+    // hiccup must never block the order, so it falls back to taxed.
+    let taxExempt = false;
+    if (process.env.MANNON_FF_TAX_VAT === "true") {
+      try {
+        const { isCompanyTaxExempt } = await import("./tax.server");
+        taxExempt = await isCompanyTaxExempt(quote.companyId);
+      } catch (error) {
+        const { captureException } = await import("../lib/sentry.server");
+        captureException(error);
+      }
+    }
+
+    const input = buildDraftOrderInput({
+      currencyCode: options.currencyCode,
+      poReference: quote.poReference,
+      paymentTermsTemplateId: options.paymentTermsTemplateId,
+      paymentTerm: options.paymentTerm ?? null,
+      now: options.now,
+      taxExempt,
+      purchasingEntity: linked.link,
+      lines: quote.lines.map((line) => ({
+        variantId: line.variantId,
+        quantity: line.quantity,
+        price: line.price.toString(),
+      })),
+      // The discount, shipping and custom items the buyer was sent.
+      adjustments: readAdjustments(quote.adjustments),
+    });
+
+    // Shopify is the source of truth for money — preview first (we need the total
+    // for the credit check before we create anything).
+    const previewed = await calculateDraftOrder(admin, input);
+
+    // The buyer agreed to the total Shopify calculated when the quote was sent.
+    // If Shopify's total is different now (tax, a price or shipping changed),
+    // ask the buyer to confirm the new total before creating the order.
+    const sent = readSnapshot(quote.totalsSnapshot);
+    if (sent && totalsDiffer(sent, previewed) && !sameAmount(options.confirmedTotal, previewed.total)) {
+      throw new TotalsChangedError(sent, previewed);
+    }
+
+    // F2 — credit check (Growth-gated at the route; feature-flagged here). Block a
+    // net-terms order that would breach the limit or a company on hold, BEFORE we
+    // create the draft order, so nothing is stranded.
+    if (CREDIT_ENABLED()) {
+      const profile = await getCreditProfile(quote.companyId);
+      if (profile) {
+        const outstanding = await outstandingForCompany(
+          quote.companyId,
+          isDemoEmail(quote.buyer.email) ? { onlyBuyerId: quote.buyerId } : {},
+        );
+        const decision = evaluateCredit({
+          status: profile.status,
+          creditLimit: Number(profile.creditLimit),
+          outstanding,
+          newOrderAmount: Number(previewed.total),
+        });
+        if (!decision.allowed) throw new CreditBlockedError(decision);
+      }
+    }
+
+    const created = await createDraftOrder(admin, input);
+    totals = created.totals ?? previewed;
+
+    // Only now mutate quote state: COUNTERED → ACCEPTED → ORDERED.
+    await acceptQuote(quoteId, { now: options.now });
+    ordered = await markOrdered(quoteId, {
+      draftOrderId: created.id,
+      totalsSnapshot: totals as unknown as Prisma.InputJsonValue,
+      now: options.now,
+    });
+    draftOrderId = created.id;
+  } catch (error) {
+    // Nothing was created (or Shopify failed): let the buyer try again.
+    await releaseOrderClaim(quoteId, claim);
+    throw error;
   }
-
-  const created = await createDraftOrder(admin, input);
-  const totals = created.totals ?? previewed;
-
-  // Only now mutate quote state: COUNTERED → ACCEPTED → ORDERED.
-  await acceptQuote(quoteId, { now: options.now });
-  const ordered = await markOrdered(quoteId, {
-    draftOrderId: created.id,
-    totalsSnapshot: totals as unknown as Prisma.InputJsonValue,
-    now: options.now,
-  });
+  await releaseOrderClaim(quoteId, claim);
+  const created = { id: draftOrderId };
 
   await appendEvent({
     shopId: quote.company.shopId,

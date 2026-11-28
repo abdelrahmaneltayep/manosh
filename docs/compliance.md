@@ -51,7 +51,7 @@ under existing installs as the core slices land:
 |---|---|---|
 | `read_products` | Read the merchant catalog to build baskets, resolve SKUs, price lines. | S7, S10, S12, catalog cache |
 | `read_orders` | List a company's past orders for reorder cards. | S9 |
-| `write_draft_orders` | Create draft orders on quote-accept and reorder (also grants read for `draftOrderCalculate`). | S8, S9, S11 |
+| `write_draft_orders` | Create draft orders on quote-accept and reorder (also grants read for `draftOrderCalculate`); read a quote's draft-order and payment status and send Shopify's invoice (Phase 3). | S8, S9, S11 |
 | `read_companies` | Read native B2B companies, locations, contacts for the draft order `purchasingEntity`. When a buyer isn't linked yet, `ensureBuyerCompanyLink` finds the customer by exact email (search term only; the email field is never read back) and reads their company contact profile and location role; the ids are stored on the buyer. Read-only. | S8, S9 |
 | `write_payment_terms` | Read the store's payment terms templates to offer them at accept, and attach the chosen one (with its schedule) to the draft order. Shopify requires the write scope to set `paymentTerms` on a draft order ("The user must have access to set payment terms", live QA 2026-11-02); write implies read, so it replaces `read_payment_terms`. We never create or edit templates. | S11 |
 | `read_inventory` | Read `ProductVariant.inventoryItem.unitCost` so the AI Quote Assistant computes real margins and enforces the floor. Cost is reference-only; we never write inventory. | F1 (AI Quote Assistant) |

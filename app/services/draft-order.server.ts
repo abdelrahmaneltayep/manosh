@@ -368,3 +368,42 @@ export async function sendDraftOrderInvoice(admin: AdminGraphqlClient, draftOrde
   const body = (await response.json()) as { data?: { draftOrderInvoiceSend?: { userErrors?: UserError[] } } };
   assertNoUserErrors(body.data?.draftOrderInvoiceSend?.userErrors, "draftOrderInvoiceSend");
 }
+
+const DRAFT_ORDER_STATUS = `#graphql
+  query MannonDraftOrderStatus($id: ID!) {
+    draftOrder(id: $id) {
+      id
+      name
+      status
+      invoiceSentAt
+      order { id name displayFinancialStatus }
+    }
+  }
+`;
+
+export interface DraftOrderStatusView {
+  id: string;
+  /** Shopify's draft order name, e.g. "#D12". */
+  name: string;
+  status: "OPEN" | "INVOICE_SENT" | "COMPLETED";
+  invoiceSentAt: string | null;
+  /** The order the draft became once paid or completed. */
+  order: { id: string; name: string; financialStatus: string | null } | null;
+}
+
+/** Shopify's own status for a draft order and its order. Null if Shopify can't say. */
+export async function getDraftOrderStatus(admin: AdminGraphqlClient, draftOrderId: string): Promise<DraftOrderStatusView | null> {
+  const response = await admin.graphql(DRAFT_ORDER_STATUS, { variables: { id: draftOrderId } });
+  const body = (await response.json()) as {
+    data?: { draftOrder?: { id: string; name: string; status: DraftOrderStatusView["status"]; invoiceSentAt: string | null; order: { id: string; name: string; displayFinancialStatus: string | null } | null } | null };
+  };
+  const d = body.data?.draftOrder;
+  if (!d) return null;
+  return {
+    id: d.id,
+    name: d.name,
+    status: d.status,
+    invoiceSentAt: d.invoiceSentAt,
+    order: d.order ? { id: d.order.id, name: d.order.name, financialStatus: d.order.displayFinancialStatus } : null,
+  };
+}

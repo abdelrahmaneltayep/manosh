@@ -126,6 +126,10 @@ model Quote {
   poReference      String?
   draftOrderId     String?                          // gid://shopify/DraftOrder/... (set on accept)
   totalsSnapshot   Json?                            // exact draftOrderCalculate output
+  adjustments      Json?     // Phase 3: discount, shipping line, custom items as typed (Shopify calculates them)
+  buyerMessage     String?   // Phase 3: message sent with the quote
+  internalNote     String?   // Phase 3: merchant-only note
+  orderingSince    DateTime? // Phase 3: claim while the draft order is created (one order per quote)
   lines            QuoteLine[]
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt

@@ -106,7 +106,15 @@ export function createMockShopify() {
       drafts.set(id, d);
       return { draftOrderCreate: { draftOrder: { id, subtotalPriceSet: d.subtotalPriceSet, totalTaxSet: d.totalTaxSet, totalPriceSet: d.totalPriceSet, totalDiscountsSet: d.totalDiscountsSet, totalShippingPriceSet: d.totalShippingPriceSet }, userErrors: [] } };
     },
-    MannonDraftOrderInvoiceSend: (v) => ({ draftOrderInvoiceSend: drafts.has(v.id) ? { draftOrder: { id: v.id }, userErrors: [] } : { draftOrder: null, userErrors: [{ field: ["id"], message: "Draft order not found" }] } }),
+    MannonDraftOrderStatus: (v) => {
+      const d = drafts.get(v.id);
+      return { draftOrder: d ? { id: d.id, name: d.name, status: d.status, invoiceSentAt: d.invoiceSentAt ?? null, order: d.order ?? null } : null };
+    },
+    MannonDraftOrderInvoiceSend: (v) => {
+      const d = drafts.get(v.id);
+      if (d && d.status === "OPEN") Object.assign(d, { status: "INVOICE_SENT", invoiceSentAt: new Date().toISOString() });
+      return ({ draftOrderInvoiceSend: drafts.has(v.id) ? { draftOrder: { id: v.id }, userErrors: [] } : { draftOrder: null, userErrors: [{ field: ["id"], message: "Draft order not found" }] } });
+    },
     MannonDemoCompany: () => ({ companies: { nodes: [{ id: MOCK_COMPANY.id, name: MOCK_COMPANY.name, locations: { nodes: [{ id: MOCK_COMPANY.locationId }] }, contacts: { nodes: [{ id: MOCK_COMPANY.contactId }] } }] } }),
     MannonDemoOrders: (v) => ({ orders: { nodes: orders.slice(0, v.first || 3).map((o) => ({ id: o.id, name: o.name, createdAt: o.createdAt, totalPriceSet: { shopMoney: { amount: totalsFor({ lineItems: o.lines }).totalPriceSet.shopMoney.amount, currencyCode: CURRENCY } } })) } }),
     MannonDemoSeedOrder: (v) => {

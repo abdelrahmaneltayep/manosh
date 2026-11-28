@@ -104,3 +104,12 @@ describe("draftOrderFailureMessage (pure)", () => {
     expect(draftOrderFailureMessage(plain)).toBe(plain);
   });
 });
+
+describe("accept when Shopify is unreachable", () => {
+  it("says nothing was ordered and to try again", () => {
+    expect(acceptFailureMessage(new Error("getaddrinfo ENOTFOUND shop.myshopify.com"))).toBe(
+      "Your supplier’s store couldn’t be reached, so nothing was ordered. Please try again in a moment.",
+    );
+    expect(acceptFailureMessage(new TypeError("fetch failed"))).toMatch(/nothing was ordered/);
+  });
+});

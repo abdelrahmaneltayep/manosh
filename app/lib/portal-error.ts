@@ -54,6 +54,10 @@ export function acceptFailureMessage(error: unknown): string {
   }
   if (first) return `Shopify couldn’t create the order: ${first.trim().replace(/\.?$/, ".")} Please contact your supplier.`;
   const message = error instanceof Error ? error.message : "";
+  // Shopify couldn't be reached at all: nothing was created.
+  if (/ENOTFOUND|ECONNRESET|ECONNREFUSED|ETIMEDOUT|fetch failed|socket hang up|network/i.test(message)) {
+    return "Your supplier’s store couldn’t be reached, so nothing was ordered. Please try again in a moment.";
+  }
   if (/not found|no session|offline session|access token|expired/i.test(message)) {
     return "Your supplier’s store connection needs a refresh. Please try again in a moment or contact your supplier.";
   }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import prisma from "../db.server";
 import { acceptAndOrder, CreditBlockedError } from "./quote-accept.server";
 import { DEMO_EMAIL_DOMAIN } from "./demo.server";
+import { QuoteAlreadyOrderedError } from "./order-claim.server";
 import {
   DraftOrderError,
   type AdminGraphqlClient,
@@ -172,9 +173,18 @@ describe.skipIf(!hasDb)("acceptAndOrder (DB + mocked Admin API)", () => {
     // Take it to ORDERED first, then try again.
     await acceptAndOrder(quote.id, admin, { currencyCode: "USD" });
 
+    // An ordered quote is "already an order" (the buyer's page shows the order).
     await expect(
       acceptAndOrder(quote.id, mockAdmin(), { currencyCode: "USD" }),
-    ).rejects.toBeInstanceOf(IllegalQuoteTransitionError);
+    ).rejects.toBeInstanceOf(QuoteAlreadyOrderedError);
+  });
+
+  it("refuses to accept a quote that was never sent", async () => {
+    const shop = await prisma.shop.create({ data: { shopifyDomain: "s8b.myshopify.com", quoteExpiryDays: 14 } });
+    const company = await prisma.company.create({ data: { shopId: shop.id, shopifyCompanyId: "gid://shopify/Company/81", name: "Co" } });
+    const buyer = await prisma.buyer.create({ data: { companyId: company.id, email: "b@s8b.example" } });
+    const quote = await submitQuote({ companyId: company.id, buyerId: buyer.id, lines: [{ variantId: "gid://v/1", title: "W", quantity: 1, price: "1.00" }] });
+    await expect(acceptAndOrder(quote.id, mockAdmin(), { currencyCode: "USD" })).rejects.toBeInstanceOf(IllegalQuoteTransitionError);
   });
 
   it("fails cleanly when Shopify has no company contact for the buyer (lookup only, no order, no state change)", async () => {

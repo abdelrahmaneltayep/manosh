@@ -13,6 +13,7 @@ import {
   type DraftOrderTotals,
 } from "./draft-order.server";
 import { emailQuoteOrdered } from "./quote-emails.server";
+import { claimForOrder, releaseOrderClaim, OrderInProgressError, QuoteAlreadyOrderedError } from "./order-claim.server";
 
 /**
  * F25.2 — merchant one-click convert: an ACCEPTED quote → a native Shopify draft
@@ -57,6 +58,28 @@ export async function convertQuoteToOrder(
   }
   if (quote.convertedOrderId || quote.draftOrderId) throw new QuoteConvertError("This quote is already an order.");
   if (quote.lines.length === 0) throw new QuoteConvertError("This quote has no line items.");
+
+  // One order per quote, even if the buyer accepts at the same moment.
+  let claim: Date;
+  try {
+    claim = await claimForOrder(quoteId, ["ACCEPTED", "COUNTERED"]);
+  } catch (error) {
+    if (error instanceof QuoteAlreadyOrderedError || error instanceof OrderInProgressError) throw new QuoteConvertError(error.message);
+    throw error;
+  }
+  try {
+    return await convertClaimed(quote, admin, opts);
+  } finally {
+    await releaseOrderClaim(quoteId, claim);
+  }
+}
+
+async function convertClaimed(
+  quote: Prisma.QuoteGetPayload<{ include: { lines: true; company: true; buyer: true } }>,
+  admin: AdminGraphqlClient,
+  opts: { currencyCode: string; paymentTermsTemplateId?: string | null; now?: Date; sendInvoice?: boolean },
+): Promise<ConvertQuoteResult> {
+  const quoteId = quote.id;
 
   // The native purchasing entity, read from Shopify when the buyer isn't
   // linked yet (Customers → Companies owns it). Nothing is written to Shopify.

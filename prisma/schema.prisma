@@ -1162,6 +1162,7 @@ model Quote {
   adjustments    Json? // Phase 3: order discount, shipping line, custom items as typed (Shopify calculates them)
   buyerMessage   String? // Phase 3: message to the buyer, sent with the quote
   internalNote   String? // Phase 3: merchant-only note, never shown to the buyer
+  orderingSince  DateTime? // Phase 3: set while an order is being created in Shopify, so two accepts can't both create one
   reminderState  Json? // F8: per-quote follow-up state ({ unsubscribed, nudgesSent, overrideCadence })
   placedByRepId  String? // F12: the sales rep who placed/negotiated this on behalf of the buyer
   placedByRep    SalesRep?           @relation("QuotePlacedByRep", fields: [placedByRepId], references: [id], onDelete: SetNull)

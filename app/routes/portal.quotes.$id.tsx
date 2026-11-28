@@ -12,7 +12,8 @@ import {
   IllegalQuoteTransitionError,
   QuoteNotFoundError,
 } from "../services/quote.server";
-import { acceptAndOrder, CreditBlockedError } from "../services/quote-accept.server";
+import { acceptAndOrder, CreditBlockedError, TotalsChangedError } from "../services/quote-accept.server";
+import { OrderInProgressError, QuoteAlreadyOrderedError } from "../services/order-claim.server";
 import { isReorderAwaitingApproval } from "../services/reorder.server";
 import { DraftOrderError } from "../services/draft-order.server";
 import { getCatalog } from "../services/catalog.server";
@@ -163,6 +164,8 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
 
   const poReference = String(form.get("poReference") ?? "").trim() || null;
   const paymentTermsTemplateId = String(form.get("paymentTermsTemplateId") ?? "").trim() || null;
+  // Set when the buyer confirms a total that changed since the quote was sent.
+  const confirmedTotal = String(form.get("confirmedTotal") ?? "").trim() || null;
 
   try {
     const { unauthenticated } = await import("../shopify.server");
@@ -209,9 +212,23 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       if (!chosen) return { error: "Those payment terms are no longer available. Please pick again." };
       paymentTerm = { paymentTermsType: chosen.paymentTermsType, dueInDays: chosen.dueInDays };
     }
-    await acceptAndOrder(quoteId, admin, { currencyCode, paymentTermsTemplateId, paymentTerm });
+    await acceptAndOrder(quoteId, admin, { currencyCode, paymentTermsTemplateId, paymentTerm, confirmedTotal });
     return redirect(`/portal/quotes/${quoteId}`);
   } catch (error) {
+    // A second accept (double click, another tab): the order is already there.
+    if (error instanceof QuoteAlreadyOrderedError) return redirect(`/portal/quotes/${quoteId}`);
+    if (error instanceof OrderInProgressError) return { error: error.message };
+    if (error instanceof TotalsChangedError) {
+      return {
+        totalsChanged: {
+          was: formatMoney(error.was.total, error.was.currencyCode),
+          now: formatMoney(error.now.total, error.now.currencyCode),
+          total: error.now.total,
+          poReference,
+          paymentTermsTemplateId,
+        },
+      };
+    }
     if (
       error instanceof DraftOrderError ||
       error instanceof IllegalQuoteTransitionError ||
@@ -257,6 +274,7 @@ export default function BuyerQuote() {
   const actionError = actionData && "error" in actionData ? actionData.error : null;
   const actionMessage = actionData && "message" in actionData ? actionData.message : null;
   const justSentForApproval = actionData && "approvalPending" in actionData;
+  const totalsChanged = actionData && "totalsChanged" in actionData ? actionData.totalsChanged : null;
 
   return (
     <section className="portal-card">
@@ -351,7 +369,31 @@ export default function BuyerQuote() {
         </div>
       )}
 
-      {quote.status === "COUNTERED" && (
+      {quote.status === "COUNTERED" && totalsChanged && (
+        <Form method="post" className="accept-form" aria-live="polite">
+          <input type="hidden" name="intent" value="accept" />
+          <input type="hidden" name="confirmedTotal" value={totalsChanged.total} />
+          <input type="hidden" name="poReference" value={totalsChanged.poReference ?? ""} />
+          <input type="hidden" name="paymentTermsTemplateId" value={totalsChanged.paymentTermsTemplateId ?? ""} />
+          <div className="accept-confirm" role="region" aria-label="The total changed">
+            <p>
+              <strong>The total changed since your quote was sent.</strong> Shopify now calculates{" "}
+              <strong>{totalsChanged.now}</strong> (it was {totalsChanged.was}), for example because tax or shipping
+              changed. Nothing has been ordered yet.
+            </p>
+            <div className="portal-actions">
+              <button type="submit" className="portal-button portal-button-accept" disabled={submitting}>
+                {submitting ? "Creating order…" : `Place order at ${totalsChanged.now}`}
+              </button>
+              <Link to="." className="portal-link-button">
+                Not now
+              </Link>
+            </div>
+          </div>
+        </Form>
+      )}
+
+      {quote.status === "COUNTERED" && !totalsChanged && (
         <Form method="post" className="accept-form">
           <input type="hidden" name="intent" value="accept" />
 

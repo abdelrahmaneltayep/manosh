@@ -58,7 +58,7 @@ import { draftUpsellBundle } from "../services/insights-ai.server";
 import { UpgradeToClaude } from "../components/UpgradeToClaude";
 import { DraftedByClaude } from "../components/DraftedByClaude";
 import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-convert.server";
-import { DraftOrderError } from "../services/draft-order.server";
+import { DraftOrderError, getDraftOrderStatus, sendDraftOrderInvoice, type DraftOrderStatusView } from "../services/draft-order.server";
 import { issueBuyerQuoteLink } from "../services/buyer-sign-in-link.server";
 import { replyLockFor } from "../services/plan-limits.server";
 import { emailQuoteSent } from "../services/quote-emails.server";
@@ -93,7 +93,7 @@ const IS_TEST = process.env.NODE_ENV !== "production";
 const AI_QUOTE_ENABLED = () => process.env.MANNON_FF_AI_QUOTE === "true";
 
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const quote = await getQuoteDetailForShop(session.shop, params.id!);
   if (!quote) {
     throw new Response("Quote not found", { status: 404 });
@@ -107,7 +107,22 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const shopRow = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { id: true } });
   const lastEmail = shopRow ? await lastDeliveryFor(shopRow.id, "Quote", quote.id) : null;
   const timelineSources = shopRow ? await quoteTimelineSources(shopRow.id, quote.id) : { events: [], emails: [] };
+  // An ordered quote: Shopify's own draft-order and payment status.
+  let draftOrder: DraftOrderStatusView | null = null;
+  let draftOrderUnavailable = false;
+  if (quote.draftOrderId) {
+    try {
+      draftOrder = await getDraftOrderStatus(admin, quote.draftOrderId);
+      if (!draftOrder) draftOrderUnavailable = true;
+    } catch {
+      draftOrderUnavailable = true;
+    }
+  }
   const timeline = buildTimeline(timelineSources.events, timelineSources.emails);
+  if (draftOrder?.invoiceSentAt) {
+    timeline.unshift({ at: new Date(draftOrder.invoiceSentAt).toISOString(), text: "Invoice sent by Shopify" });
+    timeline.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+  }
   // Dual-mode gating: Growth/Scale included, Starter on a one-time 7-day trial,
   // Free/expired locked. Read-only here — the trial is only *started* in the
   // action, on first real use (never on a page view).
@@ -137,6 +152,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       : null,
     suggestions,
     timeline,
+    draftOrder,
+    draftOrderUnavailable,
     // Buyers can't make their own offer on a quote yet, so the reply is "Send quote".
     sendLabel: sendLabel({ buyerOffered: false }),
     sendBlocked: sendBlockedReason({ status: quote.status, expiresAt: quote.expiresAt }),
@@ -323,6 +340,28 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     }
   }
 
+  // The one action on an ordered quote: Shopify emails the buyer its invoice.
+  if (intent === "send-invoice") {
+    const owned = await prisma.quote.findFirst({
+      where: { id: quoteId, company: { shop: { shopifyDomain: session.shop } } },
+      select: { draftOrderId: true },
+    });
+    if (!owned?.draftOrderId) return { ok: false as const, kind: "quote" as const, error: "This quote doesn’t have a draft order yet." };
+    try {
+      await sendDraftOrderInvoice(admin, owned.draftOrderId);
+      return { ok: true as const, kind: "quote" as const, message: "Shopify sent the invoice to the buyer." };
+    } catch (error) {
+      return {
+        ok: false as const,
+        kind: "quote" as const,
+        error:
+          error instanceof DraftOrderError
+            ? `Shopify didn’t send the invoice: ${error.message.replace(/^draftOrderInvoiceSend failed: /, "")}`
+            : "Shopify couldn’t be reached, so the invoice wasn’t sent. Try again in a moment.",
+      };
+    }
+  }
+
   if (intent === "note") {
     const saved = await saveInternalNote(session.shop, quoteId, String(form.get("internalNote") ?? ""));
     return saved
@@ -455,7 +494,7 @@ function UpsellBundle({ quoteId }: { quoteId: string }) {
 }
 
 export default function QuoteDetail() {
-  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions, replyLock, lastEmail, timeline, sendLabel: sendText, sendBlocked } = useLoaderData<typeof loader>();
+  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions, replyLock, lastEmail, timeline, sendLabel: sendText, sendBlocked, draftOrder, draftOrderUnavailable } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const aiFetcher = useFetcher<typeof action>();
@@ -553,6 +592,9 @@ export default function QuoteDetail() {
     (quote.status === "ACCEPTED" || quote.status === "COUNTERED") &&
     !quote.draftOrderId &&
     !quote.convertedOrderId;
+  // Ordered: one action, Shopify emails the buyer its invoice (until paid).
+  const canSendInvoice = Boolean(quote.draftOrderId) && draftOrder?.status !== "COMPLETED" && !draftOrderUnavailable;
+  const payment = paymentStatus(draftOrder);
   const orderGid = quote.draftOrderId || quote.convertedOrderId || null;
   const orderNumericId = orderGid ? String(orderGid).split("/").pop() : null;
   const orderUrl = orderGid
@@ -594,7 +636,9 @@ export default function QuoteDetail() {
       primaryAction={
         canConvert
           ? { content: "Convert to order", onAction: () => post("convert"), loading: submitting }
-          : undefined
+          : canSendInvoice
+            ? { content: "Send invoice", onAction: () => post("send-invoice"), loading: submitting && navigation.formData?.get("intent") === "send-invoice" }
+            : undefined
       }
       secondaryActions={secondaryActions}
     >
@@ -658,9 +702,25 @@ export default function QuoteDetail() {
           </Banner>
         )}
         {orderUrl && (
-          <Banner tone="success" title="Order created" action={{ content: "Open the order in Shopify", url: orderUrl }}>
-            <p>The buyer has the invoice. Shopify calculated the totals.</p>
-          </Banner>
+          <Card>
+            <BlockStack gap="300">
+              <InlineStack align="space-between" blockAlign="center" gap="200">
+                <Text as="h2" variant="headingMd">
+                  Order
+                </Text>
+                {payment && <Badge tone={payment.tone}>{payment.label}</Badge>}
+              </InlineStack>
+              <InlineStack gap="200" blockAlign="center" wrap>
+                <Text as="p">{draftOrder ? `Draft order ${draftOrder.name}${draftOrder.order ? ` · Order ${draftOrder.order.name}` : ""}` : "Draft order in Shopify"}</Text>
+                <PolarisLink url={draftOrder?.order ? `shopify://admin/orders/${draftOrder.order.id.split("/").pop()}` : orderUrl}>Open in Shopify</PolarisLink>
+              </InlineStack>
+              <Text as="p" tone="subdued">
+                {draftOrderUnavailable
+                  ? "Shopify’s payment status isn’t available right now. Open the order in Shopify to check it."
+                  : payment?.detail}
+              </Text>
+            </BlockStack>
+          </Card>
         )}
 
         <Layout>
@@ -1204,6 +1264,21 @@ function AiSuggestionPanel({
  * renders (so the quote shows at once), from draftOrderCalculate or, once
  * ordered, the stored Shopify snapshot. Never computed in the app.
  */
+/** Shopify's draft-order and payment status in plain words (display only). */
+function paymentStatus(d: { status: string; invoiceSentAt: string | null; order: { financialStatus: string | null } | null } | null) {
+  if (!d) return null;
+  if (d.order) {
+    const fs = d.order.financialStatus ?? "";
+    const label = fs ? fs.charAt(0) + fs.slice(1).toLowerCase().replace(/_/g, " ") : "Order placed";
+    const tone: "success" | "attention" | "warning" | undefined = fs === "PAID" ? "success" : fs === "PENDING" || fs === "PARTIALLY_PAID" ? "attention" : fs === "REFUNDED" || fs === "VOIDED" ? "warning" : undefined;
+    return { label: `Payment: ${label}`, tone, detail: "Shopify turned the draft into an order. Payment is tracked on the order in Shopify." };
+  }
+  if (d.status === "INVOICE_SENT") {
+    return { label: "Invoice sent", tone: "attention" as const, detail: `Shopify emailed the invoice${d.invoiceSentAt ? ` on ${formatDate(d.invoiceSentAt)}` : ""}. Waiting for the buyer to pay.` };
+  }
+  return { label: "Invoice not sent", tone: "attention" as const, detail: "Send the invoice and Shopify emails the buyer a link to pay." };
+}
+
 function ShopifyTotals({
   quoteId,
   ordered,
