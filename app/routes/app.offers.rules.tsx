@@ -27,7 +27,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   if (!MAKE_AN_OFFER_ENABLED()) throw new Response("Not found", { status: 404 });
   const caps = await getShopCapabilities(session.shop);
-  if (caps.makeAnOffer === "teaser") throw redirect("/app/offers");
+  if (caps.makeAnOffer === "teaser") throw redirect("/app/quotes?view=offers");
   const rules = await listRules(session.shop);
   return { rules, cap: caps.offerRuleCap, used: rules.length, tier: caps.makeAnOffer };
 };
@@ -78,7 +78,7 @@ export default function OfferRules() {
   const firstRun = rules.length === 0;
 
   return (
-    <Page backAction={{ content: "Offers", url: "/app/offers" }} title="Offer rules">
+    <Page backAction={{ content: "Offers", url: "/app/quotes?view=offers" }} title="Offer rules">
       <TitleBar title="Offer rules" />
       <BlockStack gap="400">
         {actionData?.message && <Banner tone="success">{actionData.message}</Banner>}

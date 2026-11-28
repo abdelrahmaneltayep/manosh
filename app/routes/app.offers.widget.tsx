@@ -31,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   if (!MAKE_AN_OFFER_ENABLED()) throw new Response("Not found", { status: 404 });
   const caps = await getShopCapabilities(session.shop);
-  if (caps.makeAnOffer === "teaser") throw redirect("/app/offers");
+  if (caps.makeAnOffer === "teaser") throw redirect("/app/quotes?view=offers");
   const cfg = await getWidgetConfig(session.shop);
   const surfaces = (cfg?.surfaces as Record<string, boolean> | undefined) ?? { button: true, banner: false, inlineForm: true, exitPopup: false };
   const shopRow = await prisma.shop.findUnique({
@@ -146,7 +146,7 @@ export default function OfferWidget() {
   };
 
   return (
-    <Page backAction={{ content: "Offers", url: "/app/offers" }} title="Storefront widget">
+    <Page backAction={{ content: "Offers", url: "/app/quotes?view=offers" }} title="Storefront widget">
       <TitleBar title="Storefront widget" />
       <SaveBar id={SAVE_BAR_ID}>
         <button variant="primary" onClick={handleSave} disabled={busy}>Save</button>

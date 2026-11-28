@@ -52,7 +52,7 @@ export function attentionItems(c: AttentionCounts, f: AttentionFlags): Attention
       ? { id: "requests", count: c.requests, label: plural(c.requests, "storefront request to answer", "storefront requests to answer"), url: "/app/quote-requests", action: "Answer requests" }
       : null,
     f.offers && c.offers > 0
-      ? { id: "offers", count: c.offers, label: plural(c.offers, "offer to review", "offers to review"), url: "/app/offers", action: "Review offers" }
+      ? { id: "offers", count: c.offers, label: plural(c.offers, "offer to review", "offers to review"), url: "/app/quotes?view=offers", action: "Review offers" }
       : null,
     c.expiringSoon > 0
       ? { id: "expiringSoon", count: c.expiringSoon, label: plural(c.expiringSoon, "quote expiring soon", "quotes expiring soon"), url: "/app/quotes?view=open", action: "View quotes" }

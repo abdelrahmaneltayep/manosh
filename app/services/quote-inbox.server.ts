@@ -1,5 +1,6 @@
 import type { Buyer, Company, Quote, QuoteLine, QuoteStatus } from "@prisma/client";
 import prisma from "../db.server";
+import { DEMO_EMAIL_DOMAIN } from "./demo.server";
 import {
   applyAutoExpiry,
   counterQuote,
@@ -27,6 +28,18 @@ export interface InboxRow {
   createdAt: Date;
   expiresAt: Date;
   poReference: string | null;
+  /** Shopify's last calculated total (draftOrderCalculate snapshot), never computed here. */
+  total: { amount: string; currencyCode: string } | null;
+  /** How the quote started: a storefront request, the buyer portal, a rep… */
+  source: string;
+}
+
+/** Quotes from demo-store visitors (buyer@demo.mannon.invalid) never appear in a real list. */
+export const NOT_DEMO_QUOTE = { NOT: { buyer: { email: { endsWith: `@${DEMO_EMAIL_DOMAIN}` } } } };
+
+function snapshotTotal(snapshot: unknown): InboxRow["total"] {
+  const t = snapshot as { total?: unknown; currencyCode?: unknown } | null;
+  return t && typeof t.total === "string" && typeof t.currencyCode === "string" ? { amount: t.total, currencyCode: t.currencyCode } : null;
 }
 
 export type QuoteDetail = Quote & {
@@ -43,7 +56,7 @@ export type QuoteDetail = Quote & {
  */
 export async function listQuotesForShop(shopDomain: string): Promise<InboxRow[]> {
   const quotes = await prisma.quote.findMany({
-    where: { company: { shop: { shopifyDomain: shopDomain } } },
+    where: { company: { shop: { shopifyDomain: shopDomain } }, ...NOT_DEMO_QUOTE },
     include: {
       company: true,
       buyer: true,
@@ -63,6 +76,8 @@ export async function listQuotesForShop(shopDomain: string): Promise<InboxRow[]>
     createdAt: quote.createdAt,
     expiresAt: quote.expiresAt,
     poReference: quote.poReference,
+    total: snapshotTotal(quote.totalsSnapshot),
+    source: quote.source,
   }));
 }
 

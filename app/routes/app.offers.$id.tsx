@@ -31,7 +31,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   if (!MAKE_AN_OFFER_ENABLED()) throw new Response("Not found", { status: 404 });
   const caps = await getShopCapabilities(session.shop);
-  if (caps.makeAnOffer === "teaser") throw redirect("/app/offers");
+  if (caps.makeAnOffer === "teaser") throw redirect("/app/quotes?view=offers");
   const offer = await getOffer(session.shop, params.id!);
   if (!offer) throw new Response("Offer not found", { status: 404 });
   const suggestion = await offerSuggestion(session.shop, offer.id);
@@ -162,7 +162,7 @@ export default function OfferDetail() {
 
   return (
     <Page
-      backAction={{ content: "Offers", url: "/app/offers" }}
+      backAction={{ content: "Offers", url: "/app/quotes?view=offers" }}
       title={`Offer from ${offer.buyerEmail}`}
       titleMetadata={
         <Badge tone={offer.status === "ACCEPTED" || offer.status === "CONVERTED" ? "success" : offer.status === "PENDING" ? "attention" : undefined}>

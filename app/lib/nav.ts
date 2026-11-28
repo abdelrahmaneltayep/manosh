@@ -79,8 +79,8 @@ export const SECTION_GROUPS: Record<string, SectionTab[]> = {
   quotes: [
     { id: "quotes", label: "Quotes", url: "/app/quotes" },
     { id: "requests", label: "Requests", url: "/app/quote-requests", flag: "quoteRequests" },
-    { id: "offers", label: "Offers", url: "/app/offers", flag: "offers" },
-    { id: "followups", label: "Follow-ups", url: "/app/followups", flag: "followups" },
+    { id: "offers", label: "Offers", url: "/app/quotes?view=offers", flag: "offers" },
+    { id: "followups", label: "Follow-ups", url: "/app/quotes?view=waiting", flag: "followups" },
   ],
   // Quote forms — "capture demand on my storefront".
   forms: [

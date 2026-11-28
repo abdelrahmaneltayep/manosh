@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { filterQuotes, viewCounts, paginate, viewById } from "./quote-views";
+import { availableViews, filterQuotes, sectionTabFor, viewCounts, paginate, viewById } from "./quote-views";
 
 const q = (displayStatus: string, companyName: string, buyerEmail = "b@x.test") =>
   ({ displayStatus, companyName, buyerEmail }) as never;
@@ -27,5 +27,27 @@ describe("quote views", () => {
     expect(paginate(rows, 2, 25).rows).toHaveLength(5);
     expect(paginate(rows, 99, 25).page).toBe(2);
     expect(paginate([], 1).pages).toBe(1);
+  });
+});
+
+describe("Offers and Follow-ups as views of the Quotes table", () => {
+  const rows = [
+    { displayStatus: "SUBMITTED" as const, companyName: "A", buyerEmail: "a@x.co" },
+    { displayStatus: "COUNTERED" as const, companyName: "B", buyerEmail: "b@x.co" },
+  ];
+
+  it("Waiting on buyer lists the quotes you've priced", () => {
+    expect(filterQuotes(rows, "waiting", "").map((r) => r.companyName)).toEqual(["B"]);
+  });
+
+  it("shows the Offers view only where Make an Offer is on", () => {
+    expect(availableViews({ offers: false, followups: true }).map((v) => v.id)).not.toContain("offers");
+    expect(availableViews({ offers: true, followups: true }).map((v) => v.id)).toContain("offers");
+    // An unknown or hidden view falls back to All.
+    expect(viewById("offers", availableViews({ offers: false, followups: true })).id).toBe("all");
+  });
+
+  it("lights the matching section tab", () => {
+    expect([sectionTabFor("offers"), sectionTabFor("waiting"), sectionTabFor("needs-reply")]).toEqual(["offers", "followups", "quotes"]);
   });
 });

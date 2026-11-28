@@ -1,6 +1,7 @@
 import prisma from "../db.server";
 import { EXPIRING_SOON_DAYS } from "../lib/dashboard";
 import { appendEvent } from "./events.server";
+import { NOT_DEMO_QUOTE } from "./quote-inbox.server";
 import type { AttentionCounts, SetupState } from "../lib/home";
 
 /**
@@ -12,9 +13,9 @@ export async function getAttentionCounts(shopId: string, now = new Date()): Prom
   const [requests, quotesToPrice, expiringSoon, offers, applications, accessRequests, overdueInvoices, taxToVerify] =
     await Promise.all([
       prisma.quoteRequest.count({ where: { shopId, status: "NEW" } }),
-      prisma.quote.count({ where: { company: { shopId }, status: "SUBMITTED" } }),
+      prisma.quote.count({ where: { company: { shopId }, status: "SUBMITTED", ...NOT_DEMO_QUOTE } }),
       prisma.quote.count({
-        where: { company: { shopId }, status: { in: ["SUBMITTED", "COUNTERED"] }, expiresAt: { gt: now, lte: soon } },
+        where: { company: { shopId }, status: { in: ["SUBMITTED", "COUNTERED"] }, expiresAt: { gt: now, lte: soon }, ...NOT_DEMO_QUOTE },
       }),
       prisma.offer.count({ where: { shopId, status: "PENDING" } }),
       prisma.wholesaleApplication.count({ where: { shopId, status: { in: ["PENDING", "MORE_INFO"] } } }),

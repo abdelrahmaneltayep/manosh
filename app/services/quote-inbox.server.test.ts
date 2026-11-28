@@ -93,6 +93,21 @@ describe.skipIf(!hasDb)("quote inbox service (DB)", () => {
     return { shop, company, buyer, quote };
   }
 
+  it("shows Shopify's total, never a computed one, and hides demo-visitor quotes", async () => {
+    const { company, quote } = await shopWithQuote("t.myshopify.com");
+    await prisma.quote.update({ where: { id: quote.id }, data: { totalsSnapshot: { subtotal: "95.00", totalTax: "9.50", total: "104.50", currencyCode: "CAD" } } });
+    const demoBuyer = await prisma.buyer.create({ data: { companyId: company.id, email: "visitor-x@demo.mannon.invalid" } });
+    await submitQuote({ companyId: company.id, buyerId: demoBuyer.id, lines: [{ variantId: "gid://v/1", title: "W", quantity: 1, price: "1.00" }] });
+    const rows = await listQuotesForShop("t.myshopify.com");
+    expect(rows.map((r) => r.id)).toEqual([quote.id]);
+    expect(rows[0].total).toEqual({ amount: "104.50", currencyCode: "CAD" });
+  });
+
+  it("an unpriced quote has no total", async () => {
+    await shopWithQuote("u.myshopify.com");
+    expect((await listQuotesForShop("u.myshopify.com"))[0].total).toBeNull();
+  });
+
   it("lists a shop's quotes with a display status (no write for a due quote)", async () => {
     const now = new Date("2026-07-18T00:00:00Z");
     const { quote } = await shopWithQuote("a.myshopify.com", { now });

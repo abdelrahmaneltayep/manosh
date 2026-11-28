@@ -7,12 +7,19 @@ export interface QuoteView {
   id: string;
   label: string;
   statuses: QuoteStatus[] | null; // null = every status
+  /** "offers" lists Make an Offer offers instead of quotes. */
+  kind?: "offers";
+  /** Only shown when this part of the app is on. */
+  needs?: "offers" | "followups";
 }
 
 export const QUOTE_VIEWS: QuoteView[] = [
   { id: "all", label: "All", statuses: null },
   { id: "needs-reply", label: "Needs reply", statuses: ["SUBMITTED"] },
+  // Follow-ups: quotes you've priced that wait on the buyer; bulk "Send reminder".
+  { id: "waiting", label: "Waiting on buyer", statuses: ["COUNTERED"] },
   { id: "open", label: "Open", statuses: ["SUBMITTED", "COUNTERED"] },
+  { id: "offers", label: "Offers", statuses: [], kind: "offers", needs: "offers" },
   { id: "accepted", label: "Accepted", statuses: ["ACCEPTED"] },
   { id: "ordered", label: "Ordered", statuses: ["ORDERED"] },
   { id: "expired", label: "Expired", statuses: ["EXPIRED"] },
@@ -20,8 +27,18 @@ export const QUOTE_VIEWS: QuoteView[] = [
 
 export const QUOTES_PER_PAGE = 25;
 
-export function viewById(id: string | null | undefined): QuoteView {
-  return QUOTE_VIEWS.find((v) => v.id === id) ?? QUOTE_VIEWS[0];
+export function viewById(id: string | null | undefined, available: QuoteView[] = QUOTE_VIEWS): QuoteView {
+  return available.find((v) => v.id === id) ?? available[0];
+}
+
+/** The views this shop can use (Offers only where Make an Offer is on and in the plan). */
+export function availableViews(on: { offers: boolean; followups: boolean }): QuoteView[] {
+  return QUOTE_VIEWS.filter((v) => !v.needs || on[v.needs]);
+}
+
+/** Which section tab is lit: the Offers and Follow-ups tabs open these views. */
+export function sectionTabFor(viewId: string): "quotes" | "offers" | "followups" {
+  return viewId === "offers" ? "offers" : viewId === "waiting" ? "followups" : "quotes";
 }
 
 interface Filterable {
