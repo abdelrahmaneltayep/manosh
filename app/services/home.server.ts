@@ -68,6 +68,12 @@ export async function getSetupProgress(shopId: string): Promise<Progress & { dis
   };
 }
 
+/** When the last request arrived from the storefront (proof the button is live). */
+export async function lastStorefrontRequestAt(shopId: string): Promise<Date | null> {
+  const last = await prisma.quoteRequest.findFirst({ where: { shopId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  return last?.createdAt ?? null;
+}
+
 /** Hide the setup guide for good (append-only; recorded once). */
 export async function dismissSetupGuide(shopId: string): Promise<void> {
   const already = await prisma.event.count({ where: { shopId, type: "SETUP_GUIDE_DISMISSED" } });

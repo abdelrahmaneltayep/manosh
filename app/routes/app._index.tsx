@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs, SerializeFrom } from "@remix-run/node";
-import { useFetcher, useLoaderData } from "@remix-run/react";
+import { useFetcher, useLoaderData, useRevalidator } from "@remix-run/react";
 import {
   Page,
   Card,
@@ -22,14 +22,15 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getDashboardMetrics } from "../services/dashboard.server";
 import { shouldPromptReview, markReviewPromptShown } from "../services/review-prompt.server";
-import { getAttentionCounts, getSetupProgress, dismissSetupGuide } from "../services/home.server";
+import { getAttentionCounts, getSetupProgress, dismissSetupGuide, lastStorefrontRequestAt } from "../services/home.server";
 import { syncShopPlan } from "../services/billing.server";
 import { selectedPlanHandle } from "../lib/billing-v3";
 import { isGrowthTier } from "../lib/billing";
 import { featureAvailable, shopPlanHandle } from "../lib/plan-features";
 import { ensureAlertEmails } from "../services/merchant-alerts.server";
 import { requestReview } from "../lib/review-request";
-import { attentionItems, setupSteps, setupProgress, type AttentionItem, type SetupStep } from "../lib/home";
+import { attentionItems, guideSteps, setupSteps, setupProgress, storefrontStatus, type AttentionItem, type SetupStep, type StorefrontStatus } from "../lib/home";
+import { themeEditorUrl } from "../lib/theme-deep-links";
 import { navFlags } from "../lib/nav";
 import { EXPIRING_SOON_DAYS } from "../lib/dashboard";
 import { quoteStatusBadge } from "../lib/quote-status";
@@ -57,21 +58,28 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   await syncShopPlan(request, session.shop, billing);
   const shop = await prisma.shop.findUnique({
     where: { shopifyDomain: session.shop },
-    select: { id: true, plan: true, legacyPlan: true },
+    select: { id: true, plan: true, legacyPlan: true, quoteWidgetEnabled: true },
   });
   const flags = navFlags(process.env);
   if (!shop) {
-    return { metrics: null, promptReview: false, attention: [], steps: [] as SetupStep[], setupDismissed: false, planSelected: true, analyticsOn: flags.analytics };
+    return { metrics: null, promptReview: false, attention: [], steps: [] as SetupStep[], setupDismissed: false, planSelected: true, analyticsOn: flags.analytics, storefront: null };
   }
   const planSelected = selectedPlanHandle(shop.plan, shop.legacyPlan) !== null;
-  const [metrics, promptReview, counts, progress] = await Promise.all([
+  const [metrics, promptReview, counts, progress, lastRequestAt] = await Promise.all([
     getDashboardMetrics(shop.id),
     shouldPromptReview(shop.id),
     getAttentionCounts(shop.id),
     getSetupProgress(shop.id),
+    lastStorefrontRequestAt(shop.id),
   ]);
+  const storefront = storefrontStatus({
+    featureOn: flags.quoteRequests,
+    buttonOn: shop.quoteWidgetEnabled === true,
+    lastRequestAt: lastRequestAt?.toISOString() ?? null,
+    themeEditorUrl: themeEditorUrl(session.shop, process.env.SHOPIFY_API_KEY, "quote_button"),
+  });
   const growthTier = isGrowthTier(shop.plan);
-  const steps = setupSteps({
+  const steps = guideSteps(setupSteps({
     quoteWidget: flags.quoteRequests,
     catalogs: flags.catalogs,
     credit: flags.credit,
@@ -86,7 +94,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     scaleTier: featureAvailable("salesReps", shopPlanHandle(shop)),
     planSelected,
     ...progress,
-  });
+  }));
   // Only count work the shop's plan lets the merchant act on: a count that
   // leads to an upgrade-only page ("14 offers to review" on Free) is noise.
   const handle = shopPlanHandle(shop);
@@ -98,7 +106,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     credit: flags.credit && featureAvailable("netTerms", handle),
     tax: flags.tax && growthTier, // verifying certificates is part of Growth's tax workflow
   });
-  return { metrics, promptReview, attention, steps, setupDismissed: progress.dismissed, planSelected, analyticsOn: flags.analytics };
+  return { metrics, promptReview, attention, steps, setupDismissed: progress.dismissed, planSelected, analyticsOn: flags.analytics, storefront };
 };
 
 // Two acknowledgements, both append-only Events so they survive reloads:
@@ -113,6 +121,30 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   else await markReviewPromptShown(shop.id);
   return { ok: true };
 };
+
+function StorefrontCard({ status }: { status: StorefrontStatus }) {
+  return (
+    <Card>
+      <BlockStack gap="300">
+        <InlineStack align="space-between" blockAlign="center" gap="300">
+          <Text as="h2" variant="headingMd">
+            Storefront
+          </Text>
+          <Badge tone={status.on ? "success" : "attention"}>{status.label}</Badge>
+        </InlineStack>
+        <Text as="p" tone="subdued">
+          {status.detail}
+          {status.lastRequestAt ? ` Last request: ${formatDate(status.lastRequestAt)}.` : ""}
+        </Text>
+        <InlineStack>
+          <Button url={status.primary.url} target={status.primary.external ? "_top" : undefined}>
+            {status.primary.content}
+          </Button>
+        </InlineStack>
+      </BlockStack>
+    </Card>
+  );
+}
 
 function AttentionCard({ items }: { items: AttentionItem[] }) {
   return (
@@ -378,7 +410,7 @@ function ExpiringSoonCard({ metrics }: { metrics: Metrics }) {
 }
 
 export default function Index() {
-  const { metrics, promptReview, attention, steps, setupDismissed, planSelected, analyticsOn } = useLoaderData<typeof loader>();
+  const { metrics, promptReview, attention, steps, setupDismissed, planSelected, analyticsOn, storefront } = useLoaderData<typeof loader>();
   const shopify = useAppBridge();
   const reviewFetcher = useFetcher();
   // Review prompt: once the merchant has turned a quote into an order, ask
@@ -405,6 +437,7 @@ export default function Index() {
       <TitleBar title="Mannon" />
       <BlockStack gap="400">
         <AttentionCard items={attention as AttentionItem[]} />
+        {storefront && <StorefrontCard status={storefront as StorefrontStatus} />}
         {showGuide && <SetupGuide steps={steps} />}
         {/* The guide's "Choose a plan" step covers this while the guide is open. */}
         {!planSelected && !showGuide && (
@@ -421,11 +454,17 @@ export default function Index() {
 
 // Merchant-facing errors stay a friendly page, never a raw stack trace.
 export function ErrorBoundary() {
+  const revalidator = useRevalidator();
+  const retrying = revalidator.state === "loading";
   return (
     <Page>
       <TitleBar title="Mannon" />
-      <Banner tone="critical" title="We couldn’t load your home page" action={{ content: "Try again", url: "/app" }}>
-        <p>Your data is safe. Reload the page, and if this keeps happening contact Mannon support.</p>
+      <Banner
+        tone="critical"
+        title="We couldn’t load your home page"
+        action={{ content: retrying ? "Retrying…" : "Retry", onAction: () => revalidator.revalidate(), loading: retrying, disabled: retrying }}
+      >
+        <p>Your data is safe. Retry, and if this keeps happening contact Mannon support.</p>
       </Banner>
     </Page>
   );

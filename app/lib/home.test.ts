@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { attentionItems, setupSteps, setupProgress, type AttentionCounts, type SetupState } from "./home";
+import { attentionItems, guideSteps, setupSteps, setupProgress, storefrontStatus, SETUP_GUIDE_MAX, type AttentionCounts, type SetupState } from "./home";
 
 const ZERO: AttentionCounts = { requests: 0, quotesToPrice: 0, expiringSoon: 0, offers: 0, applications: 0, accessRequests: 0, overdueInvoices: 0, taxToVerify: 0 };
 const FLAGS_ON = { quoteRequests: true, offers: true, wholesale: true, catalogSharing: true, credit: true, tax: true };
@@ -58,5 +58,48 @@ describe("setupSteps", () => {
     expect(setupProgress(steps)).toEqual({ done: 2, total: 4, complete: false });
     const all = setupSteps({ ...BASE, hasQuoteWidget: true, hasBuyer: true, hasSentQuote: true, planSelected: true });
     expect(setupProgress(all).complete).toBe(true);
+  });
+});
+
+describe("guideSteps (Built for Shopify: at most 5 tasks; Mannon shows 4)", () => {
+  const everything = { ...BASE, catalogs: true, credit: true, tax: true, i18n: true, payments: true, erp: true, accounting: true, reps: true, catalogSharing: true, growthTier: true, scaleTier: true };
+
+  it("never shows more than 4 tasks, core path first", () => {
+    const steps = guideSteps(setupSteps(everything));
+    expect(SETUP_GUIDE_MAX).toBe(4);
+    expect(steps.map((s) => s.id)).toEqual(["storefront", "buyer", "quote", "plan"]);
+  });
+
+  it("fills a spare slot with an optional step when the button feature is off", () => {
+    const steps = guideSteps(setupSteps({ ...everything, quoteWidget: false }));
+    expect(steps).toHaveLength(4);
+    expect(steps.map((s) => s.id).slice(0, 3)).toEqual(["buyer", "quote", "plan"]);
+    expect(steps[3].optional).toBe(true);
+  });
+});
+
+describe("storefrontStatus", () => {
+  const editor = "https://x.myshopify.com/admin/themes/current/editor?template=product&addAppBlockId=k/quote_button&target=mainSection";
+
+  it("says the button is off and how to turn it on", () => {
+    const s = storefrontStatus({ featureOn: true, buttonOn: false, lastRequestAt: null, themeEditorUrl: editor });
+    expect(s?.label).toBe("Quote button: off");
+    expect(s?.primary).toEqual({ content: "Turn on the button", url: "/app/quote-requests?setup=1" });
+  });
+
+  it("points to the theme editor when the button is on but no request has arrived", () => {
+    const s = storefrontStatus({ featureOn: true, buttonOn: true, lastRequestAt: null, themeEditorUrl: editor });
+    expect(s?.label).toBe("Quote button: on");
+    expect(s?.primary).toEqual({ content: "Open theme editor", url: editor, external: true });
+  });
+
+  it("shows the last request as proof it is live", () => {
+    const s = storefrontStatus({ featureOn: true, buttonOn: true, lastRequestAt: "2026-11-27T10:00:00.000Z", themeEditorUrl: editor });
+    expect(s?.detail).toMatch(/sending requests/);
+    expect(s?.primary.url).toBe("/app/quote-requests?setup=1");
+  });
+
+  it("hides the card when the feature isn't part of the app", () => {
+    expect(storefrontStatus({ featureOn: false, buttonOn: false, lastRequestAt: null, themeEditorUrl: null })).toBeNull();
   });
 });

@@ -168,6 +168,70 @@ export function setupSteps(s: SetupState): SetupStep[] {
   return steps;
 }
 
+/**
+ * The setup guide shows at most this many tasks (Built for Shopify allows 5).
+ * The core path comes first; optional feature steps fill any spare slot.
+ */
+export const SETUP_GUIDE_MAX = 4;
+
+/** The tasks the guide shows: core first, then optional, capped at SETUP_GUIDE_MAX. */
+export function guideSteps(steps: SetupStep[]): SetupStep[] {
+  const core = steps.filter((s) => !s.optional);
+  const optional = steps.filter((s) => s.optional);
+  return [...core, ...optional].slice(0, SETUP_GUIDE_MAX);
+}
+
+// --- storefront status ------------------------------------------------------
+
+export interface StorefrontStatusInput {
+  /** The quote button feature exists in this deployment (MANNON_FF_QUOTE_WIDGET). */
+  featureOn: boolean;
+  /** The merchant switched the button on in Mannon. */
+  buttonOn: boolean;
+  /** When the last request came in from the store (ISO), if any. */
+  lastRequestAt: string | null;
+  /** Theme editor link that adds the Request a Quote block, if the shop/key are usable. */
+  themeEditorUrl: string | null;
+}
+
+export interface StorefrontStatus {
+  on: boolean;
+  label: "Quote button: on" | "Quote button: off";
+  /** One plain sentence about what this means for buyers. */
+  detail: string;
+  lastRequestAt: string | null;
+  primary: { content: string; url: string; external?: boolean };
+}
+
+/**
+ * Home's storefront card. Mannon can't read the theme (no theme scope), so
+ * "on" means switched on in Mannon; a recent storefront request is the proof
+ * it shows on the store. Null when the feature isn't part of this deployment.
+ */
+export function storefrontStatus(i: StorefrontStatusInput): StorefrontStatus | null {
+  if (!i.featureOn) return null;
+  if (!i.buttonOn) {
+    return {
+      on: false,
+      label: "Quote button: off",
+      detail: "Buyers can\u2019t ask for a quote from your store yet.",
+      lastRequestAt: i.lastRequestAt,
+      primary: { content: "Turn on the button", url: "/app/quote-requests?setup=1" },
+    };
+  }
+  return {
+    on: true,
+    label: "Quote button: on",
+    detail: i.lastRequestAt
+      ? "Buyers are sending requests from your store."
+      : "No requests from your store yet. If buyers can\u2019t see the button, add the block to your product page in the theme editor.",
+    lastRequestAt: i.lastRequestAt,
+    primary: i.lastRequestAt || !i.themeEditorUrl
+      ? { content: "Button settings", url: "/app/quote-requests?setup=1" }
+      : { content: "Open theme editor", url: i.themeEditorUrl, external: true },
+  };
+}
+
 export function setupProgress(steps: SetupStep[]): { done: number; total: number; complete: boolean } {
   const done = steps.filter((s) => s.done).length;
   return { done, total: steps.length, complete: done === steps.length };
