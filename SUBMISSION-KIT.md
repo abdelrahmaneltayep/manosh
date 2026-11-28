@@ -99,8 +99,8 @@ not `mannon`.
 | Plan | Price / mo | Trial | Highlights |
 |---|---|---|---|
 | **Free** | **$0** | — | Up to 10 quotes/mo · 1 company account · passwordless portal · one-tap reorder · quick order pad |
-| **Starter** | **$9** | 14 days | Everything in Free · unlimited quotes & requests · up to 5 company accounts · 1 custom price list · basic quote analytics |
-| **Growth** | **$29** | 14 days | Everything in Starter · ✦ Draft with Claude (counters & carts) · net terms & deposits · Make an Offer · 25 company accounts · 10 price lists · full analytics + Claude insights |
+| **Starter** | **$9** | 14 days | Everything in Free · unlimited quotes & requests · up to 5 company accounts · 3 custom price lists · basic quote analytics |
+| **Growth** | **$29** | 14 days | Everything in Starter · ✦ Draft with Claude (counters & carts) · net terms & deposits · Make an Offer · 25 company accounts · unlimited price lists · full analytics + Claude insights |
 | **Scale** | **$69** | 14 days | Everything in Growth · unlimited accounts & price lists · automated offers · sales-rep portal · accounting sync · white-label buyer portal · deal-level analytics |
 
 Paste-ready plan descriptions:
@@ -116,7 +116,7 @@ Paste-ready plan descriptions:
 - Everything in Free
 - Unlimited quotes & requests
 - Up to 5 company accounts
-- 1 custom price list
+- 3 custom price lists
 - Basic quote analytics
 
 **Growth — $29/mo · 14-day trial** (handle `growth`)
@@ -124,7 +124,7 @@ Paste-ready plan descriptions:
 - Draft with Claude: counters & carts
 - Net terms & deposits
 - Make an Offer (manual rules)
-- 25 company accounts, 10 price lists
+- 25 company accounts, unlimited lists
 - Full analytics + Claude insights
 
 **Scale — $69/mo · 14-day trial** (handle `scale`)
