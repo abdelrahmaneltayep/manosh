@@ -7,6 +7,7 @@ import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
 import { submitRateOk } from "./wholesale.server";
 import { getVisibleCatalog } from "./catalogs.server";
 import { submitBuyerQuote } from "./portal-quote.server";
+import { RequestAlreadyHandledError } from "./quote.server";
 import { quoteWidgetFeatures, type QuoteWidgetFeatures } from "../lib/billing";
 import { validateQuoteRequest, type QuoteRequestInput, type CleanLine } from "../lib/quote-widget";
 import { formBelongsToShop, QUOTE_CAPTURE_ENABLED } from "./quote-form.server";
@@ -154,10 +155,21 @@ export async function createQuoteRequest(
     captureException(error);
   }
 
+  // A request from a buyer the store already has becomes a quote with status
+  // New straight away. Best-effort: if it can't, the request waits in Requests.
+  let quoteId: string | null = null;
+  try {
+    const converted = await convertToQuote(shopDomain, request.id, { onlyKnownBuyer: true });
+    if (converted.ok) quoteId = converted.quoteId;
+  } catch (error) {
+    captureException(error);
+  }
+
   // Alert the merchant and confirm to the visitor (best-effort; the request is
   // already saved). Both attempts are logged, so a failed send shows in the admin.
   try {
-    const requestUrl = `${ctx.baseUrl.replace(/\/$/, "")}/app/quote-requests`;
+    const appUrl = ctx.baseUrl.replace(/\/$/, "");
+    const requestUrl = quoteId ? `${appUrl}/app/quotes/${quoteId}` : `${appUrl}/app/quote-requests`;
     const m = renderTemplate(resolveTemplate("quote_request_created", shop.emailTemplates ?? null), {
       email: clean.value.email,
       companyLine: clean.value.companyName ? `\nCompany: ${clean.value.companyName}` : "",
@@ -174,7 +186,7 @@ export async function createQuoteRequest(
     captureException(error);
   }
 
-  return { ok: true, requestId: request.id };
+  return { ok: true, requestId: request.id, ...(quoteId ? { quoteId } : {}) };
 }
 
 // --- merchant inbox ----------------------------------------------------------
@@ -286,20 +298,37 @@ async function ensureBuyer(shopId: string, email: string, companyName: string | 
 
 export type ConvertResult = { ok: true; quoteId: string } | { ok: false; error: string };
 
-/** Convert a NEW request into a real F1 Quote in one click. */
-export async function convertToQuote(shopDomain: string, id: string): Promise<ConvertResult> {
+/**
+ * Turn a NEW storefront request into a quote with status New (SUBMITTED). The
+ * request is marked CONVERTED in the quote's own transaction, so a request
+ * becomes at most one quote: running this twice, or racing a merchant click,
+ * returns the same quote. The request already alerted the merchant and
+ * acknowledged the buyer, so the quote sends neither again.
+ *
+ * `onlyKnownBuyer`: used for automatic conversion (on arrival and in the
+ * backfill). A request from a new email would add a company account, which
+ * counts toward the plan's limit, so that stays the merchant's decision.
+ */
+export async function convertToQuote(shopDomain: string, id: string, opts: { onlyKnownBuyer?: boolean } = {}): Promise<ConvertResult> {
   const shop = await shopFor(shopDomain);
   if (!shop) return { ok: false, error: "Unknown shop." };
   const request = await prisma.quoteRequest.findFirst({ where: { id, shopId: shop.id } });
   if (!request) return { ok: false, error: "Request not found." };
+  if (request.status === "CONVERTED" && request.convertedQuoteId) return { ok: true, quoteId: request.convertedQuoteId };
   if (request.status !== "NEW") return { ok: false, error: "This request was already handled." };
 
   let ensured: { buyerId: string; companyId: string };
-  try {
-    ensured = await ensureBuyer(shop.id, request.email, request.companyName, request.id);
-  } catch (error) {
-    if (error instanceof CompanyCapError) return { ok: false, error: error.message };
-    throw error;
+  if (opts.onlyKnownBuyer) {
+    const known = await prisma.buyer.findFirst({ where: { email: { equals: request.email, mode: "insensitive" }, status: "ACTIVE", company: { shopId: shop.id } }, select: { id: true, companyId: true } });
+    if (!known) return { ok: false, error: "New buyer: create the quote from the request." };
+    ensured = { buyerId: known.id, companyId: known.companyId };
+  } else {
+    try {
+      ensured = await ensureBuyer(shop.id, request.email, request.companyName, request.id);
+    } catch (error) {
+      if (error instanceof CompanyCapError) return { ok: false, error: error.message };
+      throw error;
+    }
   }
   const { buyerId, companyId } = ensured;
 
@@ -318,13 +347,38 @@ export async function convertToQuote(shopDomain: string, id: string): Promise<Co
   }
   if (selections.length === 0) return { ok: false, error: "None of the requested items matched your catalog. Reach out to the buyer directly." };
 
-  const result = await submitBuyerQuote({ id: buyerId, companyId }, selections, catalog);
-  if (!result.ok) return { ok: false, error: result.error };
-
-  await prisma.quoteRequest.update({ where: { id: request.id }, data: { status: "CONVERTED", convertedQuoteId: result.quote.id } });
-  // F24.1 — carry the originating form onto the created quote (quote.created carries formId).
-  if (request.formId) {
-    await prisma.quote.update({ where: { id: result.quote.id }, data: { formId: request.formId } });
+  try {
+    const result = await submitBuyerQuote({ id: buyerId, companyId }, selections, catalog, {
+      fromRequest: { id: request.id, formId: request.formId },
+      notify: false,
+    });
+    if (!result.ok) return { ok: false, error: result.error };
+    return { ok: true, quoteId: result.quote.id };
+  } catch (error) {
+    if (!(error instanceof RequestAlreadyHandledError)) throw error;
+    // Someone else converted it first: return their quote.
+    const now = await prisma.quoteRequest.findUnique({ where: { id: request.id }, select: { convertedQuoteId: true } });
+    return now?.convertedQuoteId ? { ok: true, quoteId: now.convertedQuoteId } : { ok: false, error: "This request was already handled." };
   }
-  return { ok: true, quoteId: result.quote.id };
+}
+
+/**
+ * Backfill, safe to run any number of times: turn every NEW request from a
+ * known buyer into a quote. Requests from new emails, and ones whose items
+ * aren't in the catalog, stay in Requests.
+ */
+export async function convertPendingRequests(shopDomain: string): Promise<{ converted: number; left: number }> {
+  const shop = await shopFor(shopDomain);
+  if (!shop) return { converted: 0, left: 0 };
+  const pending = await prisma.quoteRequest.findMany({ where: { shopId: shop.id, status: "NEW" }, select: { id: true }, orderBy: { createdAt: "asc" } });
+  let converted = 0;
+  for (const r of pending) {
+    try {
+      const result = await convertToQuote(shopDomain, r.id, { onlyKnownBuyer: true });
+      if (result.ok) converted++;
+    } catch (error) {
+      captureException(error);
+    }
+  }
+  return { converted, left: pending.length - converted };
 }

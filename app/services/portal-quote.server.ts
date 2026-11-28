@@ -74,7 +74,13 @@ export async function submitBuyerQuote(
   buyer: { id: string; companyId: string },
   selections: QuoteSelection[],
   catalog: CatalogItem[],
-  options: { placedByRepId?: string | null } = {},
+  options: {
+    placedByRepId?: string | null;
+    /** Turning a storefront request into a quote (see submitQuote). */
+    fromRequest?: { id: string; formId?: string | null };
+    /** The request already alerted the merchant and acknowledged the buyer. */
+    notify?: boolean;
+  } = {},
 ): Promise<SubmitBuyerQuoteResult> {
   const built = buildQuoteLinesFromSelections(catalog, selections);
   if (!built.ok) return built;
@@ -141,6 +147,7 @@ export async function submitBuyerQuote(
     placedByRepId: options.placedByRepId ?? null,
     displayCurrency,
     displayRate,
+    ...(options.fromRequest ? { source: "WIDGET" as const, fromRequest: options.fromRequest } : {}),
   });
 
   // F8 — schedule automated follow-ups (feature-flagged; no-op if the policy is
@@ -155,7 +162,8 @@ export async function submitBuyerQuote(
   }
 
   // Alert the merchant and confirm to the buyer (best-effort, never throws).
-  await emailQuoteReceived(quote.id);
+  // A storefront request already did both when it arrived.
+  if (options.notify !== false) await emailQuoteReceived(quote.id);
 
   return { ok: true, quote };
 }

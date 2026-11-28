@@ -110,6 +110,14 @@ export async function submitQuote(input: {
   placedByRepId?: string | null;
   displayCurrency?: string | null;
   displayRate?: string | null;
+  /** How the quote started (a storefront request is WIDGET). Default PORTAL. */
+  source?: "PORTAL" | "WIDGET" | "REP";
+  /**
+   * The storefront request this quote answers. The request is marked
+   * CONVERTED in the same transaction, and only if it is still NEW: a request
+   * becomes at most one quote, even when two conversions race.
+   */
+  fromRequest?: { id: string; formId?: string | null };
   now?: Date;
 }): Promise<QuoteWithLines> {
   const now = input.now ?? new Date();
@@ -134,6 +142,8 @@ export async function submitQuote(input: {
         placedByRepId: input.placedByRepId ?? null,
         displayCurrency: input.displayCurrency ?? null,
         displayRate: input.displayRate ?? null,
+        ...(input.source ? { source: input.source } : {}),
+        ...(input.fromRequest?.formId ? { formId: input.fromRequest.formId } : {}),
         lines: {
           create: input.lines.map((line) => ({
             variantId: line.variantId,
@@ -146,18 +156,33 @@ export async function submitQuote(input: {
       },
       include: { lines: true },
     });
+    if (input.fromRequest) {
+      const claimed = await tx.quoteRequest.updateMany({
+        where: { id: input.fromRequest.id, shopId: company.shopId, status: "NEW" },
+        data: { status: "CONVERTED", convertedQuoteId: quote.id },
+      });
+      if (claimed.count !== 1) throw new RequestAlreadyHandledError(input.fromRequest.id);
+    }
     await appendEvent(
       {
         shopId: company.shopId,
         type: "QUOTE_SUBMITTED",
         entityType: "Quote",
         entityId: quote.id,
-        payload: { to: "SUBMITTED", lineCount: input.lines.length },
+        payload: { to: "SUBMITTED", lineCount: input.lines.length, ...(input.fromRequest ? { requestId: input.fromRequest.id } : {}) },
       },
       tx,
     );
     return quote;
   });
+}
+
+/** A storefront request was already turned into a quote (or declined). */
+export class RequestAlreadyHandledError extends Error {
+  constructor(public requestId: string) {
+    super(`Request ${requestId} was already handled`);
+    this.name = "RequestAlreadyHandledError";
+  }
 }
 
 interface TransitionOptions {
