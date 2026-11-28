@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -430,7 +431,7 @@ export async function approveLead(shopDomain: string, leadId: string, reviewedBy
       portalUrl: provision?.magicUrl ?? `${baseUrl.replace(/\/$/, "")}/portal`,
       shopName: await shopNameFor(shopDomain),
     });
-    const result = await sendEmail({ to: lead.email, subject, html: body.replace(/\n/g, "<br>"), text: body });
+    const result = await sendEmail({ ...(await storeSender(shopDomain)), to: lead.email, subject, html: body.replace(/\n/g, "<br>"), text: body });
     if (!result.sent) return { ok: true, access: { to: lead.email, text: body } };
   } catch (error) {
     captureException(error);

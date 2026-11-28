@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -175,7 +176,7 @@ export async function sendInstallNudges(shopDomain: string, baseUrl: string): Pr
   for (const b of buyers) {
     try {
       const tpl = renderTemplate(resolveTemplate("pwa_install_nudge", null), { buyerName: b.name ?? "there", shopName: await shopNameFor(shopDomain), portalUrl: `${baseUrl.replace(/\/$/, "")}/portal` });
-      const res = await sendEmail({ to: b.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+      const res = await sendEmail({ ...(await storeSender(shopDomain)), to: b.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
       if (res.sent) sent++;
     } catch (error) {
       captureException(error);

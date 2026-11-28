@@ -1,4 +1,5 @@
 import type { SalesRep } from "@prisma/client";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -109,7 +110,7 @@ export async function inviteRep(
   // template body (with the secure sign-in link) follows.
   const note = input.note?.trim();
   const body = note ? `${note}\n\n${tpl.body}` : tpl.body;
-  const result = await sendEmail({ to: email, subject: tpl.subject, html: body.replace(/\n/g, "<br>"), text: body });
+  const result = await sendEmail({ ...(await storeSender(shopDomain)), to: email, subject: tpl.subject, html: body.replace(/\n/g, "<br>"), text: body });
 
   // `sent` is false whenever the invite didn't go out (no sender, or the send
   // failed), so the page can always hand the merchant the link instead.
@@ -294,7 +295,7 @@ export async function recordOnBehalf(input: {
       companyName: input.companyName,
       shopName: await shopNameFor(input.shopDomain),
     });
-    await sendEmail({ to: input.buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+    await sendEmail({ ...(await storeSender(input.shopDomain)), to: input.buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
   } catch (error) {
     captureException(error);
   }

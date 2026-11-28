@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import { captureException } from "../lib/sentry.server";
 import { renderTemplate, resolveTemplate, sendEmail, type SendResult, type TemplateKey } from "./mailer.server";
@@ -58,7 +59,7 @@ async function sendToBuyer(
     expiresAt: q.expiresAt.toISOString().slice(0, 10),
   });
   const result = await sendEmail(
-    { to: q.buyer.email, subject, html: body.replace(/\n/g, "<br>"), text: body, fromName: await shopNameFor(shop.shopifyDomain), tag: template },
+    { ...(await storeSender(shop.shopifyDomain)), to: q.buyer.email, subject, html: body.replace(/\n/g, "<br>"), text: body, tag: template },
     { shopId: shop.id, template, entityType: "Quote", entityId: quoteId },
   );
   return {
@@ -103,7 +104,7 @@ export async function emailQuoteReceived(quoteId: string, baseUrl?: string): Pro
       shopName: await shopNameFor(shop.shopifyDomain),
     });
     await sendEmail(
-      { to: q.buyer.email, subject: ack.subject, html: ack.body.replace(/\n/g, "<br>"), text: ack.body, fromName: await shopNameFor(shop.shopifyDomain), tag: "quote_request_ack" },
+      { ...(await storeSender(shop.shopifyDomain)), to: q.buyer.email, subject: ack.subject, html: ack.body.replace(/\n/g, "<br>"), text: ack.body, tag: "quote_request_ack" },
       { shopId: shop.id, template: "quote_request_ack", entityType: "Quote", entityId: quoteId },
     );
   } catch (error) {

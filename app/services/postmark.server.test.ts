@@ -69,3 +69,10 @@ describe("Postmark payload escaping, pre-converted text", () => {
     expect(body.HtmlBody).toBe("From: &lt;script&gt;x&lt;/script&gt;<br>Thanks");
   });
 });
+
+describe("Postmark Reply-To", () => {
+  it("uses the store's address when the message names one", () => {
+    const body = postmarkPayload({ to: "buyer@x.co", subject: "s", html: "h", replyTo: "owner@store.example" }, "quotes@support-mannon.com", "outbound");
+    expect(body.ReplyTo).toBe("owner@store.example");
+  });
+});

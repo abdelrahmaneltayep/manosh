@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import { appendEvent } from "./events.server";
 import { daysOverdue } from "../lib/aging";
@@ -109,7 +110,7 @@ export async function runRemindersForShop(
         shopName: await shopNameFor(shopDomain),
       });
       const result = await sendEmail(
-        { to: buyer.email, subject, html: body, text: body, fromName: await shopNameFor(shopDomain), tag: KIND_TO_TEMPLATE[stage] },
+        { ...(await storeSender(shopDomain)), to: buyer.email, subject, html: body, text: body, tag: KIND_TO_TEMPLATE[stage] },
         { shopId: shop.id, template: KIND_TO_TEMPLATE[stage], entityType: "Invoice", entityId: invoice.id },
       );
       delivered = result.sent;

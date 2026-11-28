@@ -1,4 +1,5 @@
 import type { PaymentPlanType } from "@prisma/client";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -275,7 +276,7 @@ export async function issuePayLink(
         payUrl: url,
         shopName: await shopNameFor(plan.quote.company.shop.shopifyDomain),
       });
-      await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+      await sendEmail({ ...(await storeSender(plan.quote.company.shop.shopifyDomain)), to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     } catch (error) {
       captureException(error);
     }
@@ -431,7 +432,7 @@ export async function runPaymentRemindersForShop(shopDomain: string, baseUrl: st
           payUrl: new URL(`/portal/quotes/${plan.quote.id}`, baseUrl).toString(),
           shopName: await shopNameFor(shopDomain),
         });
-        await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+        await sendEmail({ ...(await storeSender(shopDomain)), to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
       }
       stages.add(stage);
       await prisma.paymentInstallment.update({ where: { id: inst.id }, data: { reminderStages: [...stages] } });

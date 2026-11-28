@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { storeSender } from "../services/store-sender.server";
 import { shopNameFor } from "../services/shop-name.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useActionData, useFetcher, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
@@ -114,7 +115,7 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
     const shopRow = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { id: true } });
     const preview = renderPreview({ subject, body }, sampleValues(placeholders(DEFAULT_TEMPLATES[key])));
     const sent = await sendEmail(
-      { to, subject: `[Test] ${preview.subject}`, html: preview.body.replace(/\n/g, "<br>"), text: preview.body, fromName: await shopNameFor(session.shop), tag: "template_test" },
+      { ...(await storeSender(session.shop)), to, subject: `[Test] ${preview.subject}`, html: preview.body.replace(/\n/g, "<br>"), text: preview.body, tag: "template_test" },
       shopRow ? { shopId: shopRow.id, template: key, entityType: "TemplateTest", entityId: key } : undefined,
     );
     return sent.sent

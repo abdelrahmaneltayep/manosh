@@ -1,4 +1,5 @@
 import type { CompanyRole } from "@prisma/client";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -113,7 +114,7 @@ export async function inviteMember(
     role: input.role,
     shopName: await shopNameFor(company.shop.shopifyDomain),
   });
-  const result = await sendEmail({ to: email, subject, html: body, text: body });
+  const result = await sendEmail({ ...(await storeSender(company.shop.shopifyDomain)), to: email, subject, html: body, text: body });
 
   // `sent` is false whenever the invite didn't go out, so the caller can show the link.
   return { member, inviteUrl: url, sent: result.sent };

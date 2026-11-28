@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { storeSender } from "../services/store-sender.server";
 import { shopNameFor } from "../services/shop-name.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
@@ -190,13 +191,12 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
     const currencyCode = catalog[0]?.currencyCode ?? "USD";
     const pdf = await renderQuotePdf(session.shop, quoteId, { currencyCode, plan: status.plan });
     if (!pdf) return { ok: false as const, kind: "quote" as const, error: "Quote not found." };
-    const sent = await sendEmail({
+    const sent = await sendEmail({ ...(await storeSender(session.shop)),
       to: pdf.buyerEmail,
       subject: "Your quote",
       html: "<p>Your quote is attached as a PDF.</p>",
       text: "Your quote is attached as a PDF.",
       attachments: [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }],
-      fromName: await shopNameFor(session.shop),
       tag: "quote_pdf",
     }, { shopId: pdf.shopId, template: "quote_pdf", entityType: "Quote", entityId: quoteId });
     // Only claim a send that happened.

@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import type { FollowupKind } from "@prisma/client";
 import prisma from "../db.server";
@@ -219,7 +220,7 @@ export async function dispatchForShop(shopDomain: string, baseUrl: string, now: 
       shopName: await shopNameFor(shopDomain),
     });
     const delivery = await sendEmail(
-      { to: quote.buyer.email, subject, html: body.replace(/\n/g, "<br>"), text: body, fromName: await shopNameFor(shopDomain), tag: key },
+      { ...(await storeSender(shopDomain)), to: quote.buyer.email, subject, html: body.replace(/\n/g, "<br>"), text: body, tag: key },
       { shopId: shop.id, template: key, entityType: "Quote", entityId: quote.id },
     );
     // A failed send stays SCHEDULED, so the next run retries it (and the quote
@@ -304,7 +305,7 @@ export async function sendNow(
   const reminder = await buildReminder(shopDomain, quoteId, baseUrl, options.customBody);
   if (!reminder) return false;
   const result = await sendEmail(
-    { to: reminder.to, subject: reminder.subject, html: reminder.body.replace(/\n/g, "<br>"), text: reminder.body, fromName: await shopNameFor(shopDomain), tag: "followup_reminder" },
+    { ...(await storeSender(shopDomain)), to: reminder.to, subject: reminder.subject, html: reminder.body.replace(/\n/g, "<br>"), text: reminder.body, tag: "followup_reminder" },
     { shopId: reminder.shopId, template: "followup_reminder", entityType: "Quote", entityId: quoteId },
   );
   // Only record a send that happened.

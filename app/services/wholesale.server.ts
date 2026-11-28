@@ -1,4 +1,5 @@
 import type { WholesaleFieldType, WholesaleStatus } from "@prisma/client";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -265,7 +266,7 @@ export async function submitApplication(
     portalUrl: magicUrl ?? `${payload.baseUrl.replace(/\/$/, "")}/portal`,
     shopName: await shopNameFor(shopDomain),
   });
-  await sendEmail({ to: contactEmail, subject, html: body, text: body });
+  await sendEmail({ ...(await storeSender(shopDomain)), to: contactEmail, subject, html: body, text: body });
 
   return { ok: true, status };
 }
@@ -421,7 +422,7 @@ export async function decideApplication(
   // template body (with the portal link) follows so the message stays actionable.
   const note = options.customNote?.trim();
   const body = note ? `${note}\n\n${rendered.body}` : rendered.body;
-  const result = await sendEmail({ to: app.contactEmail, subject: rendered.subject, html: body, text: body });
+  const result = await sendEmail({ ...(await storeSender(shopDomain)), to: app.contactEmail, subject: rendered.subject, html: body, text: body });
   return { to: app.contactEmail, subject: rendered.subject, body, sent: result.sent };
 }
 

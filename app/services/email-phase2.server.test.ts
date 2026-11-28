@@ -145,6 +145,33 @@ describe.skipIf(!hasDb)("Phase 2 email", () => {
     expect((await prisma.emailDelivery.findFirstOrThrow({ where: { entityId: quote.id } })).status).toBe("FAILED");
   });
 
+  it("buyer replies reach the store, never Mannon's sending address", async () => {
+    const { quote } = await seed(["owner@store.example", "ops@store.example"]);
+    await emailQuoteReceived(quote.id, BASE_URL);
+    await emailQuoteSent(quote.id, BASE_URL);
+    await emailQuoteOrdered(quote.id, BASE_URL);
+    const toBuyer = outbox.filter((m) => m.to === "buyer@mail.example");
+    expect(toBuyer).toHaveLength(3);
+    for (const m of toBuyer) {
+      expect(m.replyTo).toBe("owner@store.example");
+      expect(m.replyTo).not.toBe(process.env.MANNON_MAIL_FROM);
+      expect(m.fromName).toBe("Mail Supply Co.");
+    }
+  });
+
+  it("follow-up and expiry reminders reply to the store too", async () => {
+    const { quote } = await seed();
+    await upsertPolicy("mail.myshopify.com", { enabled: true, expiryDays: 14, cadenceDays: [3], maxNudges: 1, expiryWarningDays: 3 });
+    await rescheduleExpiryWarnings("mail.myshopify.com");
+    const warning = await prisma.quoteFollowup.findFirstOrThrow({ where: { quoteId: quote.id, kind: "EXPIRY_WARNING" } });
+    const run = new Date(Date.UTC(warning.scheduledFor.getUTCFullYear(), warning.scheduledFor.getUTCMonth(), warning.scheduledFor.getUTCDate() + 1, 10));
+    while ([0, 6].includes(run.getUTCDay())) run.setUTCDate(run.getUTCDate() + 1);
+    await dispatchForShop("mail.myshopify.com", BASE_URL, run);
+    const reminders = outbox.filter((m) => m.to === "buyer@mail.example");
+    expect(reminders.length).toBeGreaterThan(0);
+    for (const m of reminders) expect(m.replyTo).toBe("owner@store.example");
+  });
+
   it("tells the buyer when the order is placed", async () => {
     const { quote } = await seed();
     await emailQuoteOrdered(quote.id, BASE_URL);

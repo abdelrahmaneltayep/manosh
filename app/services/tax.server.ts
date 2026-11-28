@@ -1,4 +1,5 @@
 import type { TaxIdType as PrismaTaxIdType } from "@prisma/client";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -87,7 +88,7 @@ export async function submitTaxProfile(
     const buyer = company?.buyers[0];
     if (buyer) {
       const tpl = renderTemplate(resolveTemplate("tax_certificate_received", null), { buyerName: buyer.name ?? "there", companyName: company!.name, shopName: await shopNameFor(company!.shop.shopifyDomain) });
-      await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+      await sendEmail({ ...(await storeSender(company!.shop.shopifyDomain)), to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     }
   } catch (error) {
     captureException(error);
@@ -291,7 +292,7 @@ export async function runCertExpiryRemindersForShop(shopDomain: string, now: Dat
         expiresAt: p.certificateExpiresAt!.toISOString().slice(0, 10),
         shopName: await shopNameFor(shopDomain),
       });
-      await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+      await sendEmail({ ...(await storeSender(shopDomain)), to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     }
     await prisma.taxProfile.update({ where: { id: p.id }, data: { certExpiryRemindedAt: now } });
     sent++;
@@ -314,7 +315,7 @@ async function emailBuyer(
     const buyer = company?.buyers[0];
     if (!buyer) return null;
     const tpl = renderTemplate(resolveTemplate(templateKey as never, null), { buyerName: buyer.name ?? "there", companyName: company!.name, shopName: await shopNameFor(company!.shop.shopifyDomain), ...extra });
-    const result = await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
+    const result = await sendEmail({ ...(await storeSender(company!.shop.shopifyDomain)), to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     return { to: buyer.email, text: tpl.body, sent: result.sent };
   } catch (error) {
     captureException(error);

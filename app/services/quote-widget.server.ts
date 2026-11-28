@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { storeSender } from "./store-sender.server";
 import { shopNameFor } from "./shop-name.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -166,7 +167,7 @@ export async function createQuoteRequest(
     await alertMerchant(shopDomain, { subject: m.subject, text: m.body }, { template: "quote_request_created", entityType: "QuoteRequest", entityId: request.id });
     const a = renderTemplate(resolveTemplate("quote_request_ack", shop.emailTemplates ?? null), { shopName: await shopNameFor(shopDomain) });
     await sendEmail(
-      { to: clean.value.email, subject: a.subject, html: a.body.replace(/\n/g, "<br>"), text: a.body, fromName: await shopNameFor(shopDomain) },
+      { ...(await storeSender(shopDomain)), to: clean.value.email, subject: a.subject, html: a.body.replace(/\n/g, "<br>"), text: a.body },
       { shopId: shop.id, template: "quote_request_ack", entityType: "QuoteRequest", entityId: request.id },
     );
   } catch (error) {
@@ -247,7 +248,7 @@ export async function getQuoteRequestForShop(shopDomain: string, id: string): Pr
 export async function replyToRequest(shopDomain: string, id: string, body: string): Promise<boolean> {
   const reply = await prepareRequestReply(shopDomain, id, body);
   if (!reply) return false;
-  const result = await sendEmail({ to: reply.to, subject: "About your quote request", html: reply.text.replace(/\n/g, "<br>"), text: reply.text });
+  const result = await sendEmail({ ...(await storeSender(shopDomain)), to: reply.to, subject: "About your quote request", html: reply.text.replace(/\n/g, "<br>"), text: reply.text });
   // Only report a reply that actually went out.
   return result.sent;
 }
