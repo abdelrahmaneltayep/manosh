@@ -63,8 +63,8 @@ capability — the public page + discovery listing both require a `LIVE` catalog
 
 The container can't reach a store, so after merge:
 
-1. Set `MANNON_FF_CATALOG_SHARE=true`; set `MANNON_MERCHANT_ALERT_EMAIL` to receive
-   new-lead notices.
+1. Set `MANNON_FF_CATALOG_SHARE=true`. New-lead notices go to the store's alert
+   addresses (Settings › Notifications).
 2. Run the `f19_catalog_sharing` migration (`prisma migrate deploy`).
 3. Smoke-test: publish a catalog with prices hidden → open the public link → confirm
    no prices and no hidden SKUs → request access → the lead appears → **Approve** →

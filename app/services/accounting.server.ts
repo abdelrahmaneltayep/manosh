@@ -1,4 +1,5 @@
 import type { AccountingProvider, CustomerMatchStrategy, Prisma } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -19,6 +20,7 @@ import {
   PROVIDERS,
 } from "../lib/accounting";
 import { accountingSyncAllowed } from "../lib/billing";
+import { alertMerchant } from "./merchant-alerts.server";
 
 /**
  * F10 — Accounting Sync service (QuickBooks Online + Xero). Growth-only, dark-
@@ -571,16 +573,13 @@ export async function sendFailureDigest(
 
   const summary = summarizeForDigest(failures.map(() => ({ status: "FAILED" as const })));
   const provider = providerName((failures[0].provider as Provider));
-  const to = process.env.MANNON_MERCHANT_ALERT_EMAIL;
-  if (to) {
-    const tpl = renderTemplate(resolveTemplate("accounting_sync_failure", null), {
-      failed: String(summary.failed),
-      provider,
-      shopName: shopDomain,
-      syncLogUrl: `${baseUrl.replace(/\/$/, "")}/app/accounting`,
-    });
-    await sendEmail({ to, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
-  }
+  const tpl = renderTemplate(resolveTemplate("accounting_sync_failure", null), {
+    failed: String(summary.failed),
+    provider,
+    shopName: await shopNameFor(shopDomain),
+    syncLogUrl: `${baseUrl.replace(/\/$/, "")}/app/accounting`,
+  });
+  await alertMerchant(shopDomain, { subject: tpl.subject, text: tpl.body }, { template: "accounting_sync_failure" });
   await prisma.accountingSyncLog.updateMany({
     where: { id: { in: failures.map((f) => f.id) } },
     data: { digested: true },

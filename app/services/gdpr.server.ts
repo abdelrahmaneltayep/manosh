@@ -2,6 +2,7 @@ import prisma from "../db.server";
 import { sendEmail } from "./mailer.server";
 import { captureException } from "../lib/sentry.server";
 import { clearPlanOnUninstall } from "./billing.server";
+import { alertMerchant } from "./merchant-alerts.server";
 
 /**
  * GDPR mandatory-webhook handlers (F6). See /docs/compliance.md for the exact
@@ -34,15 +35,17 @@ export async function redactCustomer(
   const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { id: true } });
   if (!shop) return 0;
 
-  const [buyers, offers, requests, leads, applications] = await prisma.$transaction([
+  const [buyers, offers, requests, leads, applications, deliveries] = await prisma.$transaction([
     // Buyer cascades to Quote/QuoteLine via onDelete: Cascade.
     prisma.buyer.deleteMany({ where: { email, company: { shopId: shop.id } } }),
     prisma.offer.deleteMany({ where: { buyerEmail: email, shopId: shop.id } }),
     prisma.quoteRequest.deleteMany({ where: { email, shopId: shop.id } }),
     prisma.catalogLead.deleteMany({ where: { email, publicCatalog: { shopId: shop.id } } }),
     prisma.wholesaleApplication.deleteMany({ where: { contactEmail: email, shopId: shop.id } }),
+    // The log of emails sent to this address.
+    prisma.emailDelivery.deleteMany({ where: { to: email, shopId: shop.id } }),
   ]);
-  return buyers.count + offers.count + requests.count + leads.count + applications.count;
+  return buyers.count + offers.count + requests.count + leads.count + applications.count + deliveries.count;
 }
 
 /**
@@ -54,20 +57,21 @@ export async function collectCustomerData(
   shopDomain: string,
   customer: { email?: string | null },
 ) {
-  const empty = { buyers: [], offers: [], quoteRequests: [], catalogLeads: [], wholesaleApplications: [] };
+  const empty = { buyers: [], offers: [], quoteRequests: [], catalogLeads: [], wholesaleApplications: [], emailDeliveries: [] };
   if (!customer.email) return empty;
   const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { id: true } });
   if (!shop) return empty;
   const email = { equals: customer.email, mode: "insensitive" as const };
 
-  const [buyers, offers, quoteRequests, catalogLeads, wholesaleApplications] = await Promise.all([
+  const [buyers, offers, quoteRequests, catalogLeads, wholesaleApplications, emailDeliveries] = await Promise.all([
     prisma.buyer.findMany({ where: { email, company: { shopId: shop.id } }, include: { quotes: { include: { lines: true } } } }),
     prisma.offer.findMany({ where: { buyerEmail: email, shopId: shop.id } }),
     prisma.quoteRequest.findMany({ where: { email, shopId: shop.id } }),
     prisma.catalogLead.findMany({ where: { email, publicCatalog: { shopId: shop.id } } }),
     prisma.wholesaleApplication.findMany({ where: { contactEmail: email, shopId: shop.id } }),
+    prisma.emailDelivery.findMany({ where: { to: email, shopId: shop.id } }),
   ]);
-  return { buyers, offers, quoteRequests, catalogLeads, wholesaleApplications };
+  return { buyers, offers, quoteRequests, catalogLeads, wholesaleApplications, emailDeliveries };
 }
 
 /**
@@ -92,19 +96,14 @@ export async function deliverCustomerData(
   // Audit log: shop + counts only — never the customer's email or any PII.
   console.log(`[gdpr] customers/data_request handled for ${shopDomain}: ${total} record(s)`, counts);
 
-  const to = process.env.MANNON_MERCHANT_ALERT_EMAIL;
-  if (to && total > 0) {
+  if (total > 0) {
     const dump = JSON.stringify(data, null, 2);
     const text =
       `A customer data request was received on ${shopDomain}.\n\n` +
       `Below is the data Mannon holds for this customer, so you can fulfil the request:\n\n${dump}`;
     try {
-      await sendEmail({
-        to,
-        subject: `Customer data request — ${shopDomain}`,
-        text,
-        html: `<pre>${dump.replace(/[<>]/g, "")}</pre>`,
-      });
+      // Not logged per entity: the log would hold the customer's data again.
+      await alertMerchant(shopDomain, { subject: `Customer data request — ${shopDomain}`, text, html: `<pre>${dump.replace(/[<>]/g, "")}</pre>` });
     } catch (error) {
       captureException(error);
     }

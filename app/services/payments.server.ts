@@ -1,4 +1,5 @@
 import type { PaymentPlanType } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -272,7 +273,7 @@ export async function issuePayLink(
         buyerName: buyer.name ?? "there",
         amount: `${plan.currency} ${amount}`,
         payUrl: url,
-        shopName: plan.quote.company.shop.shopifyDomain,
+        shopName: await shopNameFor(plan.quote.company.shop.shopifyDomain),
       });
       await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     } catch (error) {
@@ -428,7 +429,7 @@ export async function runPaymentRemindersForShop(shopDomain: string, baseUrl: st
           amount: `${plan.currency} ${inst.amount.toString()}`,
           dueDate: inst.dueDate.toISOString().slice(0, 10),
           payUrl: new URL(`/portal/quotes/${plan.quote.id}`, baseUrl).toString(),
-          shopName: shopDomain,
+          shopName: await shopNameFor(shopDomain),
         });
         await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
       }

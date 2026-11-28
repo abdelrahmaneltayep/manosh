@@ -60,6 +60,8 @@ export function createMockShopify() {
   let nextDraft = 5001;
 
   const ops = {
+    // Phase 2: the store's contact email seeds the merchant alert address.
+    MannonShopContact: () => ({ shop: { name: "Harbor Coffee Wholesale", contactEmail: "owner@mannon-dev.example", email: "owner@mannon-dev.example" } }),
     MannonCatalog: () => ({
       shop: { currencyCode: CURRENCY },
       products: { nodes: MOCK_CATALOG.map((p) => ({ id: p.productId, title: p.title, isGiftCard: false, variants: { nodes: p.variants } })) },

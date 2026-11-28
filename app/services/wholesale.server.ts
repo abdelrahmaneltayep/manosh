@@ -1,4 +1,5 @@
 import type { WholesaleFieldType, WholesaleStatus } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { issueMagicLink } from "./magic-link.server";
@@ -262,7 +263,7 @@ export async function submitApplication(
     companyName,
     decision: "approved",
     portalUrl: magicUrl ?? `${payload.baseUrl.replace(/\/$/, "")}/portal`,
-    shopName: shopDomain,
+    shopName: await shopNameFor(shopDomain),
   });
   await sendEmail({ to: contactEmail, subject, html: body, text: body });
 
@@ -414,7 +415,7 @@ export async function decideApplication(
     decision:
       decision === "APPROVED" ? "approved" : decision === "REJECTED" ? "declined" : "in need of more information",
     portalUrl: magicUrl ?? `${baseUrl}/portal`,
-    shopName: shopDomain,
+    shopName: await shopNameFor(shopDomain),
   });
   // A merchant-reviewed custom note (e.g. Claude-drafted) leads the email; the
   // template body (with the portal link) follows so the message stays actionable.

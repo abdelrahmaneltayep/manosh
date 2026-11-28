@@ -1,4 +1,5 @@
 import type { TaxIdType as PrismaTaxIdType } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -85,7 +86,7 @@ export async function submitTaxProfile(
     });
     const buyer = company?.buyers[0];
     if (buyer) {
-      const tpl = renderTemplate(resolveTemplate("tax_certificate_received", null), { buyerName: buyer.name ?? "there", companyName: company!.name, shopName: company!.shop.shopifyDomain });
+      const tpl = renderTemplate(resolveTemplate("tax_certificate_received", null), { buyerName: buyer.name ?? "there", companyName: company!.name, shopName: await shopNameFor(company!.shop.shopifyDomain) });
       await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     }
   } catch (error) {
@@ -288,7 +289,7 @@ export async function runCertExpiryRemindersForShop(shopDomain: string, now: Dat
         buyerName: buyer.name ?? "there",
         companyName: p.company.name,
         expiresAt: p.certificateExpiresAt!.toISOString().slice(0, 10),
-        shopName: shopDomain,
+        shopName: await shopNameFor(shopDomain),
       });
       await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     }
@@ -312,7 +313,7 @@ async function emailBuyer(
     });
     const buyer = company?.buyers[0];
     if (!buyer) return null;
-    const tpl = renderTemplate(resolveTemplate(templateKey as never, null), { buyerName: buyer.name ?? "there", companyName: company!.name, shopName: company!.shop.shopifyDomain, ...extra });
+    const tpl = renderTemplate(resolveTemplate(templateKey as never, null), { buyerName: buyer.name ?? "there", companyName: company!.name, shopName: await shopNameFor(company!.shop.shopifyDomain), ...extra });
     const result = await sendEmail({ to: buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
     return { to: buyer.email, text: tpl.body, sent: result.sent };
   } catch (error) {

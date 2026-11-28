@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
+import { shopNameFor } from "./shop-name.server";
 import type { OrgRole } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -69,7 +70,7 @@ export async function createOrganization(
   try {
     const tokens = await getBrandingTokens(firstShopDomain);
     const tpl = resolveTemplate("org_invite", null);
-    const { subject, body } = renderTemplate(tpl, { orgName: name, portalName: tokens.portalName, shopName: firstShopDomain });
+    const { subject, body } = renderTemplate(tpl, { orgName: name, portalName: tokens.portalName, shopName: await shopNameFor(firstShopDomain) });
     await sendEmail({ to: ownerEmail, subject, html: body.replace(/\n/g, "<br>"), text: body });
   } catch {
     /* best-effort */

@@ -11,6 +11,7 @@ import {
   type AdminGraphqlClient,
   type DraftOrderTotals,
 } from "./draft-order.server";
+import { emailQuoteOrdered } from "./quote-emails.server";
 
 /**
  * F25.2 — merchant one-click convert: an ACCEPTED quote → a native Shopify draft
@@ -108,6 +109,9 @@ export async function convertQuoteToOrder(
     entityId: quoteId,
     payload: { orderId: created.id, invoiceSent },
   });
+
+  // Tell the buyer the order is placed (best-effort, logged against the quote).
+  await emailQuoteOrdered(quoteId);
 
   return { orderId: created.id, totals: created.totals, invoiceSent };
 }

@@ -1,8 +1,10 @@
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { shopNameFor } from "../services/shop-name.server";
 import { json } from "@remix-run/node";
 import prisma from "../db.server";
 import { rollupAllShops, getAnalytics } from "../services/quote-analytics.server";
-import { resolveTemplate, renderTemplate, sendEmail } from "../services/mailer.server";
+import { resolveTemplate, renderTemplate } from "../services/mailer.server";
+import { alertMerchant } from "../services/merchant-alerts.server";
 
 /**
  * F7 — analytics rollup scheduler. Hit daily by an external scheduler:
@@ -31,21 +33,31 @@ async function run(request: Request): Promise<Response> {
     // Monday — weekly digest for opted-in Growth and Scale shops.
     const shops = await prisma.shop.findMany({
       where: { plan: { in: ["GROWTH", "SCALE"] }, weeklyDigest: true },
-      select: { shopifyDomain: true, emailTemplates: true },
+      select: { id: true, shopifyDomain: true, emailTemplates: true },
     });
-    const to = process.env.MANNON_MAIL_FROM; // best-effort recipient until owner email is wired
+    // Sent to the store's own alert addresses (Settings › Notifications), at
+    // most once a week even if the job runs twice on a Monday.
+    const weekAgo = new Date(now.getTime() - 6 * 86_400_000);
     for (const shop of shops) {
+      const already = await prisma.emailDelivery.count({
+        where: { shopId: shop.id, template: "weekly_digest", status: "SENT", createdAt: { gte: weekAgo } },
+      });
+      if (already) continue;
       const view = await getAnalytics(shop.shopifyDomain, 7, now);
-      if (!view || !to) continue;
+      if (!view) continue;
       const tpl = resolveTemplate("weekly_digest", shop.emailTemplates);
       const { subject, body } = renderTemplate(tpl, {
-        shopName: shop.shopifyDomain,
+        shopName: await shopNameFor(shop.shopifyDomain),
         quotes: String(view.count),
         winRate: view.kpis.winRate == null ? "—" : `${Math.round(view.kpis.winRate * 100)}%`,
         pipeline: `${view.currency} ${view.kpis.openPipeline.toFixed(2)}`,
       });
-      await sendEmail({ to, subject, html: body, text: body });
-      digests++;
+      const results = await alertMerchant(
+        shop.shopifyDomain,
+        { subject, text: body },
+        { template: "weekly_digest", entityType: "Shop", entityId: shop.id },
+      );
+      if (results.some((r) => r.sent)) digests++;
     }
   }
 

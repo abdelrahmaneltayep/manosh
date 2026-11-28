@@ -63,11 +63,10 @@ reminders for Growth shops only.
 
 ## Email delivery
 
-Mannon had no mailer before F2. `app/services/mailer.server.ts` is a small,
-non-throwing abstraction that **no-ops until a transport + `MANNON_MAIL_FROM` are
-configured** (mirrors the analytics/Sentry pattern). The reminder pipeline and
-`PaymentReminder` records work end-to-end around it; wire SMTP/Resend/SendGrid in
-`sendEmail()` when ready. Templates (invoice issued + three reminders) are editable
+`app/services/mailer.server.ts` is a small, non-throwing mailer that sends through
+Postmark (`app/services/postmark.server.ts`) once `MANNON_MAIL_FROM` and
+`POSTMARK_SERVER_TOKEN` are set, and no-ops until then. A reminder is recorded only
+when its email was delivered, so a failed send is retried on the next run. Templates (invoice issued + three reminders) are editable
 in Settings and stored on `Shop.emailTemplates`.
 
 ## Invoice PDF

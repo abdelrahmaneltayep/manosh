@@ -1,4 +1,5 @@
 import type { ErpKind, StockSource, Prisma } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -16,6 +17,7 @@ import {
   type NormalizedOrder,
   type StockUpdate,
 } from "../lib/erp";
+import { alertMerchant } from "./merchant-alerts.server";
 
 /**
  * F15 — ERP / Inventory Sync service. Growth-only, dark-launched behind
@@ -366,11 +368,8 @@ export async function sendFailureDigest(shopDomain: string): Promise<boolean> {
   const failures = await prisma.erpSyncLog.findMany({ where: { shopId, status: "FAILED", digested: false }, select: { id: true } });
   if (failures.length === 0) return false;
   const summary = summarizeForDigest(failures.map(() => ({ status: "FAILED" as const })));
-  const to = process.env.MANNON_MERCHANT_ALERT_EMAIL;
-  if (to) {
-    const tpl = renderTemplate(resolveTemplate("erp_sync_failure", null), { failed: String(summary.failed), shopName: shopDomain, syncLogUrl: `${(process.env.SHOPIFY_APP_URL ?? "").replace(/\/$/, "")}/app/erp` });
-    await sendEmail({ to, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
-  }
+  const tpl = renderTemplate(resolveTemplate("erp_sync_failure", null), { failed: String(summary.failed), shopName: await shopNameFor(shopDomain), syncLogUrl: `${(process.env.SHOPIFY_APP_URL ?? "").replace(/\/$/, "")}/app/erp` });
+  await alertMerchant(shopDomain, { subject: tpl.subject, text: tpl.body }, { template: "erp_sync_failure" });
   await prisma.erpSyncLog.updateMany({ where: { id: { in: failures.map((f) => f.id) } }, data: { digested: true } });
   return true;
 }

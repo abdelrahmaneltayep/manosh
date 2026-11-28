@@ -27,6 +27,7 @@ import { syncShopPlan } from "../services/billing.server";
 import { selectedPlanHandle } from "../lib/billing-v3";
 import { isGrowthTier } from "../lib/billing";
 import { featureAvailable, shopPlanHandle } from "../lib/plan-features";
+import { ensureAlertEmails } from "../services/merchant-alerts.server";
 import { requestReview } from "../lib/review-request";
 import { attentionItems, setupSteps, setupProgress, type AttentionItem, type SetupStep } from "../lib/home";
 import { navFlags } from "../lib/nav";
@@ -47,7 +48,9 @@ type Metrics = NonNullable<SerializeFrom<typeof loader>["metrics"]>;
  *      built from the append-only Event stream; read-only, never computes money).
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session, billing } = await authenticate.admin(request);
+  const { session, billing, admin } = await authenticate.admin(request);
+  // New installs: alerts go to the store's Shopify contact email until changed.
+  await ensureAlertEmails(session.shop, admin);
   // Home is where Shopify returns the merchant after they approve a plan, so
   // read the plan from Shopify first: "Choose a plan" must agree with Shopify's
   // own Billing card the moment they land (App Store review 1.2.2).

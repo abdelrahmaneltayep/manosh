@@ -223,7 +223,7 @@ Names only; values live in Fly secrets and must never be printed or committed.
 | Required | `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`, `SCOPES`, `SHOPIFY_APP_URL`, `SESSION_SECRET`, `DATABASE_URL` |
 | AI | `ANTHROPIC_API_KEY` |
 | Scheduled jobs | `CRON_SECRET` |
-| Email | `MANNON_MAIL_FROM` (see section 11, gap 1) |
+| Email | `MANNON_MAIL_FROM`, `POSTMARK_SERVER_TOKEN` (secret), optional `POSTMARK_MESSAGE_STREAM` (see section 11, gap 1) |
 | Integrations | `QBO_CLIENT_ID`, `QBO_CLIENT_SECRET`, `XERO_CLIENT_ID`, `XERO_CLIENT_SECRET`, `MANNON_ENCRYPTION_KEY`, `MANNON_VAPID_PUBLIC_KEY`, `MANNON_VAPID_PRIVATE_KEY` |
 | Monitoring | `SENTRY_DSN`, `POSTHOG_API_KEY`, `POSTHOG_HOST` |
 | Other | `MANNON_DEMO_SHOP`, `MANNON_MERCHANT_ALERT_EMAIL`, `SHOPIFY_APP_HANDLE` |
@@ -339,18 +339,16 @@ Lessons that still apply:
 
 ## 11. Known gaps (verified, most important first)
 
-1. **No email is delivered, and the app now says so.** No provider is connected.
-   `emailDeliveryEnabled()` in `app/services/mailer.server.ts` is the single switch:
-   true only when a provider is installed with `setMailTransport()` and
-   `MANNON_MAIL_FROM` is set. While it is false, `sendEmail` reports `skipped`,
-   nothing is recorded as sent, and every "send" action is a Copy action
-   (`app/lib/email-delivery.ts`): Copy buyer link on a quote, Copy reminder on
-   Follow-ups, a copyable message for application decisions, request replies and
-   catalog access, a copyable sign-in link for reps and buyer team invites.
-   Settings › Notifications shows "Sender: Not connected". Connecting a provider
-   means writing one transport function and calling `setMailTransport`; the labels
-   switch back on their own. Not yet covered: payment, tax and invoice reminder jobs
-   still write their records when run (they are not scheduled in production).
+1. **Email is built on Postmark but not switched on in production.** Delivery is on
+   when `MANNON_MAIL_FROM` (quotes@support-mannon.com) and the Fly secret
+   `POSTMARK_SERVER_TOKEN` are both set; `emailDeliveryEnabled()` in
+   `app/services/mailer.server.ts` is the single switch. Until then `sendEmail`
+   reports `skipped` and every "send" action is a Copy action
+   (`app/lib/email-delivery.ts`). Every send is logged in `EmailDelivery`; a failed
+   buyer email shows on the quote with a Copy buyer link. Merchant alerts go to the
+   store's addresses in Settings › Notifications (filled from the store's contact
+   email). Senders not yet logged per quote: approvals, payments, tax, rep and team
+   invites (they still send, and report failures to the merchant where they did).
 2. **Scheduled jobs are off** in production (section 9.3), and the latest build is not
    deployed (section 1).
 3. **The Free plan path is untested on a real store.** It is unknown whether choosing
@@ -368,8 +366,9 @@ Lessons that still apply:
    subscription query.
 6. **The IP allowlist uses shared networks**, not exact addresses (section 9.4).
 7. **Two jobs are not safe to run more often than scheduled:** `analytics` sends the
-   weekly digest on every Monday call, and `reorder-push` nudges on every call. The
-   digest's recipient is also a placeholder (`MANNON_MAIL_FROM`).
+   weekly digest on every Monday call (now at most once a week per store, checked
+   against the email log), and `reorder-push` nudges on every call. The digest
+   goes to the store's alert addresses.
 8. **UX items left open** (`docs/ux-audit.md`): quote expiry is stored in two places;
    long forms other than Settings lack a save bar; product and collection fields take
    typed ids instead of Shopify's resource picker; the migration to Polaris web

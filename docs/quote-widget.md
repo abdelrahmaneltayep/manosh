@@ -79,5 +79,5 @@ off on Starter server-side regardless of the form.
   documented hardening follow-up.
 - Lead companies use a synthetic `quote-request:` Shopify company id, reconciled to
   a real `gid://shopify/Company` on the first order (same pattern as F6).
-- No new Shopify OAuth scope. `MANNON_MERCHANT_ALERT_EMAIL` receives new-request
-  notices; the visitor gets an acknowledgement.
+- No new Shopify OAuth scope. new-request notices go to the store's alert
+  addresses (Settings › Notifications); the visitor gets an acknowledgement.

@@ -22,7 +22,7 @@ import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { requireBilling } from "../services/billing.server";
 import { isGrowthTier } from "../lib/billing";
-import { getPolicy, upsertPolicy, needsNudgeList, sendNow, copyReminder } from "../services/followups.server";
+import { getPolicy, upsertPolicy, needsNudgeList, sendNow, copyReminder, rescheduleExpiryWarnings } from "../services/followups.server";
 import { clampCadence } from "../lib/followups";
 import { formatDate } from "../lib/format";
 import {
@@ -58,6 +58,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     // Growth and Scale both include the full cadence (Scale ⊃ Growth).
     isGrowth: isGrowthTier(status.plan),
+    planName: shop?.plan === "STARTER" ? "Starter" : "Free",
     policy,
     timezone: shop?.timezone ?? "",
     effectiveCadence: clampCadence(policy.cadenceDays, policy.planMax),
@@ -105,7 +106,12 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
         : { ok: false, error: "That quote is no longer open." };
     }
     const ok = await sendNow(session.shop, quoteId, baseUrl, { customBody });
-    return ok ? { ok: true, message: emailCopy(true).reminderDone } : { ok: false, error: "Couldn’t send that reminder." };
+    if (ok) return { ok: true, message: emailCopy(true).reminderDone };
+    // Not delivered: hand over the reminder to send by hand instead.
+    const fallback = await copyReminder(session.shop, quoteId, baseUrl, { customBody });
+    return fallback
+      ? { ok: true, message: "The reminder email wasn’t delivered. Copy it below and send it yourself.", copy: { quoteId, to: fallback.to, text: fallback.body } }
+      : { ok: false, error: "That quote is no longer open." };
   }
 
   if (intent === "save-policy") {
@@ -115,12 +121,17 @@ export const action = async ({ request }: ActionFunctionArgs): Promise<ActionRes
       .filter((n) => Number.isInteger(n) && n > 0);
     const expiryDays = Math.max(1, Math.min(365, Number(form.get("expiryDays")) || 14));
     const maxNudges = Math.max(0, Math.min(10, Number(form.get("maxNudges")) || 3));
+    const warnRaw = Number(form.get("expiryWarningDays"));
+    const expiryWarningDays = Number.isFinite(warnRaw) ? Math.max(0, Math.min(30, Math.round(warnRaw))) : 1;
     await upsertPolicy(session.shop, {
       enabled: form.get("enabled") === "on",
       expiryDays,
       cadenceDays: cadence.length ? cadence : [3, 7, 12],
       maxNudges,
+      expiryWarningDays,
     });
+    // Move pending expiry reminders on open quotes to the new timing.
+    await rescheduleExpiryWarnings(session.shop);
     const timezone = String(form.get("timezone") ?? "").trim();
     await prisma.shop.update({ where: { shopifyDomain: session.shop }, data: { timezone: timezone || null } });
     return { ok: true, message: "Follow-up policy saved." };
@@ -138,6 +149,7 @@ export default function Followups() {
   const [expiryDays, setExpiryDays] = useState(String(data.policy.expiryDays));
   const [cadence, setCadence] = useState(data.policy.cadenceDays.join(", "));
   const [maxNudges, setMaxNudges] = useState(String(data.policy.maxNudges));
+  const [warnDays, setWarnDays] = useState(String(data.policy.expiryWarningDays ?? 1));
   const [tz, setTz] = useState(data.timezone);
 
   const err = actionData && !actionData.ok ? actionData.error : null;
@@ -215,17 +227,28 @@ export default function Followups() {
                 checked={enabled}
                 onChange={setEnabled}
               />
-              <InlineGrid columns={{ xs: 1, sm: 3 }} gap="300">
+              <InlineGrid columns={{ xs: 1, sm: 2, md: 4 }} gap="300">
                 <TextField label="Expire quotes after (days)" type="number" name="expiryDays" value={expiryDays} onChange={setExpiryDays} min={1} max={365} autoComplete="off" />
                 <TextField label="Nudge on days after submit" name="cadenceDays" value={cadence} onChange={setCadence} autoComplete="off" helpText="Comma-separated, e.g. 3, 7, 12" disabled={!data.isGrowth} />
                 <TextField label="Max nudges" type="number" name="maxNudges" value={maxNudges} onChange={setMaxNudges} min={0} max={10} autoComplete="off" disabled={!data.isGrowth} />
+                <TextField
+                  label="Expiry reminder (days before)"
+                  type="number"
+                  name="expiryWarningDays"
+                  value={warnDays}
+                  onChange={setWarnDays}
+                  min={0}
+                  max={30}
+                  autoComplete="off"
+                  helpText="One reminder this many days before a quote expires. 0 turns it off."
+                />
               </InlineGrid>
               <TextField label="Store time zone" name="timezone" value={tz} onChange={setTz} autoComplete="off" placeholder="e.g. Asia/Riyadh" helpText={emailDelivery
                   ? "Reminders only go out during business hours (Mon–Fri, 9–18) in this time zone. Use a name like Asia/Riyadh or America/New_York."
                   : "Used to work out business hours (Mon–Fri, 9–18). Use a name like Asia/Riyadh or America/New_York."} />
               {!data.isGrowth && (
                 <Banner tone="warning">
-                  <p>Starter includes a <b>single</b> reminder per quote plus the expiry. Upgrade to Growth for a multi-nudge cadence and auto-expiry actions.</p>
+                  <p>The {data.planName} plan includes a <b>single</b> reminder per quote plus the expiry reminder. Upgrade to Growth for a multi-nudge cadence and auto-expiry actions.</p>
                   <Box paddingBlockStart="200"><Button url={upgradeUrl("growth")} variant="primary">Upgrade to Growth</Button></Box>
                 </Banner>
               )}

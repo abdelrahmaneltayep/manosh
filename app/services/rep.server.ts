@@ -1,4 +1,5 @@
 import type { SalesRep } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
@@ -101,7 +102,7 @@ export async function inviteRep(
 
   const tpl = renderTemplate(resolveTemplate("rep_invite", null), {
     repName: rep.name ?? "there",
-    shopName: shopDomain,
+    shopName: await shopNameFor(shopDomain),
     inviteUrl: url.toString(),
   });
   // A merchant-reviewed (e.g. Claude-drafted) personal note leads the invite; the
@@ -291,7 +292,7 @@ export async function recordOnBehalf(input: {
       buyerName: input.buyer.name ?? "there",
       repName: rep?.name ?? rep?.email ?? "your rep",
       companyName: input.companyName,
-      shopName: input.shopDomain,
+      shopName: await shopNameFor(input.shopDomain),
     });
     await sendEmail({ to: input.buyer.email, subject: tpl.subject, html: tpl.body.replace(/\n/g, "<br>"), text: tpl.body });
   } catch (error) {

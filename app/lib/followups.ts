@@ -10,6 +10,8 @@ export interface FollowupPolicy {
   expiryDays: number;
   cadenceDays: number[];
   maxNudges: number;
+  /** Days before expiry for the one "about to expire" email; 0 turns it off. Default 1. */
+  expiryWarningDays?: number;
 }
 
 export const DEFAULT_POLICY: FollowupPolicy = {
@@ -55,8 +57,11 @@ export function computeSchedule(
     if (when < expiresAt) items.push({ kind: "REMINDER", scheduledFor: when });
   }
 
-  const warnAt = new Date(expiresAt.getTime() - DAY_MS);
-  if (warnAt > submittedAt) items.push({ kind: "EXPIRY_WARNING", scheduledFor: warnAt });
+  // One "about to expire" email, the merchant's chosen number of days before
+  // expiry (0 = none). Never before the quote exists.
+  const warnDays = Math.max(0, Math.min(30, Math.round(policy.expiryWarningDays ?? 1)));
+  const warnAt = new Date(expiresAt.getTime() - warnDays * DAY_MS);
+  if (warnDays > 0 && warnAt > submittedAt) items.push({ kind: "EXPIRY_WARNING", scheduledFor: warnAt });
 
   items.push({ kind: "EXPIRED", scheduledFor: expiresAt });
   return items;

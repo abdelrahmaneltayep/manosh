@@ -1,6 +1,9 @@
-import type { LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData } from "@remix-run/react";
-import { Page, Card, BlockStack, InlineStack, Text, Badge, ResourceList, ResourceItem, Banner } from "@shopify/polaris";
+import { useEffect, useState } from "react";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
+import { Form, useActionData, useLoaderData, useNavigation } from "@remix-run/react";
+import { Page, Card, BlockStack, InlineStack, Text, Badge, ResourceList, ResourceItem, Banner, TextField, Button } from "@shopify/polaris";
+import prisma from "../db.server";
+import { ensureAlertEmails, parseAlertEmails } from "../services/merchant-alerts.server";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getEmailTemplates } from "../services/settings.server";
@@ -15,13 +18,37 @@ import { useEmailDelivery } from "../lib/use-email-delivery";
  * own edit page with a back action, instead of 34 open editors on Settings.
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  const { session, admin } = await authenticate.admin(request);
+  // First visit: fill the alert address with the store's Shopify contact email.
+  await ensureAlertEmails(session.shop, admin);
+  const [overrides, shop] = await Promise.all([
+    getEmailTemplates(session.shop),
+    prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { alertEmails: true } }),
+  ]);
+  return {
+    customized: Object.keys(overrides ?? {}),
+    alertEmails: shop?.alertEmails ?? [],
+    sender: process.env.MANNON_MAIL_FROM ?? null,
+  };
+};
+
+export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);
-  const overrides = await getEmailTemplates(session.shop);
-  return { customized: Object.keys(overrides ?? {}) };
+  const form = await request.formData();
+  if (String(form.get("intent") ?? "") !== "alert-emails") return { ok: false as const, error: "Unknown action." };
+  const { emails, invalid } = parseAlertEmails(String(form.get("alertEmails") ?? ""));
+  if (invalid.length) return { ok: false as const, error: `These don’t look like email addresses: ${invalid.join(", ")}` };
+  if (emails.length === 0) return { ok: false as const, error: "Add at least one address, or alerts have nowhere to go." };
+  await prisma.shop.update({ where: { shopifyDomain: session.shop }, data: { alertEmails: emails } });
+  return { ok: true as const, message: "Alert addresses saved." };
 };
 
 export default function Notifications() {
-  const { customized } = useLoaderData<typeof loader>();
+  const { customized, alertEmails, sender } = useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+  const navigation = useNavigation();
+  const [alerts, setAlerts] = useState(alertEmails.join(", "));
+  useEffect(() => setAlerts(alertEmails.join(", ")), [alertEmails]);
   const edited = new Set(customized);
   const emailDelivery = useEmailDelivery();
   const copy = emailCopy(emailDelivery);
@@ -30,6 +57,46 @@ export default function Notifications() {
       <TitleBar title="Notifications" />
       <SectionTabs active="notifications" />
       <BlockStack gap="400">
+        {actionData && !actionData.ok && <Banner tone="critical" title="Couldn’t save"><p>{actionData.error}</p></Banner>}
+        {actionData && actionData.ok && <Banner tone="success" title={actionData.message} />}
+        {emailDelivery && (
+          <Card>
+            <BlockStack gap="200">
+              <InlineStack gap="200" blockAlign="center">
+                <Text as="h2" variant="headingMd">Sender</Text>
+                <Badge tone="success">Connected</Badge>
+              </InlineStack>
+              <Text as="p" variant="bodyMd">
+                {`Emails go out from ${sender ?? "Mannon"} with your store’s name, and replies come back to that address.`}
+              </Text>
+            </BlockStack>
+          </Card>
+        )}
+        <Card>
+          <Form method="post">
+            <input type="hidden" name="intent" value="alert-emails" />
+            <BlockStack gap="300">
+              <BlockStack gap="100">
+                <Text as="h2" variant="headingMd">Your alerts</Text>
+                <Text as="p" tone="subdued" variant="bodySm">
+                  Where Mannon tells you about new quote requests, access requests and sync problems. It
+                  starts with your store’s contact email from Shopify.
+                </Text>
+              </BlockStack>
+              <TextField
+                label="Send alerts to"
+                name="alertEmails"
+                value={alerts}
+                onChange={setAlerts}
+                autoComplete="email"
+                helpText="One or more addresses, separated by commas."
+              />
+              <InlineStack>
+                <Button submit loading={navigation.state === "submitting"}>Save addresses</Button>
+              </InlineStack>
+            </BlockStack>
+          </Form>
+        </Card>
         {!emailDelivery && (
           <Card>
             <BlockStack gap="200">

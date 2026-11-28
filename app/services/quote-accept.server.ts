@@ -21,6 +21,7 @@ import { evaluateCredit, getCreditProfile, outstandingForCompany, type CreditDec
 import { isDemoEmail } from "./demo.server";
 import { createInvoiceForOrder } from "./invoice.server";
 import { featureAvailable, shopPlanHandle } from "../lib/plan-features";
+import { emailQuoteOrdered } from "./quote-emails.server";
 
 const CREDIT_ENABLED = () => process.env.MANNON_FF_CREDIT === "true";
 
@@ -233,6 +234,9 @@ export async function acceptAndOrder(
       captureException(error);
     }
   }
+
+  // Tell the buyer the order is placed (best-effort, logged against the quote).
+  await emailQuoteOrdered(quoteId);
 
   return { quote: ordered, totals };
 }

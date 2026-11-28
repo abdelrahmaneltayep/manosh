@@ -1,4 +1,5 @@
 import type { OrderApproval } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
@@ -66,7 +67,7 @@ export async function ensurePendingApproval(params: {
       amount: `${params.currency} ${params.amount.toFixed(2)}`,
       approvalUrl: link,
       companyName: company.name,
-      shopName: company.shop.shopifyDomain,
+      shopName: await shopNameFor(company.shop.shopifyDomain),
     });
     for (const to of approvers) await sendEmail({ to, subject, html: body, text: body });
   }
@@ -118,7 +119,7 @@ export async function decideApproval(params: {
       const { subject, body } = renderTemplate(template, {
         decision: params.decision === "APPROVED" ? "approved" : "rejected",
         quoteUrl: `${params.baseUrl}/portal/quotes/${approval.quoteId}`,
-        shopName: company.shop.shopifyDomain,
+        shopName: await shopNameFor(company.shop.shopifyDomain),
       });
       await sendEmail({ to: requester.email, subject, html: body, text: body });
     }

@@ -1,6 +1,7 @@
 import prisma from "../db.server";
 import type { CatalogItem } from "./catalog.server";
 import { submitQuote, type QuoteLineInput, type QuoteWithLines } from "./quote.server";
+import { emailQuoteReceived } from "./quote-emails.server";
 
 /**
  * Buyer-portal quote submission (F1). Turns a buyer's basket of catalog
@@ -152,6 +153,9 @@ export async function submitBuyerQuote(
       /* self-heals on the next cron reconcile */
     }
   }
+
+  // Alert the merchant and confirm to the buyer (best-effort, never throws).
+  await emailQuoteReceived(quote.id);
 
   return { ok: true, quote };
 }

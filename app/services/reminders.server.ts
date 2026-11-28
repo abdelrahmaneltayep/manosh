@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { shopNameFor } from "./shop-name.server";
 import { appendEvent } from "./events.server";
 import { daysOverdue } from "../lib/aging";
 import { formatInvoiceNumber, legacyInvoiceNumber } from "../lib/tax";
@@ -94,17 +95,31 @@ export async function runRemindersForShop(
     }
 
     const buyer = invoice.company.buyers[0];
+    let delivered = false;
     if (buyer) {
       const template = resolveTemplate(KIND_TO_TEMPLATE[stage], shop.emailTemplates);
+      const appUrl = (process.env.SHOPIFY_APP_URL ?? "").replace(/\/$/, "");
       const { subject, body } = renderTemplate(template, {
         buyerName: buyer.name ?? "there",
         invoiceNumber: invoice.sequenceNo != null ? formatInvoiceNumber(invoice.sequenceNo) : legacyInvoiceNumber(invoice.id),
         amount: `${invoice.currency} ${Number(invoice.amount).toFixed(2)}`,
         dueDate: invoice.dueDate.toISOString().slice(0, 10),
-        invoiceUrl: `/portal/invoices/${invoice.id}`,
-        shopName: shopDomain,
+        // Absolute, so the link works from an inbox.
+        invoiceUrl: `${appUrl}/portal/invoices/${invoice.id}`,
+        shopName: await shopNameFor(shopDomain),
       });
-      await sendEmail({ to: buyer.email, subject, html: body, text: body });
+      const result = await sendEmail(
+        { to: buyer.email, subject, html: body, text: body, fromName: await shopNameFor(shopDomain), tag: KIND_TO_TEMPLATE[stage] },
+        { shopId: shop.id, template: KIND_TO_TEMPLATE[stage], entityType: "Invoice", entityId: invoice.id },
+      );
+      delivered = result.sent;
+    }
+
+    // Only a delivered reminder counts. Otherwise release the stage so a later
+    // run (once email works) sends it, and record nothing as sent.
+    if (!delivered) {
+      await prisma.paymentReminder.deleteMany({ where: { invoiceId: invoice.id, kind: stage } });
+      continue;
     }
 
     await appendEvent({

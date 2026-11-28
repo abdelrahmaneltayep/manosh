@@ -53,7 +53,7 @@ describe("email delivery switch", () => {
     setMailTransport(async () => {
       throw new Error("provider down");
     });
-    expect(await sendEmail(MESSAGE)).toEqual({ sent: false });
+    expect(await sendEmail(MESSAGE)).toEqual({ sent: false, error: "provider down" });
   });
 });
 

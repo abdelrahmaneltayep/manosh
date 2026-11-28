@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { shopNameFor } from "../services/shop-name.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { useActionData, useFetcher, useLoaderData, useNavigation, useSubmit } from "@remix-run/react";
 import { Page, Card, BlockStack, InlineStack, Text, Badge, Banner, Button, Box, TextField, Modal } from "@shopify/polaris";
@@ -6,7 +7,9 @@ import { TitleBar, SaveBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { getEmailTemplates, saveEmailTemplates } from "../services/settings.server";
-import { DEFAULT_TEMPLATES, resolveTemplate, type TemplateKey } from "../services/mailer.server";
+import { DEFAULT_TEMPLATES, resolveTemplate, sendEmail, emailDeliveryEnabled, type TemplateKey } from "../services/mailer.server";
+import { merchantAlertAddresses } from "../services/merchant-alerts.server";
+import { checkTemplate, placeholders, renderPreview, sampleValues, templateProblem } from "../lib/template-check";
 import { TEMPLATE_INFO, mergeTemplateOverride } from "../lib/notification-templates";
 import {
   claudeAccess,
@@ -30,11 +33,6 @@ function templateKey(raw: string | undefined): TemplateKey {
   return raw as TemplateKey;
 }
 
-/** The {{placeholders}} a template can use, read from its default wording. */
-function placeholders(t: { subject: string; body: string }): string[] {
-  return [...new Set([...`${t.subject} ${t.body}`.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]))];
-}
-
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const key = templateKey(params.key);
@@ -52,14 +50,16 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     body: current.body,
     edited: Boolean(overrides?.[key]),
     variables: placeholders(DEFAULT_TEMPLATES[key]),
+    defaults: DEFAULT_TEMPLATES[key],
+    testTo: (await merchantAlertAddresses(session.shop))[0] ?? null,
     access: claudeAccess(shop ?? { plan: "FREE" }, new Date()),
   };
 };
 
 type ActionResult =
-  | { ok: true; kind: "saved" | "reset"; message: string }
+  | { ok: true; kind: "saved" | "reset" | "test"; message: string }
   | { ok: true; kind: "draft"; subject: string; body: string }
-  | { ok: false; kind: "save" | "draft"; error: string };
+  | { ok: false; kind: "save" | "draft" | "test"; error: string };
 
 export const action = async ({ request, params }: ActionFunctionArgs): Promise<ActionResult> => {
   const { session } = await authenticate.admin(request);
@@ -102,6 +102,27 @@ export const action = async ({ request, params }: ActionFunctionArgs): Promise<A
   const subject = String(form.get("subject") ?? "");
   const body = String(form.get("body") ?? "");
   if (!subject.trim() || !body.trim()) return { ok: false, kind: "save", error: "Add a subject and a message, or reset to the default." };
+  // The same checks the editor shows: the link stays, and every placeholder is one Mannon fills.
+  const problem = templateProblem(checkTemplate(DEFAULT_TEMPLATES[key], { subject, body }));
+
+  // Send the wording as it stands (saved or not), filled with sample data, to the merchant.
+  if (intent === "test") {
+    if (problem) return { ok: false, kind: "test", error: problem };
+    if (!emailDeliveryEnabled()) return { ok: false, kind: "test", error: "Mannon isn’t connected to a sender yet, so a test can’t go out." };
+    const to = (await merchantAlertAddresses(session.shop))[0];
+    if (!to) return { ok: false, kind: "test", error: "Add an alert address in Notifications first: tests go there." };
+    const shopRow = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { id: true } });
+    const preview = renderPreview({ subject, body }, sampleValues(placeholders(DEFAULT_TEMPLATES[key])));
+    const sent = await sendEmail(
+      { to, subject: `[Test] ${preview.subject}`, html: preview.body.replace(/\n/g, "<br>"), text: preview.body, fromName: await shopNameFor(session.shop), tag: "template_test" },
+      shopRow ? { shopId: shopRow.id, template: key, entityType: "TemplateTest", entityId: key } : undefined,
+    );
+    return sent.sent
+      ? { ok: true, kind: "test", message: `Test sent to ${to}.` }
+      : { ok: false, kind: "test", error: `The test wasn’t delivered${sent.error ? `: ${sent.error}` : "."}` };
+  }
+
+  if (problem) return { ok: false, kind: "save", error: problem };
   await saveEmailTemplates(session.shop, mergeTemplateOverride(existing, key, { subject, body }, DEFAULT_TEMPLATES[key]));
   return { ok: true, kind: "saved", message: "Email saved." };
 };
@@ -149,6 +170,16 @@ export default function NotificationTemplate() {
   const aiError = ai.data && !ai.data.ok ? ai.data.error : null;
   const saveError = result && !result.ok && result.kind === "save" ? result.error : null;
   const saved = result && result.ok && (result.kind === "saved" || result.kind === "reset") ? result.message : null;
+  const testResult = result && result.kind === "test" ? result : null;
+  const problem = templateProblem(checkTemplate(data.defaults, { subject, body }));
+  const preview = renderPreview({ subject, body }, sampleValues(data.variables));
+  const sendTest = () => {
+    const fd = new FormData();
+    fd.set("intent", "test");
+    fd.set("subject", subject);
+    fd.set("body", body);
+    submit(fd, { method: "post" });
+  };
 
   return (
     <Page
@@ -193,6 +224,8 @@ export default function NotificationTemplate() {
           </Banner>
         )}
         {saved && !dirty && <Banner tone="success" title={saved} onDismiss={() => undefined} />}
+        {testResult && testResult.ok && <Banner tone="success" title={testResult.message} />}
+        {testResult && !testResult.ok && <Banner tone="warning" title="Test not sent"><p>{testResult.error}</p></Banner>}
 
         <Card>
           <BlockStack gap="300">
@@ -213,7 +246,7 @@ export default function NotificationTemplate() {
               </InlineStack>
             )}
             <TextField label="Subject" value={subject} onChange={setSubject} autoComplete="off" />
-            <TextField label="Message" value={body} onChange={setBody} autoComplete="off" multiline={8} />
+            <TextField label="Message" value={body} onChange={setBody} autoComplete="off" multiline={8} error={problem ?? undefined} />
             {data.variables.length > 0 && (
               <Text as="p" tone="subdued" variant="bodySm">
                 {`You can use: ${data.variables.map((v) => `{{${v}}}`).join(", ")}. Mannon fills these in ${emailDelivery ? "when the email is sent" : "when the message is prepared"}.`}
@@ -241,6 +274,35 @@ export default function NotificationTemplate() {
                 </BlockStack>
               </Box>
             )}
+          </BlockStack>
+        </Card>
+        <Card>
+          <BlockStack gap="300">
+            <InlineStack align="space-between" blockAlign="center" gap="200" wrap>
+              <Text as="h2" variant="headingMd">Preview</Text>
+              <Button
+                onClick={sendTest}
+                disabled={busy || !emailDelivery || !data.testTo || Boolean(problem)}
+                accessibilityLabel={data.testTo ? `Send a test of this email to ${data.testTo}` : "Send test to me"}
+              >
+                Send test to me
+              </Button>
+            </InlineStack>
+            <Text as="p" tone="subdued" variant="bodySm">
+              {!emailDelivery
+                ? "Tests can go out once a sender is connected."
+                : data.testTo
+                  ? `With sample details. A test goes to ${data.testTo}.`
+                  : "With sample details. Add an alert address in Notifications to send yourself a test."}
+            </Text>
+            <Box background="bg-surface-secondary" borderRadius="200" padding="300">
+              <BlockStack gap="200">
+                <Text as="p" variant="bodyMd" fontWeight="semibold">{preview.subject}</Text>
+                <Text as="p" variant="bodyMd" breakWord>
+                  <span style={{ whiteSpace: "pre-wrap" }}>{preview.body}</span>
+                </Text>
+              </BlockStack>
+            </Box>
           </BlockStack>
         </Card>
         {!access.allowed && <UpgradeToClaude access={access} upgradeUrl={upgradeUrl("growth")} />}

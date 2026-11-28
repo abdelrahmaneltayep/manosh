@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { shopNameFor } from "./shop-name.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
 import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
@@ -9,6 +10,7 @@ import { quoteWidgetFeatures, type QuoteWidgetFeatures } from "../lib/billing";
 import { validateQuoteRequest, type QuoteRequestInput, type CleanLine } from "../lib/quote-widget";
 import { formBelongsToShop, QUOTE_CAPTURE_ENABLED } from "./quote-form.server";
 import { assertCanAddCompany, CompanyCapError } from "./plan-limits.server";
+import { alertMerchant } from "./merchant-alerts.server";
 
 /**
  * F17 — storefront "Request a Quote" widget service. Public submissions are
@@ -25,7 +27,7 @@ export class NotFoundError extends Error {}
 async function shopFor(shopDomain: string) {
   return prisma.shop.findUnique({
     where: { shopifyDomain: shopDomain },
-    select: { id: true, plan: true, quoteWidgetEnabled: true, quoteWidgetLabel: true, quoteWidgetGated: true, quoteWidgetCartEnabled: true, quoteWidgetCustomFields: true },
+    select: { id: true, plan: true, quoteWidgetEnabled: true, quoteWidgetLabel: true, quoteWidgetGated: true, quoteWidgetCartEnabled: true, quoteWidgetCustomFields: true, emailTemplates: true },
   });
 }
 
@@ -151,21 +153,22 @@ export async function createQuoteRequest(
     captureException(error);
   }
 
-  // Notify the merchant + auto-reply to the visitor (best-effort).
+  // Alert the merchant and confirm to the visitor (best-effort; the request is
+  // already saved). Both attempts are logged, so a failed send shows in the admin.
   try {
     const requestUrl = `${ctx.baseUrl.replace(/\/$/, "")}/app/quote-requests`;
-    const merchantTo = process.env.MANNON_MERCHANT_ALERT_EMAIL;
-    if (merchantTo) {
-      const m = renderTemplate(resolveTemplate("quote_request_created", null), {
-        email: clean.value.email,
-        companyLine: clean.value.companyName ? `\nCompany: ${clean.value.companyName}` : "",
-        itemCount: String(clean.value.lines.length),
-        requestUrl,
-      });
-      await sendEmail({ to: merchantTo, subject: m.subject, html: m.body.replace(/\n/g, "<br>"), text: m.body });
-    }
-    const a = renderTemplate(resolveTemplate("quote_request_ack", null), { shopName: shopDomain });
-    await sendEmail({ to: clean.value.email, subject: a.subject, html: a.body.replace(/\n/g, "<br>"), text: a.body });
+    const m = renderTemplate(resolveTemplate("quote_request_created", shop.emailTemplates ?? null), {
+      email: clean.value.email,
+      companyLine: clean.value.companyName ? `\nCompany: ${clean.value.companyName}` : "",
+      itemCount: String(clean.value.lines.length),
+      requestUrl,
+    });
+    await alertMerchant(shopDomain, { subject: m.subject, text: m.body }, { template: "quote_request_created", entityType: "QuoteRequest", entityId: request.id });
+    const a = renderTemplate(resolveTemplate("quote_request_ack", shop.emailTemplates ?? null), { shopName: await shopNameFor(shopDomain) });
+    await sendEmail(
+      { to: clean.value.email, subject: a.subject, html: a.body.replace(/\n/g, "<br>"), text: a.body, fromName: await shopNameFor(shopDomain) },
+      { shopId: shop.id, template: "quote_request_ack", entityType: "QuoteRequest", entityId: request.id },
+    );
   } catch (error) {
     captureException(error);
   }

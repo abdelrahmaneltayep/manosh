@@ -1,4 +1,5 @@
 import type { CompanyRole } from "@prisma/client";
+import { shopNameFor } from "./shop-name.server";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
 import { issueMagicLink } from "./magic-link.server";
@@ -110,7 +111,7 @@ export async function inviteMember(
     companyName: company.name,
     inviteUrl: url,
     role: input.role,
-    shopName: company.shop.shopifyDomain,
+    shopName: await shopNameFor(company.shop.shopifyDomain),
   });
   const result = await sendEmail({ to: email, subject, html: body, text: body });
 

@@ -1,4 +1,6 @@
+import prisma from "../db.server";
 import { captureException } from "../lib/sentry.server";
+import { postmarkTransport } from "./postmark.server";
 
 /**
  * F2 — minimal transactional mailer. Mannon had no email system before this
@@ -23,11 +25,25 @@ export interface EmailMessage {
   html: string;
   text?: string;
   attachments?: EmailAttachment[];
+  /** Display name on the From line, e.g. the store's name. The address is always MANNON_MAIL_FROM. */
+  fromName?: string | null;
+  replyTo?: string | null;
+  tag?: string;
+}
+
+/** What a send was about, so the delivery is logged and shown to the merchant. */
+export interface DeliveryMeta {
+  shopId: string;
+  template?: string;
+  entityType?: string;
+  entityId?: string;
 }
 
 export interface SendResult {
   sent: boolean;
   skipped?: "unconfigured";
+  /** Provider's reason when a send failed. */
+  error?: string;
 }
 
 /** Default templates. Shop overrides (Shop.emailTemplates JSON) win per key. */
@@ -192,6 +208,16 @@ export const DEFAULT_TEMPLATES: Record<string, { subject: string; body: string }
     body:
       "Hi {{companyName}},\n\nYou're approved to buy wholesale from {{shopName}}. Your prices for “{{catalogTitle}}” are now unlocked.\n\nOpen your portal with this secure link — no password needed:\n\n{{portalUrl}}\n\nThank you,\n{{shopName}}",
   },
+  quote_sent: {
+    subject: "Your quote from {{shopName}} is ready",
+    body:
+      "Hi {{buyerName}},\n\n{{shopName}} has priced your quote. Open it to see the prices and Shopify's totals, then accept it or ask for a change. This secure link signs you in, no password needed:\n\n{{quoteUrl}}\n\nThe quote is valid until {{expiresAt}}.\n\nThank you,\n{{shopName}}",
+  },
+  quote_ordered: {
+    subject: "Your order with {{shopName}} is placed",
+    body:
+      "Hi {{buyerName}},\n\nThanks — your accepted quote is now an order with {{shopName}}. You can see it any time in your portal:\n\n{{quoteUrl}}\n\nThank you,\n{{shopName}}",
+  },
   org_invite: {
     subject: "Your agency workspace is ready — {{orgName}}",
     body:
@@ -274,26 +300,33 @@ export function resolveTemplate(
 }
 
 /**
- * Hands one message to an email provider. None is wired yet: choosing a provider
- * is an open decision, so `transport` stays null and nothing is delivered.
+ * Hands one message to an email provider. Postmark is the provider
+ * (postmark.server.ts): it is used automatically when POSTMARK_SERVER_TOKEN is
+ * set. Tests install their own with setMailTransport().
  */
-export type MailTransport = (message: EmailMessage, from: string) => Promise<void>;
+export type MailTransport = (message: EmailMessage, from: string) => Promise<{ messageId?: string | null } | void>;
 
 let transport: MailTransport | null = null;
 
-/** Install (or clear) the provider. The future provider module calls this; tests use it too. */
+/** Install (or clear) a transport. Tests use this; production uses Postmark. */
 export function setMailTransport(next: MailTransport | null): void {
   transport = next;
 }
 
+function activeTransport(): MailTransport | null {
+  if (transport) return transport;
+  return process.env.POSTMARK_SERVER_TOKEN ? postmarkTransport() : null;
+}
+
 /**
- * The single switch for "can this app deliver email?". True only when a provider
- * is installed AND a sender address is set. Every screen that offers to email
- * someone reads this, so the app never promises a message it cannot send: while
- * it is false the UI offers Copy actions instead (see lib/email-delivery.ts).
+ * The single switch for "can this app deliver email?". True only when a
+ * provider is available (Postmark token, or a test transport) AND a sender
+ * address is set. Every screen that offers to email someone reads this, so the
+ * app never promises a message it cannot send: while it is false the UI offers
+ * Copy actions instead (see lib/email-delivery.ts).
  */
 export function emailDeliveryEnabled(): boolean {
-  return transport !== null && Boolean(process.env.MANNON_MAIL_FROM);
+  return activeTransport() !== null && Boolean(process.env.MANNON_MAIL_FROM);
 }
 
 /** @deprecated Same as emailDeliveryEnabled(); kept for existing callers. */
@@ -302,17 +335,60 @@ export function isMailerConfigured(): boolean {
 }
 
 /**
- * Deliver a message through the installed provider. Returns `skipped` when
- * delivery is off and never reports `sent: true` unless the provider accepted
- * the message. Never throws (errors go to Sentry).
+ * Deliver a message. Returns `skipped` when delivery is off and never reports
+ * `sent: true` unless the provider accepted the message. With `meta`, the
+ * attempt is logged (EmailDelivery) so the merchant can see failures. Never
+ * throws (errors go to Sentry).
  */
-export async function sendEmail(message: EmailMessage): Promise<SendResult> {
-  if (!emailDeliveryEnabled() || !transport) return { sent: false, skipped: "unconfigured" };
+export async function sendEmail(message: EmailMessage, meta?: DeliveryMeta): Promise<SendResult> {
+  const active = activeTransport();
+  if (!active || !process.env.MANNON_MAIL_FROM) {
+    await logDelivery(meta, message.to, "SKIPPED", "No email sender is connected.");
+    return { sent: false, skipped: "unconfigured" };
+  }
   try {
-    await transport(message, process.env.MANNON_MAIL_FROM as string);
+    const result = await active(message, process.env.MANNON_MAIL_FROM);
+    await logDelivery(meta, message.to, "SENT", null, (result && result.messageId) || null);
     return { sent: true };
   } catch (error) {
     captureException(error);
-    return { sent: false };
+    const reason = error instanceof Error ? error.message : "The email couldn’t be sent.";
+    await logDelivery(meta, message.to, "FAILED", reason);
+    return { sent: false, error: reason };
   }
+}
+
+async function logDelivery(
+  meta: DeliveryMeta | undefined,
+  to: string,
+  status: "SENT" | "FAILED" | "SKIPPED",
+  error: string | null,
+  providerMessageId: string | null = null,
+): Promise<void> {
+  if (!meta) return;
+  try {
+    await prisma.emailDelivery.create({
+      data: {
+        shopId: meta.shopId,
+        to,
+        template: meta.template ?? null,
+        entityType: meta.entityType ?? null,
+        entityId: meta.entityId ?? null,
+        status,
+        error: error ? error.slice(0, 500) : null,
+        providerMessageId,
+      },
+    });
+  } catch (logError) {
+    captureException(logError);
+  }
+}
+
+/** The latest delivery about one thing (a quote, a request), for the merchant's screens. */
+export async function lastDeliveryFor(shopId: string, entityType: string, entityId: string) {
+  return prisma.emailDelivery.findFirst({
+    where: { shopId, entityType, entityId },
+    orderBy: { createdAt: "desc" },
+    select: { to: true, template: true, status: true, error: true, createdAt: true },
+  });
 }

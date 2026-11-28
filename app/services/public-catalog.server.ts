@@ -1,4 +1,5 @@
 import prisma from "../db.server";
+import { shopNameFor } from "./shop-name.server";
 import { appendEvent } from "./events.server";
 import { captureException } from "../lib/sentry.server";
 import { resolveTemplate, renderTemplate, sendEmail } from "./mailer.server";
@@ -21,6 +22,7 @@ import {
 } from "../lib/public-catalog";
 import { lockedMessage } from "../lib/plan-features";
 import { companyAccountAllowance } from "./plan-limits.server";
+import { alertMerchant } from "./merchant-alerts.server";
 
 /**
  * F19 — Catalog Sharing & B2B Discovery. Publish a chosen F11 Catalog as a
@@ -327,16 +329,13 @@ export async function createLead(
   // Merchant new-lead notice (best-effort).
   try {
     const tpl = resolveTemplate("catalog_lead_created", shop.emailTemplates);
-    const alertTo = process.env.MANNON_MERCHANT_ALERT_EMAIL;
-    if (alertTo) {
-      const { subject, body } = renderTemplate(tpl, {
-        catalogTitle: pub.title,
-        companyName: v.companyName ?? "A visitor",
-        buyerEmail: v.email,
-        shopName: shopDomain,
-      });
-      await sendEmail({ to: alertTo, subject, html: body.replace(/\n/g, "<br>"), text: body });
-    }
+    const { subject, body } = renderTemplate(tpl, {
+      catalogTitle: pub.title,
+      companyName: v.companyName ?? "A visitor",
+      buyerEmail: v.email,
+      shopName: await shopNameFor(shopDomain),
+    });
+    await alertMerchant(shopDomain, { subject, text: body }, { template: "catalog_lead_created", entityType: "PublicCatalog", entityId: pub.id });
   } catch (error) {
     captureException(error);
   }
@@ -429,7 +428,7 @@ export async function approveLead(shopDomain: string, leadId: string, reviewedBy
       companyName: lead.companyName ?? "there",
       catalogTitle: lead.publicCatalog.title,
       portalUrl: provision?.magicUrl ?? `${baseUrl.replace(/\/$/, "")}/portal`,
-      shopName: shopDomain,
+      shopName: await shopNameFor(shopDomain),
     });
     const result = await sendEmail({ to: lead.email, subject, html: body.replace(/\n/g, "<br>"), text: body });
     if (!result.sent) return { ok: true, access: { to: lead.email, text: body } };

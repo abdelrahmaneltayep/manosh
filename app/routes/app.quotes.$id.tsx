@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { shopNameFor } from "../services/shop-name.server";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { redirect } from "@remix-run/node";
 import {
@@ -60,12 +61,13 @@ import { convertQuoteToOrder, QuoteConvertError } from "../services/quote-conver
 import { DraftOrderError } from "../services/draft-order.server";
 import { issueBuyerQuoteLink } from "../services/buyer-sign-in-link.server";
 import { replyLockFor } from "../services/plan-limits.server";
+import { emailQuoteSent } from "../services/quote-emails.server";
 import { emailCopy } from "../lib/email-delivery";
 import { useEmailDelivery } from "../lib/use-email-delivery";
 import { CopyPanel } from "../components/CopyPanel";
 import { renderQuotePdf } from "../services/quote-pdf.server";
 import { duplicateQuote, QuoteNotFoundForShopError } from "../services/quote-duplicate.server";
-import { emailDeliveryEnabled, sendEmail } from "../services/mailer.server";
+import { emailDeliveryEnabled, lastDeliveryFor, sendEmail } from "../services/mailer.server";
 import { appendEvent } from "../services/events.server";
 import { getCatalog } from "../services/catalog.server";
 import { QUOTE_OPS_ENABLED } from "../lib/quote-ops";
@@ -81,6 +83,7 @@ import { quoteStatusBadge } from "../lib/quote-status";
 import { formatDate, formatMoney } from "../lib/format";
 import type { loader as totalsLoader } from "./app.quote-totals.$id";
 import { upgradeUrl } from "../lib/upgrade";
+import { TEMPLATE_INFO } from "../lib/notification-templates";
 
 const IS_TEST = process.env.NODE_ENV !== "production";
 // Dark-launch flag for Feature 1. AI UI + action are inert unless this is on.
@@ -97,6 +100,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   // Past a capped plan's quote limit the request is saved but can't be answered
   // until the merchant upgrades (plan-limits.server.ts canReplyToQuote).
   const replyLock = await replyLockFor(session.shop, quote.id);
+  // The last email Mannon tried to send about this quote, so a failure shows here.
+  const shopRow = await prisma.shop.findUnique({ where: { shopifyDomain: session.shop }, select: { id: true } });
+  const lastEmail = shopRow ? await lastDeliveryFor(shopRow.id, "Quote", quote.id) : null;
   // Dual-mode gating: Growth/Scale included, Starter on a one-time 7-day trial,
   // Free/expired locked. Read-only here — the trial is only *started* in the
   // action, on first real use (never on a page view).
@@ -121,6 +127,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     access,
     quoteOpsEnabled: QUOTE_OPS_ENABLED(),
     replyLock,
+    lastEmail: lastEmail
+      ? { ...lastEmail, label: TEMPLATE_INFO[lastEmail.template ?? ""]?.label ?? "Email", createdAt: lastEmail.createdAt.toISOString() }
+      : null,
     suggestions,
     quote: {
       id: quote.id,
@@ -187,7 +196,9 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
       html: "<p>Your quote is attached as a PDF.</p>",
       text: "Your quote is attached as a PDF.",
       attachments: [{ filename: pdf.filename, content: pdf.bytes, contentType: "application/pdf" }],
-    });
+      fromName: await shopNameFor(session.shop),
+      tag: "quote_pdf",
+    }, { shopId: pdf.shopId, template: "quote_pdf", entityType: "Quote", entityId: quoteId });
     // Only claim a send that happened.
     if (!sent.sent) {
       return { ok: false as const, kind: "quote" as const, error: "The quote PDF couldn’t be emailed. Use Copy buyer link or Download PDF and send it yourself." };
@@ -313,15 +324,23 @@ export const action = async ({ request, params }: ActionFunctionArgs) => {
         return { ok: false as const, kind: "quote" as const, error: parsed.error };
       }
       await counterQuoteForShop(session.shop, quoteId, parsed.lines);
-      // Mannon sends no email for a counter, so hand the merchant the buyer's
-      // sign-in link (it opens this quote) to send themselves.
+      // Email the buyer the quote with a sign-in link. When it doesn't go out
+      // (no sender connected, or the send failed) the merchant gets the link
+      // to copy, and a failure is said plainly.
       const baseUrl = process.env.SHOPIFY_APP_URL || new URL(request.url).origin;
-      const link = await issueBuyerQuoteLink(session.shop, quoteId, baseUrl);
+      const emailed = await emailQuoteSent(quoteId, baseUrl);
+      if (emailed?.result.sent) {
+        return { ok: true as const, kind: "quote" as const, message: `Quote sent to ${emailed.to}.` };
+      }
+      const link = emailed?.link ?? null;
+      const failed = emailed?.result.error;
       return {
         ok: true as const,
         kind: "quote" as const,
-        message: "Counter saved. No email was sent: copy the buyer’s link below and send it to them.",
-        buyerLink: link ? { url: link.url, email: link.buyerEmail, expiresAt: link.expiresAt.toISOString() } : undefined,
+        message: failed
+          ? `Counter saved, but the email to ${emailed?.to} wasn’t delivered (${failed.replace(/[.\s]+$/, "")}). Copy the buyer’s link below and send it yourself.`
+          : "Counter saved. No email was sent: copy the buyer’s link below and send it to them.",
+        buyerLink: link && emailed ? { url: link.url, email: emailed.to, expiresAt: link.expiresAt } : undefined,
       };
     }
 
@@ -399,7 +418,7 @@ function UpsellBundle({ quoteId }: { quoteId: string }) {
 }
 
 export default function QuoteDetail() {
-  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions, replyLock } = useLoaderData<typeof loader>();
+  const { quote, aiEnabled, access, quoteOpsEnabled, suggestions, replyLock, lastEmail } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const aiFetcher = useFetcher<typeof action>();
@@ -529,6 +548,15 @@ export default function QuoteDetail() {
           </Banner>
         )}
         {quoteAction && quoteAction.ok && quoteAction.message && <Banner tone="success" title={quoteAction.message} />}
+        {lastEmail && lastEmail.status === "FAILED" && !buyerLink && (
+          <Banner
+            tone="warning"
+            title={`The last email to ${lastEmail.to} wasn’t delivered`}
+            action={{ content: "Copy buyer link", onAction: () => post("buyer-link") }}
+          >
+            <p>{`${lastEmail.label}: ${(lastEmail.error ?? "the email provider refused it").replace(/[.\s]+$/, "")}. Copy the buyer’s sign-in link and send it yourself.`}</p>
+          </Banner>
+        )}
         {replyLock && (
           <Banner tone="warning" title="Upgrade to reply to this quote" action={{ content: "See plans", url: upgradeUrl(replyLock.upgradeTo) }}>
             <p>{replyLock.message}</p>
@@ -750,6 +778,9 @@ export default function QuoteDetail() {
                   <Text as="p" fontWeight="semibold">{quote.companyName}</Text>
                   <Text as="p" tone="subdued">{quote.buyerEmail}</Text>
                   {quote.poReference && <Text as="p" tone="subdued">PO {quote.poReference}</Text>}
+                  {lastEmail && lastEmail.status === "SENT" && (
+                    <Text as="p" tone="subdued" variant="bodySm">{`Last email: ${lastEmail.label}, sent ${formatDate(lastEmail.createdAt)}`}</Text>
+                  )}
                 </BlockStack>
               </Card>
               <Card>

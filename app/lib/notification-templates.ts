@@ -14,7 +14,7 @@ export const TEMPLATE_GROUPS: TemplateGroup[] = [
     id: "quotes",
     title: "Quotes and follow-ups",
     description: "Messages about a quote while it is open.",
-    keys: ["quote_request_ack", "quote_request_created", "followup_reminder", "followup_expiry_warning", "followup_expired", "weekly_digest"],
+    keys: ["quote_request_ack", "quote_request_created", "quote_sent", "quote_ordered", "followup_reminder", "followup_expiry_warning", "followup_expired", "weekly_digest"],
   },
   {
     id: "payments",
@@ -70,6 +70,8 @@ export const TEMPLATE_INFO: Record<string, { label: string; to: "Buyer" | "You" 
   rep_order_placed: { label: "Order placed by your rep", to: "Buyer" },
   quote_request_created: { label: "New storefront request", to: "You" },
   quote_request_ack: { label: "Request received", to: "Visitor" },
+  quote_sent: { label: "Quote ready (prices sent)", to: "Buyer" },
+  quote_ordered: { label: "Order placed", to: "Buyer" },
   deposit_received: { label: "Deposit received", to: "Buyer" },
   installment_due: { label: "Installment due", to: "Buyer" },
   installment_overdue: { label: "Installment overdue", to: "Buyer" },

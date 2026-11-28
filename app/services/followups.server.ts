@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { shopNameFor } from "./shop-name.server";
 import type { FollowupKind } from "@prisma/client";
 import prisma from "../db.server";
 import { appendEvent } from "./events.server";
@@ -48,13 +49,14 @@ export async function getPolicy(shopDomain: string): Promise<FollowupPolicy & { 
     expiryDays: p?.expiryDays ?? DEFAULT_POLICY.expiryDays,
     cadenceDays: p?.cadenceDays ?? DEFAULT_POLICY.cadenceDays,
     maxNudges: p?.maxNudges ?? DEFAULT_POLICY.maxNudges,
+    expiryWarningDays: p?.expiryWarningDays ?? 1,
     planMax,
   };
 }
 
 export async function upsertPolicy(
   shopDomain: string,
-  input: { enabled: boolean; expiryDays: number; cadenceDays: number[]; maxNudges: number },
+  input: { enabled: boolean; expiryDays: number; cadenceDays: number[]; maxNudges: number; expiryWarningDays?: number },
 ): Promise<void> {
   const shop = await prisma.shop.findUnique({ where: { shopifyDomain: shopDomain }, select: { id: true } });
   if (!shop) return;
@@ -66,6 +68,30 @@ export async function upsertPolicy(
 }
 
 // --- scheduling --------------------------------------------------------------
+
+/**
+ * After the merchant changes "Expiry reminder (days before)", move the pending
+ * reminder on every open quote. A quote that already had its reminder isn't
+ * given another (one per quote), and one whose new time has passed gets none.
+ */
+export async function rescheduleExpiryWarnings(shopDomain: string, now: Date = new Date()): Promise<number> {
+  const policy = await getPolicy(shopDomain);
+  const quotes = await prisma.quote.findMany({
+    where: { company: { shop: { shopifyDomain: shopDomain } }, status: { in: ACTIVE } },
+    select: { id: true, createdAt: true, expiresAt: true, followups: { where: { kind: "EXPIRY_WARNING" }, select: { status: true } } },
+  });
+  let scheduled = 0;
+  const warnDays = Math.max(0, Math.min(30, Math.round(policy.expiryWarningDays ?? 1)));
+  for (const q of quotes) {
+    await prisma.quoteFollowup.deleteMany({ where: { quoteId: q.id, kind: "EXPIRY_WARNING", status: "SCHEDULED" } });
+    if (!policy.enabled || warnDays === 0 || q.followups.some((f) => f.status === "SENT")) continue;
+    const warnAt = new Date(q.expiresAt.getTime() - warnDays * 24 * 60 * 60 * 1000);
+    if (warnAt <= now || warnAt <= q.createdAt) continue;
+    await prisma.quoteFollowup.create({ data: { quoteId: q.id, kind: "EXPIRY_WARNING", scheduledFor: warnAt } });
+    scheduled++;
+  }
+  return scheduled;
+}
 
 /** (Re)build the SCHEDULED follow-ups for a quote from the shop policy. */
 export async function scheduleForQuote(quoteId: string): Promise<void> {
@@ -174,6 +200,15 @@ export async function dispatchForShop(shopDomain: string, baseUrl: string, now: 
       continue;
     }
 
+    // One expiry reminder per quote, even if a run repeats or the schedule was rebuilt.
+    if (f.kind === "EXPIRY_WARNING") {
+      const already = await prisma.quoteFollowup.count({ where: { quoteId: quote.id, kind: "EXPIRY_WARNING", status: "SENT" } });
+      if (already > 0) {
+        await prisma.quoteFollowup.update({ where: { id: f.id }, data: { status: "CANCELLED" } });
+        continue;
+      }
+    }
+
     const key = f.kind === "EXPIRY_WARNING" ? "followup_expiry_warning" : "followup_reminder";
     const template = resolveTemplate(key, shop.emailTemplates);
     const { subject, body } = renderTemplate(template, {
@@ -181,9 +216,18 @@ export async function dispatchForShop(shopDomain: string, baseUrl: string, now: 
       quoteUrl: `${baseUrl}/portal/quotes/${quote.id}`,
       expiresAt: quote.expiresAt.toISOString().slice(0, 10),
       unsubscribeUrl: `${baseUrl}/portal/unsubscribe/${quote.id}?t=${unsubscribeToken(quote.id)}`,
-      shopName: shopDomain,
+      shopName: await shopNameFor(shopDomain),
     });
-    await sendEmail({ to: quote.buyer.email, subject, html: body, text: body });
+    const delivery = await sendEmail(
+      { to: quote.buyer.email, subject, html: body.replace(/\n/g, "<br>"), text: body, fromName: await shopNameFor(shopDomain), tag: key },
+      { shopId: shop.id, template: key, entityType: "Quote", entityId: quote.id },
+    );
+    // A failed send stays SCHEDULED, so the next run retries it (and the quote
+    // shows the failure with its copy link meanwhile).
+    if (!delivery.sent) {
+      skipped++;
+      continue;
+    }
     await prisma.quoteFollowup.update({ where: { id: f.id }, data: { status: "SENT", sentAt: now } });
     await appendEvent({
       shopId: shop.id,
@@ -259,7 +303,10 @@ export async function sendNow(
   const now = options.now ?? new Date();
   const reminder = await buildReminder(shopDomain, quoteId, baseUrl, options.customBody);
   if (!reminder) return false;
-  const result = await sendEmail({ to: reminder.to, subject: reminder.subject, html: reminder.body, text: reminder.body });
+  const result = await sendEmail(
+    { to: reminder.to, subject: reminder.subject, html: reminder.body.replace(/\n/g, "<br>"), text: reminder.body, fromName: await shopNameFor(shopDomain), tag: "followup_reminder" },
+    { shopId: reminder.shopId, template: "followup_reminder", entityType: "Quote", entityId: quoteId },
+  );
   // Only record a send that happened.
   if (!result.sent) return false;
   await recordManualReminder(reminder.shopId, quoteId, now, "email");
@@ -319,7 +366,7 @@ async function buildReminder(
     quoteUrl,
     expiresAt: owned.expiresAt.toISOString().slice(0, 10),
     unsubscribeUrl,
-    shopName: shopDomain,
+    shopName: await shopNameFor(shopDomain),
   });
   const custom = customBody?.trim();
   const body = custom
