@@ -137,7 +137,11 @@ function StorefrontCard({ status }: { status: StorefrontStatus }) {
           {status.lastRequestAt ? ` Last request: ${formatDate(status.lastRequestAt)}.` : ""}
         </Text>
         <InlineStack>
-          <Button url={status.primary.url} target={status.primary.external ? "_top" : undefined}>
+          <Button
+            url={status.primary.url}
+            target={status.primary.newTab ? "_blank" : undefined}
+            accessibilityLabel={status.primary.newTab ? "Open the theme editor in a new tab with the Request a Quote block placed" : undefined}
+          >
             {status.primary.content}
           </Button>
         </InlineStack>

@@ -90,7 +90,7 @@ describe("storefrontStatus", () => {
   it("points to the theme editor when the button is on but no request has arrived", () => {
     const s = storefrontStatus({ featureOn: true, buttonOn: true, lastRequestAt: null, themeEditorUrl: editor });
     expect(s?.label).toBe("Quote button: on");
-    expect(s?.primary).toEqual({ content: "Open theme editor", url: editor, external: true });
+    expect(s?.primary).toEqual({ content: "Open theme editor", url: editor, newTab: true });
   });
 
   it("shows the last request as proof it is live", () => {

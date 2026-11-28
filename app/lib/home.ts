@@ -200,7 +200,7 @@ export interface StorefrontStatus {
   /** One plain sentence about what this means for buyers. */
   detail: string;
   lastRequestAt: string | null;
-  primary: { content: string; url: string; external?: boolean };
+  primary: { content: string; url: string; /** Opens in a new tab (the theme editor), like StorefrontSetupCard. */ newTab?: boolean };
 }
 
 /**
@@ -228,7 +228,7 @@ export function storefrontStatus(i: StorefrontStatusInput): StorefrontStatus | n
     lastRequestAt: i.lastRequestAt,
     primary: i.lastRequestAt || !i.themeEditorUrl
       ? { content: "Button settings", url: "/app/quote-requests?setup=1" }
-      : { content: "Open theme editor", url: i.themeEditorUrl, external: true },
+      : { content: "Open theme editor", url: i.themeEditorUrl, newTab: true },
   };
 }
 
